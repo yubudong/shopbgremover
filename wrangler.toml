@@ -1,4 +1,12 @@
-name = "shopbgremover"
+name = "shopbgremover-api"
+main = "worker/index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shopbgremover-db"
+database_id = "f9c622b0-9360-48c1-a2a6-36e51b93d3de"
+
+[vars]
+FRONTEND_URL = "https://shopbgremover.com"
