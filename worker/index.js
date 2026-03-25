@@ -1,10 +1,10 @@
 // Cloudflare Worker - shopbgremover API backend
 // Handles: Google OAuth, session, credits, history
 
-const GOOGLE_CLIENT_ID = '346511510193-lbstnvotup93lfumjci8c7us1ooj542s.apps.googleusercontent.com';
-const GOOGLE_CLIENT_SECRET = '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';
-const REDIRECT_URI = 'https://shopbgremover.com/auth/callback';
-const FRONTEND_URL = 'https://shopbgremover.com';
+// Secrets are injected via Cloudflare Worker environment variables
+// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REMOVE_BG_API_KEY, JWT_SECRET
+const REDIRECT_URI = 'https://www.shopbgremover.com/auth/callback';
+const FRONTEND_URL = 'https://www.shopbgremover.com';
 const FREE_DAILY_LIMIT = 3;
 
 // ── CORS headers ──────────────────────────────────────────────
@@ -75,7 +75,7 @@ export default {
     // GET /auth/login → redirect to Google
     if (url.pathname === '/auth/login') {
       const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: env.GOOGLE_CLIENT_ID,
         redirect_uri: REDIRECT_URI,
         response_type: 'code',
         scope: 'openid email profile',
@@ -93,7 +93,7 @@ export default {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+          code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET,
           redirect_uri: REDIRECT_URI, grant_type: 'authorization_code',
         }),
       });
@@ -184,6 +184,37 @@ export default {
         `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
       ).bind(user.sub).run();
       return json({ ok: true, remaining: credits.credits - 1 }, 200, origin);
+    }
+
+    // POST /api/remove-bg → proxy to Remove.bg with server-side API key
+    if (url.pathname === '/api/remove-bg' && request.method === 'POST') {
+      const creditRes = await fetch(`${url.origin}/api/use-credit`, {
+        method: 'POST',
+        headers: request.headers,
+      });
+
+      const formData = await request.formData();
+      const removeForm = new FormData();
+      removeForm.append('image_file', formData.get('image_file'));
+      removeForm.append('type', 'product');
+      const bgColor = formData.get('bg_color');
+      if (bgColor) removeForm.append('bg_color', bgColor);
+
+      const res = await fetch('https://api.remove.bg/v1.0/removebg', {
+        method: 'POST',
+        headers: { 'X-Api-Key': env.REMOVE_BG_API_KEY },
+        body: removeForm,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        return json({ error: txt }, res.status, origin);
+      }
+
+      const buffer = await res.arrayBuffer();
+      return new Response(buffer, {
+        headers: { 'Content-Type': 'image/png', ...cors(origin) },
+      });
     }
 
     // GET /api/history → processing history
