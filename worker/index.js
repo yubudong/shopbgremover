@@ -3,7 +3,7 @@
 
 // Secrets are injected via Cloudflare Worker environment variables
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REMOVE_BG_API_KEY, JWT_SECRET
-const REDIRECT_URI = 'https://www.shopbgremover.com/auth/callback';
+const REDIRECT_URI = 'https://shopbgremover-api.yubudong2023.workers.dev/auth/callback';
 const FRONTEND_URL = 'https://www.shopbgremover.com';
 const FREE_DAILY_LIMIT = 3;
 
@@ -113,7 +113,7 @@ export default {
 
       // Init credits if new user
       await env.DB.prepare(
-        `INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 20)`
+        `INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 5)`
       ).bind(profile.id).run();
 
       const token = await signJWT(
@@ -239,6 +239,89 @@ export default {
         `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
       ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
       return json({ ok: true, id }, 200, origin);
+    }
+
+    // POST /api/paypal/create-order → create PayPal order
+    if (url.pathname === '/api/paypal/create-order' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return json({ error: 'Unauthorized' }, 401, origin);
+      
+      const { plan } = await request.json();
+      const PLANS = {
+        starter: { amount: '9.90', credits: 50 },
+        pro: { amount: '19.90', credits: 100 },
+        credits_25: { amount: '5.00', credits: 25 },
+      };
+      
+      if (!PLANS[plan]) return json({ error: 'Invalid plan' }, 400, origin);
+      
+      const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
+      const orderRes = await fetch('https://api-m.sandbox.paypal.com/v2/checkout/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${auth}`,
+        },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [{
+            amount: { currency_code: 'USD', value: PLANS[plan].amount },
+            description: `ShopBG Remover - ${plan}`,
+          }],
+          application_context: {
+            return_url: `${FRONTEND_URL}/payment/success`,
+            cancel_url: `${FRONTEND_URL}/payment/cancel`,
+          },
+        }),
+      });
+      
+      const order = await orderRes.json();
+      if (!order.id) return json({ error: 'PayPal order creation failed' }, 500, origin);
+      
+      // Save order to DB
+      await env.DB.prepare(
+        `INSERT INTO orders (id, user_id, plan, amount, status) VALUES (?, ?, ?, ?, 'pending')`
+      ).bind(order.id, user.sub, plan, PLANS[plan].amount).run();
+      
+      return json({ orderId: order.id, approveUrl: order.links.find(l => l.rel === 'approve')?.href }, 200, origin);
+    }
+
+    // POST /api/paypal/capture-order → capture payment and add credits
+    if (url.pathname === '/api/paypal/capture-order' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return json({ error: 'Unauthorized' }, 401, origin);
+      
+      const { orderId } = await request.json();
+      const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
+      
+      const captureRes = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
+      });
+      
+      const capture = await captureRes.json();
+      if (capture.status !== 'COMPLETED') return json({ error: 'Payment not completed' }, 400, origin);
+      
+      // Get order from DB
+      const order = await env.DB.prepare(`SELECT plan FROM orders WHERE id = ?`).bind(orderId).first();
+      if (!order) return json({ error: 'Order not found' }, 404, origin);
+      
+      const PLANS = {
+        starter: 50,
+        pro: 100,
+        credits_25: 25,
+      };
+      
+      const credits = PLANS[order.plan];
+      await env.DB.prepare(
+        `UPDATE user_credits SET credits = credits + ? WHERE user_id = ?`
+      ).bind(credits, user.sub).run();
+      
+      await env.DB.prepare(
+        `UPDATE orders SET status = 'completed' WHERE id = ?`
+      ).bind(orderId).run();
+      
+      return json({ ok: true, credits }, 200, origin);
     }
 
     return json({ error: 'Not found' }, 404, origin);

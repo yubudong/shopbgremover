@@ -4,172 +4,130 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ShopBG Remover – AI Background Removal for Shopify</title>
+  <meta name="description" content="AI-powered batch background removal for Shopify, Amazon and eBay product images. Remove backgrounds in seconds." />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=AcmSZ0H7fc4uqW1XqQeg-AkGKzXhm5XYESw6YktDytpJpyKlkf8xA6Fg5RTDgPqyiLNfxpF59wd7Ibtj&currency=USD"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f5f7fa;
-      min-height: 100vh;
-      padding: 40px 20px;
-      color: #1a1a1a;
-    }
-    .container { max-width: 800px; margin: 0 auto; }
-    .header { text-align: center; margin-bottom: 36px; }
-    .header h1 { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
-    .header p { color: #64748b; margin-top: 8px; font-size: 1rem; }
-    .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 36px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
-    }
-    .upload-area {
-      border: 2px dashed #cbd5e1;
-      border-radius: 10px;
-      padding: 48px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 24px;
-      background: #f8fafc;
-    }
-    .upload-area:hover, .upload-area.drag-over {
-      border-color: #0070f3;
-      background: #eff6ff;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; min-height: 100vh; color: #1a1a1a; }
+
+    /* NAV */
+    nav { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .nav-logo { font-size: 18px; font-weight: 800; color: #0f172a; text-decoration: none; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .credits-tag { background: #fef3c7; color: #92400e; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .nav-user { font-size: 13px; color: #64748b; }
+    .btn-nav { padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; display: inline-block; }
+    .btn-nav-outline { background: #f1f5f9; color: #334155; }
+    .btn-nav-outline:hover { background: #e2e8f0; }
+    .btn-nav-primary { background: #0070f3; color: #fff; }
+    .btn-nav-primary:hover { background: #0051cc; }
+
+    /* HERO */
+    .hero { text-align: center; padding: 56px 20px 40px; }
+    .hero h1 { font-size: 2.4rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
+    .hero p { color: #64748b; margin-top: 12px; font-size: 1.05rem; max-width: 520px; margin-left: auto; margin-right: auto; }
+
+    /* MAIN CARD */
+    .container { max-width: 820px; margin: 0 auto; padding: 0 20px 60px; }
+    .card { background: #fff; border-radius: 16px; padding: 36px; box-shadow: 0 4px 24px rgba(0,0,0,0.07); }
+
+    /* UPLOAD */
+    .upload-area { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 48px 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 24px; background: #f8fafc; }
+    .upload-area:hover, .upload-area.drag-over { border-color: #0070f3; background: #eff6ff; }
     .upload-area .icon { font-size: 2.5rem; margin-bottom: 12px; }
     .upload-area p { color: #64748b; font-size: 0.95rem; }
     .upload-area strong { color: #0f172a; }
     #fileInput { display: none; }
-    .options-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    @media (max-width: 640px) {
-      .options-grid { grid-template-columns: 1fr; }
-    }
+
+    /* OPTIONS */
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 640px) { .options-grid { grid-template-columns: 1fr; } .hero h1 { font-size: 1.8rem; } }
     .option-group { display: flex; flex-direction: column; gap: 6px; }
     .option-group label { font-size: 13px; font-weight: 600; color: #374151; }
-    .option-group select {
-      padding: 9px 12px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 14px;
-      color: #1a1a1a;
-      background: #fff;
-    }
-    .color-picker {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 6px;
-    }
-    .color-picker input[type='color'] {
-      width: 36px;
-      height: 36px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .color-input {
-      flex: 1;
-      padding: 8px 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: monospace;
-    }
-    .btn {
-      width: 100%;
-      padding: 15px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 16px;
-    }
+    .option-group select { padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #1a1a1a; background: #fff; }
+    .color-picker { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .color-picker input[type='color'] { width: 36px; height: 36px; border: none; border-radius: 4px; cursor: pointer; }
+    .color-input { flex: 1; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; font-family: monospace; }
+
+    /* CREDIT WARNING */
+    .credit-warning { background: #fef3c7; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #92400e; margin-bottom: 16px; }
+
+    /* BUTTONS */
+    .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
     .btn-primary { background: #0070f3; color: #fff; }
     .btn-primary:hover:not(:disabled) { background: #0051cc; }
     .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
     .btn-green { background: #16a34a; color: #fff; }
     .btn-green:hover { background: #15803d; }
-    .progress-track {
-      height: 8px;
-      background: #e2e8f0;
-      border-radius: 4px;
-      margin-bottom: 16px;
-      overflow: hidden;
-      display: none;
-    }
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #0070f3, #00b4d8);
-      border-radius: 4px;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-    .status {
-      text-align: center;
-      font-size: 14px;
-      color: #64748b;
-      margin-bottom: 16px;
-      min-height: 20px;
-    }
+
+    /* PROGRESS */
+    .progress-track { height: 8px; background: #e2e8f0; border-radius: 4px; margin-bottom: 16px; overflow: hidden; display: none; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #0070f3, #00b4d8); border-radius: 4px; width: 0%; transition: width 0.3s ease; }
+    .status { text-align: center; font-size: 14px; color: #64748b; margin-bottom: 16px; min-height: 20px; }
     .status.success { color: #16a34a; font-weight: 600; }
-    .status.error { color: #dc2626; }
-    .previews {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    .preview-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-    .preview-item img {
-      width: 90px;
-      height: 90px;
-      object-fit: contain;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 14px 14px;
-    }
-    .preview-name {
-      font-size: 11px;
-      color: #666;
-      max-width: 90px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .badge {
-      display: inline-block;
-      background: #f0fdf4;
-      color: #16a34a;
-      border: 1px solid #bbf7d0;
-      border-radius: 20px;
-      padding: 3px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    .footer { text-align: center; margin-top: 28px; color: #94a3b8; font-size: 12px; }
+
+    /* RESULTS */
+    .badge { display: inline-block; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+    .previews { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+    .preview-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .preview-item img { width: 90px; height: 90px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 14px 14px; }
+    .preview-name { font-size: 11px; color: #666; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* PRICING SECTION */
+    .pricing-section { margin-top: 60px; }
+    .pricing-section h2 { text-align: center; font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+    .pricing-section .sub { text-align: center; color: #64748b; margin-bottom: 36px; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 700px) { .pricing-grid { grid-template-columns: 1fr; } }
+    .plan-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 28px 24px; text-align: center; position: relative; }
+    .plan-card.popular { border-color: #0070f3; }
+    .popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #0070f3; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 14px; border-radius: 20px; white-space: nowrap; }
+    .plan-name { font-size: 1rem; font-weight: 700; color: #374151; margin-bottom: 8px; }
+    .plan-price { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
+    .plan-price span { font-size: 1rem; font-weight: 400; color: #64748b; }
+    .plan-credits { color: #64748b; font-size: 14px; margin: 8px 0 20px; }
+    .plan-features { list-style: none; text-align: left; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+    .plan-features li { font-size: 14px; color: #374151; }
+    .plan-features li::before { content: '✓ '; color: #16a34a; font-weight: 700; }
+    .btn-plan { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+    .btn-plan-primary { background: #0070f3; color: #fff; }
+    .btn-plan-primary:hover { background: #0051cc; }
+    .btn-plan-outline { background: #f1f5f9; color: #334155; }
+    .btn-plan-outline:hover { background: #e2e8f0; }
+    #paypal-container { margin-top: 12px; }
+
+    /* MODAL */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+    .modal.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 16px; padding: 36px; max-width: 420px; width: 90%; text-align: center; }
+    .modal-box h3 { font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; }
+    .modal-box p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+    /* FOOTER */
+    footer { text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>🛒 ShopBG Remover</h1>
-      <p>AI-powered batch background removal for Shopify product images</p>
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="/">🛒 ShopBG Remover</a>
+    <div class="nav-right" id="navRight">
+      <a href="/pricing.html" class="btn-nav btn-nav-outline">Pricing</a>
+      <a href="https://shopbgremover-api.yubudong2023.workers.dev/auth/login" class="btn-nav btn-nav-primary" id="loginBtn">Sign in with Google</a>
     </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>AI Background Removal<br>for Shopify Sellers</h1>
+    <p>Upload up to 50 product images — get clean white or transparent backgrounds in seconds.</p>
+  </div>
+
+  <!-- MAIN -->
+  <div class="container">
     <div class="card">
       <div class="upload-area" id="uploadArea">
         <div class="icon">📁</div>
@@ -177,7 +135,7 @@
         <p style="margin-top:6px">JPG, PNG, WebP · Max 50 images</p>
         <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp" />
       </div>
-      
+
       <div class="options-grid">
         <div class="option-group">
           <label>Background</label>
@@ -191,7 +149,6 @@
             <input type="text" id="colorHex" class="color-input" value="#ffffff" placeholder="#ffffff" />
           </div>
         </div>
-        
         <div class="option-group">
           <label>Output Size</label>
           <select id="sizePreset">
@@ -201,17 +158,17 @@
             <option value="ebay">eBay (500×500)</option>
           </select>
         </div>
-        
         <div class="option-group">
           <label>File Naming</label>
           <select id="renameTemplate">
             <option value="original">Keep original name</option>
-            <option value="sequence">Sequence (01.png, 02.png...)</option>
-            <option value="date_sequence">Date + Sequence (20260317_01.png)</option>
+            <option value="sequence">Sequence (01.png...)</option>
+            <option value="date_seq">Date + Sequence</option>
           </select>
         </div>
       </div>
-      
+
+      <div class="credit-warning" id="creditWarning" style="display:none"></div>
       <div class="status" id="status">Select images to get started</div>
       <button class="btn btn-primary" id="processBtn" disabled>Remove Background</button>
       <div class="progress-track" id="progressTrack">
@@ -223,164 +180,302 @@
         <div class="previews" id="previews"></div>
       </div>
     </div>
-    <div class="footer">Powered by Remove.bg · ShopBG Remover v2.0</div>
+
+    <!-- PRICING -->
+    <div class="pricing-section" id="pricingSection">
+      <h2>Simple Pricing</h2>
+      <p class="sub">Pay per image. No hidden fees.</p>
+      <div class="pricing-grid">
+        <div class="plan-card">
+          <div class="plan-name">Starter</div>
+          <div class="plan-price">$9.9<span>/mo</span></div>
+          <div class="plan-credits">50 images/month</div>
+          <ul class="plan-features">
+            <li>All size presets</li>
+            <li>Custom background color</li>
+            <li>90-day history</li>
+            <li>Batch rename</li>
+          </ul>
+          <button class="btn-plan btn-plan-outline" onclick="startPayment('starter')">Get Starter</button>
+          <div id="paypal-starter"></div>
+        </div>
+        <div class="plan-card popular">
+          <div class="popular-badge">Most Popular</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">$19.9<span>/mo</span></div>
+          <div class="plan-credits">100 images/month</div>
+          <ul class="plan-features">
+            <li>Everything in Starter</li>
+            <li>Priority processing</li>
+            <li>Bulk ZIP download</li>
+            <li>Email support</li>
+          </ul>
+          <button class="btn-plan btn-plan-primary" onclick="startPayment('pro')">Get Pro</button>
+          <div id="paypal-pro"></div>
+        </div>
+        <div class="plan-card">
+          <div class="plan-name">Credits Pack</div>
+          <div class="plan-price">$5<span>/pack</span></div>
+          <div class="plan-credits">25 images · Never expire</div>
+          <ul class="plan-features">
+            <li>No subscription</li>
+            <li>Use anytime</li>
+            <li>All features included</li>
+            <li>Stack multiple packs</li>
+          </ul>
+          <button class="btn-plan btn-plan-outline" onclick="startPayment('credits_25')">Buy Credits</button>
+          <div id="paypal-credits_25"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script>
-    const API_KEY = 'XQ4tTk1g4cQMixrojMzJCw9R';
-    const SIZE_PRESETS = {
-      shopify: '2048x2048',
-      amazon: '1000x1000',
-      ebay: '500x500',
-      original: null
-    };
-    
-    let selectedFiles = [];
-    let processedResults = [];
+  <!-- UPGRADE MODAL -->
+  <div class="modal" id="upgradeModal">
+    <div class="modal-box">
+      <h3>⚡ Out of Credits</h3>
+      <p>You've used all your credits. Upgrade to keep processing images.</p>
+      <div class="modal-actions">
+        <button class="btn-nav btn-nav-outline" onclick="closeModal()">Maybe later</button>
+        <button class="btn-nav btn-nav-primary" onclick="closeModal(); document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})">See Plans</button>
+      </div>
+    </div>
+  </div>
 
-    const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('fileInput');
-    const processBtn = document.getElementById('processBtn');
-    const progressTrack = document.getElementById('progressTrack');
-    const progressBar = document.getElementById('progressBar');
-    const status = document.getElementById('status');
-    const resultsArea = document.getElementById('resultsArea');
-    const resultBadge = document.getElementById('resultBadge');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const previews = document.getElementById('previews');
-    const bgColor = document.getElementById('bgColor');
-    const colorPicker = document.getElementById('colorPicker');
-    const colorInput = document.getElementById('colorInput');
-    const colorHex = document.getElementById('colorHex');
-    const sizePreset = document.getElementById('sizePreset');
-    const renameTemplate = document.getElementById('renameTemplate');
+  <!-- LOGIN MODAL -->
+  <div class="modal" id="loginModal">
+    <div class="modal-box">
+      <h3>🔐 Sign in to Continue</h3>
+      <p>Sign in with Google to get 5 free credits and access all features.</p>
+      <div class="modal-actions">
+        <button class="btn-nav btn-nav-outline" onclick="closeModal()">Cancel</button>
+        <a href="https://shopbgremover-api.yubudong2023.workers.dev/auth/login" class="btn-nav btn-nav-primary">Sign in with Google</a>
+      </div>
+    </div>
+  </div>
 
-    bgColor.addEventListener('change', () => {
-      colorPicker.style.display = bgColor.value === 'custom' ? 'flex' : 'none';
-    });
-    
-    colorInput.addEventListener('input', (e) => colorHex.value = e.target.value);
-    colorHex.addEventListener('input', (e) => {
-      if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) colorInput.value = e.target.value;
-    });
+  <footer>Powered by Remove.bg · ShopBG Remover v2.0 · <a href="/pricing.html" style="color:#94a3b8">Pricing</a></footer>
 
-    uploadArea.addEventListener('click', () => fileInput.click());
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('drag-over');
-      handleFiles(Array.from(e.dataTransfer.files));
-    });
-    fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+<script>
+const WORKER = 'https://shopbgremover-api.yubudong2023.workers.dev';
+const SIZE_PRESETS = { shopify: '2048x2048', amazon: '1000x1000', ebay: '500x500', original: null };
 
-    function handleFiles(files) {
-      selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
-      if (selectedFiles.length) {
-        uploadArea.querySelector('p').innerHTML = `<strong>${selectedFiles.length} file(s) selected</strong>`;
-        processBtn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
-        processBtn.disabled = false;
-        status.textContent = 'Ready to process';
-        status.className = 'status';
-      }
+let currentUser = null;
+let currentCredits = 0;
+let selectedFiles = [];
+let processedResults = [];
+let freeUsed = parseInt(localStorage.getItem('freeUsed') || '0');
+const FREE_LIMIT = 3;
+
+// ── Init ──────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
+    const data = await res.json();
+    if (data.user) {
+      currentUser = data.user;
+      currentCredits = data.credits?.credits || 0;
+      renderNav();
     }
+  } catch(e) {}
+}
 
-    function getFileName(originalName, index) {
-      const template = renameTemplate.value;
-      if (template === 'sequence') {
-        return String(index + 1).padStart(2, '0') + '.png';
-      } else if (template === 'date_sequence') {
-        const d = new Date();
-        const date = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-        return `${date}_${String(index + 1).padStart(2, '0')}.png`;
-      }
-      return originalName.replace(/\.[^.]+$/, '') + '.png';
+function renderNav() {
+  const nav = document.getElementById('navRight');
+  if (currentUser) {
+    nav.innerHTML = `
+      <span class="credits-tag">⚡ ${currentCredits} credits</span>
+      <span class="nav-user">${currentUser.name}</span>
+      <a href="/pricing.html" class="btn-nav btn-nav-outline">Pricing</a>
+      <a href="${WORKER}/auth/logout" class="btn-nav btn-nav-outline">Sign out</a>
+    `;
+  }
+}
+
+// ── File handling ─────────────────────────────────────────────
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const processBtn = document.getElementById('processBtn');
+const bgColor = document.getElementById('bgColor');
+const colorPicker = document.getElementById('colorPicker');
+const colorInput = document.getElementById('colorInput');
+const colorHex = document.getElementById('colorHex');
+
+bgColor.addEventListener('change', () => {
+  colorPicker.style.display = bgColor.value === 'custom' ? 'flex' : 'none';
+});
+colorInput.addEventListener('input', e => colorHex.value = e.target.value);
+colorHex.addEventListener('input', e => { if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) colorInput.value = e.target.value; });
+
+uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('drag-over'); handleFiles(Array.from(e.dataTransfer.files)); });
+fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+
+function handleFiles(files) {
+  selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
+  if (!selectedFiles.length) return;
+  uploadArea.querySelector('p').innerHTML = `<strong>${selectedFiles.length} file(s) selected</strong>`;
+  processBtn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
+  processBtn.disabled = false;
+  document.getElementById('status').textContent = 'Ready to process';
+  updateCreditWarning();
+}
+
+function updateCreditWarning() {
+  const warn = document.getElementById('creditWarning');
+  if (!selectedFiles.length) { warn.style.display = 'none'; return; }
+  if (currentUser) {
+    warn.style.display = 'block';
+    warn.textContent = `This will use ${selectedFiles.length} credits. You have ${currentCredits} remaining.`;
+  } else {
+    const remaining = FREE_LIMIT - freeUsed;
+    warn.style.display = 'block';
+    warn.textContent = `Free users: ${remaining} image${remaining !== 1 ? 's' : ''} remaining today. Sign in for more.`;
+  }
+}
+
+function getFileName(originalName, index) {
+  const t = document.getElementById('renameTemplate').value;
+  if (t === 'sequence') return String(index + 1).padStart(2, '0') + '.png';
+  if (t === 'date_seq') {
+    const d = new Date();
+    const date = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    return `${date}_${String(index + 1).padStart(2, '0')}.png`;
+  }
+  return originalName.replace(/\.[^.]+$/, '') + '.png';
+}
+
+// ── Process ───────────────────────────────────────────────────
+processBtn.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+
+  // Credit check for free users
+  if (!currentUser && freeUsed >= FREE_LIMIT) {
+    openModal('loginModal'); return;
+  }
+
+  processBtn.disabled = true;
+  document.getElementById('progressTrack').style.display = 'block';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('previews').innerHTML = '';
+  processedResults = [];
+  let errors = 0;
+
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const file = selectedFiles[i];
+    document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${file.name}`;
+    document.getElementById('progressBar').style.width = (i / selectedFiles.length * 100) + '%';
+
+    // Check credit before each image
+    const creditRes = await fetch(`${WORKER}/api/use-credit`, { method: 'POST', credentials: 'include' });
+    const creditData = await creditRes.json();
+    if (!creditData.ok) {
+      if (creditData.reason === 'no_credits') { openModal('upgradeModal'); break; }
+      if (creditData.reason === 'free_limit') { openModal('loginModal'); break; }
+      break;
     }
+    if (!currentUser) { freeUsed++; localStorage.setItem('freeUsed', freeUsed); }
+    else { currentCredits = creditData.remaining; renderNav(); }
 
-    processBtn.addEventListener('click', async () => {
-      if (!selectedFiles.length) return;
-      processBtn.disabled = true;
-      progressTrack.style.display = 'block';
-      resultsArea.style.display = 'none';
-      previews.innerHTML = '';
-      processedResults = [];
-      let errors = 0;
+    const formData = new FormData();
+    formData.append('image_file', file);
+    formData.append('type', 'product');
+    const bg = bgColor.value;
+    if (bg === 'white') formData.append('bg_color', 'ffffff');
+    else if (bg === 'custom') formData.append('bg_color', colorHex.value.replace('#', ''));
+    const size = SIZE_PRESETS[document.getElementById('sizePreset').value];
+    if (size) formData.append('size', size);
 
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        status.textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${file.name}`;
-        const pct = (i / selectedFiles.length) * 100;
-        progressBar.style.width = pct + '%';
+    try {
+      const res = await fetch(`${WORKER}/api/remove-bg`, { method: 'POST', credentials: 'include', body: formData });
+      if (res.ok) {
+        const blob = await res.blob();
+        const name = getFileName(file.name, i);
+        processedResults.push({ name, blob });
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(blob);
+        const span = document.createElement('span');
+        span.className = 'preview-name';
+        span.textContent = name;
+        item.append(img, span);
+        document.getElementById('previews').appendChild(item);
+      } else { errors++; }
+    } catch { errors++; }
+  }
 
-        const formData = new FormData();
-        formData.append('image_file', file);
-        formData.append('type', 'product');
-        
-        const bg = bgColor.value;
-        if (bg === 'white') {
-          formData.append('bg_color', 'ffffff');
-        } else if (bg === 'custom') {
-          formData.append('bg_color', colorHex.value.replace('#', ''));
-        }
-        
-        const size = SIZE_PRESETS[sizePreset.value];
-        if (size) formData.append('size', size);
+  document.getElementById('progressBar').style.width = '100%';
+  const ok = processedResults.length;
+  document.getElementById('status').textContent = `✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`;
+  document.getElementById('status').className = 'status success';
+  document.getElementById('resultBadge').textContent = `${ok} image${ok !== 1 ? 's' : ''} ready`;
+  document.getElementById('resultsArea').style.display = 'block';
+  processBtn.disabled = false;
 
-        try {
-          const res = await fetch('https://api.remove.bg/v1.0/removebg', {
-            method: 'POST',
-            headers: { 'X-Api-Key': API_KEY },
-            body: formData
-          });
-          if (res.ok) {
-            const blob = await res.blob();
-            const name = getFileName(file.name, i);
-            processedResults.push({ name, blob });
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(blob);
-            img.title = name;
-            const item = document.createElement('div');
-            item.className = 'preview-item';
-            item.appendChild(img);
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'preview-name';
-            nameSpan.textContent = name;
-            item.appendChild(nameSpan);
-            previews.appendChild(item);
-          } else {
-            const txt = await res.text();
-            console.error('API error:', txt);
-            errors++;
-          }
-        } catch (e) {
-          console.error('Fetch error:', e);
-          errors++;
-        }
+  if (currentUser && ok > 0) {
+    fetch(`${WORKER}/api/history`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_count: ok, settings: { bgColor: bg, sizePreset: document.getElementById('sizePreset').value } }),
+    });
+  }
+});
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  if (!processedResults.length) return;
+  document.getElementById('downloadBtn').textContent = 'Zipping...';
+  const zip = new JSZip();
+  processedResults.forEach(r => zip.file(r.name, r.blob));
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'shopbg-processed.zip'; a.click();
+  URL.revokeObjectURL(url);
+  document.getElementById('downloadBtn').textContent = '⬇️ Download All as ZIP';
+});
+
+// ── PayPal ────────────────────────────────────────────────────
+async function startPayment(plan) {
+  if (!currentUser) { openModal('loginModal'); return; }
+  const containerId = `paypal-${plan}`;
+  document.getElementById(containerId).innerHTML = '';
+  paypal.Buttons({
+    createOrder: async () => {
+      const res = await fetch(`${WORKER}/api/paypal/create-order`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      return data.orderId;
+    },
+    onApprove: async (data) => {
+      const res = await fetch(`${WORKER}/api/paypal/capture-order`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: data.orderID }),
+      });
+      const result = await res.json();
+      if (result.ok) {
+        currentCredits += result.credits;
+        renderNav();
+        alert(`✅ Payment successful! ${result.credits} credits added.`);
       }
+    },
+    onError: (err) => { console.error(err); alert('Payment failed. Please try again.'); }
+  }).render(`#${containerId}`);
+}
 
-      progressBar.style.width = '100%';
-      const ok = processedResults.length;
-      status.textContent = `✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`;
-      status.className = 'status success';
-      resultBadge.textContent = `${ok} image${ok !== 1 ? 's' : ''} ready`;
-      resultsArea.style.display = 'block';
-      processBtn.disabled = false;
-    });
+// ── Modal ─────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
 
-    downloadBtn.addEventListener('click', async () => {
-      if (!processedResults.length) return;
-      downloadBtn.textContent = 'Zipping...';
-      const zip = new JSZip();
-      processedResults.forEach(r => zip.file(r.name, r.blob));
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'shopbg-processed.zip';
-      a.click();
-      URL.revokeObjectURL(url);
-      downloadBtn.textContent = '⬇️ Download All as ZIP';
-    });
-  </script>
+// ── Boot ──────────────────────────────────────────────────────
+init();
+</script>
 </body>
 </html>
