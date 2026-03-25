@@ -132,11 +132,16 @@ export default {
 
     // GET /auth/logout
     if (url.pathname === '/auth/logout') {
-      return new Response(null, {
-        status: 302,
+      return new Response(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <script>
+          document.cookie = 'session=; Path=/; Domain=.shopbgremover.com; Max-Age=0; Secure; SameSite=None';
+          document.cookie = 'session=; Path=/; Max-Age=0';
+          window.location.href = '${FRONTEND_URL}';
+        </script></head><body></body></html>`, {
+        status: 200,
         headers: {
-          Location: FRONTEND_URL,
-          'Set-Cookie': 'session=; Path=/; Max-Age=0',
+          'Content-Type': 'text/html',
+          'Set-Cookie': 'session=; Path=/; Domain=.shopbgremover.com; Max-Age=0; Secure; SameSite=None',
         },
       });
     }
