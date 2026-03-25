@@ -1,0 +1,215 @@
+// Cloudflare Worker - shopbgremover API backend
+// Handles: Google OAuth, session, credits, history
+
+const GOOGLE_CLIENT_ID = '346511510193-lbstnvotup93lfumjci8c7us1ooj542s.apps.googleusercontent.com';
+const GOOGLE_CLIENT_SECRET = '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';
+const REDIRECT_URI = 'https://shopbgremover.com/auth/callback';
+const FRONTEND_URL = 'https://shopbgremover.com';
+const FREE_DAILY_LIMIT = 3;
+
+// ── CORS headers ──────────────────────────────────────────────
+function cors(origin) {
+  return {
+    'Access-Control-Allow-Origin': origin || FRONTEND_URL,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
+
+function json(data, status = 200, origin) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...cors(origin) },
+  });
+}
+
+// ── JWT (simple HMAC-SHA256) ──────────────────────────────────
+async function signJWT(payload, secret) {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = btoa(JSON.stringify(payload));
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${header}.${body}`));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return `${header}.${body}.${sigB64}`;
+}
+
+async function verifyJWT(token, secret) {
+  try {
+    const [header, body, sig] = token.split('.');
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    );
+    const valid = await crypto.subtle.verify(
+      'HMAC', key,
+      Uint8Array.from(atob(sig), c => c.charCodeAt(0)),
+      new TextEncoder().encode(`${header}.${body}`)
+    );
+    if (!valid) return null;
+    const payload = JSON.parse(atob(body));
+    if (payload.exp && payload.exp < Date.now() / 1000) return null;
+    return payload;
+  } catch { return null; }
+}
+
+// ── Auth helper ───────────────────────────────────────────────
+async function getUser(request, env) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(/session=([^;]+)/);
+  if (!match) return null;
+  return verifyJWT(match[1], env.JWT_SECRET);
+}
+
+// ── Router ────────────────────────────────────────────────────
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: cors(origin) });
+    }
+
+    // GET /auth/login → redirect to Google
+    if (url.pathname === '/auth/login') {
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'offline',
+      });
+      return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 302);
+    }
+
+    // GET /auth/callback → exchange code for token
+    if (url.pathname === '/auth/callback') {
+      const code = url.searchParams.get('code');
+      if (!code) return Response.redirect(`${FRONTEND_URL}?error=no_code`, 302);
+
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: REDIRECT_URI, grant_type: 'authorization_code',
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenData.access_token) return Response.redirect(`${FRONTEND_URL}?error=token_failed`, 302);
+
+      const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const profile = await profileRes.json();
+
+      // Upsert user
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, name, avatar) VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name=excluded.name, avatar=excluded.avatar`
+      ).bind(profile.id, profile.email, profile.name, profile.picture).run();
+
+      // Init credits if new user
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 20)`
+      ).bind(profile.id).run();
+
+      const token = await signJWT(
+        { sub: profile.id, email: profile.email, name: profile.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
+        env.JWT_SECRET
+      );
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: FRONTEND_URL,
+          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
+        },
+      });
+    }
+
+    // GET /auth/logout
+    if (url.pathname === '/auth/logout') {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: FRONTEND_URL,
+          'Set-Cookie': 'session=; Path=/; Max-Age=0',
+        },
+      });
+    }
+
+    // GET /api/me → current user info + credits
+    if (url.pathname === '/api/me') {
+      const user = await getUser(request, env);
+      if (!user) return json({ user: null }, 200, origin);
+      const credits = await env.DB.prepare(
+        `SELECT credits, total_used FROM user_credits WHERE user_id = ?`
+      ).bind(user.sub).first();
+      return json({ user: { id: user.sub, email: user.email, name: user.name }, credits }, 200, origin);
+    }
+
+    // POST /api/use-credit → deduct 1 credit (or check free quota)
+    if (url.pathname === '/api/use-credit' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const today = new Date().toISOString().slice(0, 10);
+
+      if (!user) {
+        // Free quota check
+        const row = await env.DB.prepare(
+          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
+        ).bind(ip, today).first();
+        const count = row?.count || 0;
+        if (count >= FREE_DAILY_LIMIT) {
+          return json({ ok: false, reason: 'free_limit', message: 'Daily free limit reached. Sign in for more.' }, 403, origin);
+        }
+        await env.DB.prepare(
+          `INSERT INTO free_usage (ip, date, count) VALUES (?, ?, 1)
+           ON CONFLICT(ip) DO UPDATE SET count = count + 1, date = ?`
+        ).bind(ip, today, today).run();
+        return json({ ok: true, remaining: FREE_DAILY_LIMIT - count - 1 }, 200, origin);
+      }
+
+      // Paid user: deduct credit
+      const credits = await env.DB.prepare(
+        `SELECT credits FROM user_credits WHERE user_id = ?`
+      ).bind(user.sub).first();
+      if (!credits || credits.credits <= 0) {
+        return json({ ok: false, reason: 'no_credits', message: 'No credits remaining.' }, 403, origin);
+      }
+      await env.DB.prepare(
+        `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
+      ).bind(user.sub).run();
+      return json({ ok: true, remaining: credits.credits - 1 }, 200, origin);
+    }
+
+    // GET /api/history → processing history
+    if (url.pathname === '/api/history') {
+      const user = await getUser(request, env);
+      if (!user) return json({ error: 'Unauthorized' }, 401, origin);
+      const rows = await env.DB.prepare(
+        `SELECT id, file_count, created_at, settings_json FROM processing_history
+         WHERE user_id = ? AND created_at > unixepoch() - 7776000
+         ORDER BY created_at DESC LIMIT 50`
+      ).bind(user.sub).all();
+      return json({ history: rows.results }, 200, origin);
+    }
+
+    // POST /api/history → save processing record
+    if (url.pathname === '/api/history' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return json({ error: 'Unauthorized' }, 401, origin);
+      const body = await request.json();
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
+      ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
+      return json({ ok: true, id }, 200, origin);
+    }
+
+    return json({ error: 'Not found' }, 404, origin);
+  },
+};
