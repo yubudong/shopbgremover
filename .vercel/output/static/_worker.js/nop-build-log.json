@@ -1,0 +1,24 @@
+{
+  "timestamp": 1774473636812,
+  "outputDir": ".vercel/output/static/_worker.js",
+  "versions": {
+    "@cloudflare/next-on-pages": "1.13.16"
+  },
+  "buildFiles": {
+    "functions": {
+      "invalid": [],
+      "middleware": [],
+      "edge": [],
+      "prerendered": [],
+      "ignored": []
+    },
+    "staticAssets": [
+      "/cdn-cgi/errors/no-nodejs_compat.html"
+    ],
+    "identifiers": {
+      "wasm": {},
+      "manifest": {},
+      "webpack": {}
+    }
+  }
+}
