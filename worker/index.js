@@ -3,7 +3,7 @@
 
 // Secrets are injected via Cloudflare Worker environment variables
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REMOVE_BG_API_KEY, JWT_SECRET
-const REDIRECT_URI = 'https://shopbgremover-api.yubudong2023.workers.dev/auth/callback';
+const REDIRECT_URI = 'https://api.shopbgremover.com/auth/callback';
 const FRONTEND_URL = 'https://www.shopbgremover.com';
 const FREE_DAILY_LIMIT = 3;
 
@@ -125,7 +125,7 @@ export default {
         status: 302,
         headers: {
           Location: FRONTEND_URL,
-          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
+          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
         },
       });
     }

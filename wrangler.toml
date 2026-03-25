@@ -9,5 +9,9 @@ database_name = "shopbgremover-db"
 database_id = "f9c622b0-9360-48c1-a2a6-36e51b93d3de"
 
 [vars]
-FRONTEND_URL = "https://shopbgremover.com"
-NEXTAUTH_URL = "https://shopbgremover.com"
+FRONTEND_URL = "https://www.shopbgremover.com"
+NEXTAUTH_URL = "https://www.shopbgremover.com"
+
+[[routes]]
+pattern = "api.shopbgremover.com/*"
+zone_name = "shopbgremover.com"
