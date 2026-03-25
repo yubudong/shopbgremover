@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopBG Remover – AI Background Removal for Shopify</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #1a1a1a;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 36px; }
+    .header h1 { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
+    .header p { color: #64748b; margin-top: 8px; font-size: 1rem; }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+    }
+    .upload-area {
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 48px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 24px;
+      background: #f8fafc;
+    }
+    .upload-area:hover, .upload-area.drag-over {
+      border-color: #0070f3;
+      background: #eff6ff;
+    }
+    .upload-area .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .upload-area p { color: #64748b; font-size: 0.95rem; }
+    .upload-area strong { color: #0f172a; }
+    #fileInput { display: none; }
+    .options {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      align-items: flex-end;
+    }
+    .options label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .options select {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #fff;
+      outline: none;
+    }
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+    .btn-primary { background: #0070f3; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #0051cc; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-green { background: #16a34a; color: #fff; }
+    .btn-green:hover { background: #15803d; }
+    .progress-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #0070f3, #00b4d8);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .status {
+      text-align: center;
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 16px;
+      min-height: 20px;
+    }
+    .status.success { color: #16a34a; font-weight: 600; }
+    .status.error { color: #dc2626; }
+    .previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .preview-item { position: relative; }
+    .preview-item img {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 14px 14px;
+    }
+    .badge {
+      display: inline-block;
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .footer { text-align: center; margin-top: 28px; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛒 ShopBG Remover</h1>
+      <p>AI-powered batch background removal for Shopify product images</p>
+    </div>
+    <div class="card">
+      <div class="upload-area" id="uploadArea">
+        <div class="icon">📁</div>
+        <p><strong>Click to upload</strong> or drag and drop here</p>
+        <p style="margin-top:6px">JPG, PNG, WebP · Max 50 images</p>
+        <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp" />
+      </div>
+      <div class="options">
+        <div style="flex:1">
+          <label>Background</label>
+          <select id="bgColor">
+            <option value="white">White (#FFFFFF) — Amazon / Shopify</option>
+            <option value="transparent">Transparent (PNG)</option>
+          </select>
+        </div>
+      </div>
+      <div class="status" id="status">Select images to get started</div>
+      <button class="btn btn-primary" id="processBtn" disabled>Remove Background</button>
+      <div class="progress-track" id="progressTrack">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div id="resultsArea" style="display:none">
+        <div class="badge" id="resultBadge"></div>
+        <button class="btn btn-green" id="downloadBtn">⬇️ Download All as ZIP</button>
+        <div class="previews" id="previews"></div>
+      </div>
+    </div>
+    <div class="footer">Powered by Remove.bg · ShopBG Remover v1.0</div>
+  </div>
+
+  <script>
+    const API_KEY = 'XQ4tTk1g4cQMixrojMzJCw9R';
+    let selectedFiles = [];
+    let processedResults = [];
+
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const processBtn = document.getElementById('processBtn');
+    const progressTrack = document.getElementById('progressTrack');
+    const progressBar = document.getElementById('progressBar');
+    const status = document.getElementById('status');
+    const resultsArea = document.getElementById('resultsArea');
+    const resultBadge = document.getElementById('resultBadge');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const previews = document.getElementById('previews');
+    const bgColor = document.getElementById('bgColor');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('drag-over');
+      handleFiles(Array.from(e.dataTransfer.files));
+    });
+    fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+
+    function handleFiles(files) {
+      selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
+      if (selectedFiles.length) {
+        uploadArea.querySelector('p').innerHTML = `<strong>${selectedFiles.length} file(s) selected</strong>`;
+        processBtn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
+        processBtn.disabled = false;
+        status.textContent = 'Ready to process';
+        status.className = 'status';
+      }
+    }
+
+    processBtn.addEventListener('click', async () => {
+      if (!selectedFiles.length) return;
+      processBtn.disabled = true;
+      progressTrack.style.display = 'block';
+      resultsArea.style.display = 'none';
+      previews.innerHTML = '';
+      processedResults = [];
+      let errors = 0;
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        status.textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${file.name}`;
+        const pct = (i / selectedFiles.length) * 100;
+        progressBar.style.width = pct + '%';
+
+        const formData = new FormData();
+        formData.append('image_file', file);
+        formData.append('type', 'product');
+        if (bgColor.value === 'white') formData.append('bg_color', 'ffffff');
+
+        try {
+          const res = await fetch('https://api.remove.bg/v1.0/removebg', {
+            method: 'POST',
+            headers: { 'X-Api-Key': API_KEY },
+            body: formData
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            const name = file.name.replace(/\.[^.]+$/, '') + '.png';
+            processedResults.push({ name, blob });
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(blob);
+            img.title = name;
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            item.appendChild(img);
+            previews.appendChild(item);
+          } else {
+            const txt = await res.text();
+            console.error('API error:', txt);
+            errors++;
+          }
+        } catch (e) {
+          console.error('Fetch error:', e);
+          errors++;
+        }
+      }
+
+      progressBar.style.width = '100%';
+      const ok = processedResults.length;
+      status.textContent = `✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`;
+      status.className = 'status success';
+      resultBadge.textContent = `${ok} image${ok !== 1 ? 's' : ''} ready`;
+      resultsArea.style.display = 'block';
+      processBtn.disabled = false;
+    });
+
+    downloadBtn.addEventListener('click', async () => {
+      if (!processedResults.length) return;
+      downloadBtn.textContent = 'Zipping...';
+      const zip = new JSZip();
+      processedResults.forEach(r => zip.file(r.name, r.blob));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'shopbg-processed.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+      downloadBtn.textContent = '⬇️ Download All as ZIP';
+    });
+  </script>
+</body>
+</html>

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import styles from './page.module.css';
 
+const REMOVE_BG_API_KEY = 'XQ4tTk1g4cQMixrojMzJCw9R';
+
 export default function Home() {
   const [files, setFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
@@ -12,6 +14,7 @@ export default function Home() {
 
   const handleFileChange = (e) => {
     setFiles(Array.from(e.target.files).slice(0, 50));
+    setResults([]);
   };
 
   const handleProcess = async () => {
@@ -23,17 +26,26 @@ export default function Home() {
     const processed = [];
     for (let i = 0; i < files.length; i++) {
       const formData = new FormData();
-      formData.append('image', files[i]);
-      formData.append('bgColor', bgColor);
+      formData.append('image_file', files[i]);
+      formData.append('type', 'product');
+      if (bgColor === 'white') {
+        formData.append('bg_color', 'ffffff');
+      }
 
       try {
-        const res = await fetch('/api/remove-bg', { method: 'POST', body: formData });
+        const res = await fetch('https://api.remove.bg/v1.0/removebg', {
+          method: 'POST',
+          headers: { 'X-Api-Key': REMOVE_BG_API_KEY },
+          body: formData,
+        });
         if (res.ok) {
           const blob = await res.blob();
-          processed.push({ name: files[i].name, blob });
+          processed.push({ name: files[i].name.replace(/\.[^.]+$/, '.png'), blob });
+        } else {
+          console.error(`Failed: ${files[i].name}`, await res.text());
         }
       } catch (err) {
-        console.error(`Failed to process ${files[i].name}:`, err);
+        console.error(`Error: ${files[i].name}`, err);
       }
 
       setProgress(((i + 1) / files.length) * 100);
@@ -45,47 +57,67 @@ export default function Home() {
 
   const handleDownloadZip = async () => {
     if (!results.length) return;
-
     const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
-
-    results.forEach((item, idx) => {
-      zip.file(`${idx + 1}.png`, item.blob);
-    });
-
+    results.forEach((item) => zip.file(item.name, item.blob));
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'processed-images.zip';
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className={styles.container}>
       <h1>ShopBG Remover</h1>
+      <p className={styles.subtitle}>AI background removal for Shopify sellers</p>
       <div className={styles.card}>
-        <input type="file" multiple accept="image/*" onChange={handleFileChange} disabled={processing} />
-        <p>{files.length} file(s) selected</p>
+        <div className={styles.uploadArea}>
+          <input
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            disabled={processing}
+            id="fileInput"
+          />
+          <label htmlFor="fileInput" className={styles.uploadLabel}>
+            {files.length ? `${files.length} file(s) selected` : '📁 Click or drag to upload images (max 50)'}
+          </label>
+        </div>
 
-        <div>
+        <div className={styles.options}>
           <label>Background:</label>
           <select value={bgColor} onChange={(e) => setBgColor(e.target.value)} disabled={processing}>
-            <option value="white">White</option>
-            <option value="transparent">Transparent</option>
+            <option value="white">White (#FFFFFF)</option>
+            <option value="transparent">Transparent (PNG)</option>
           </select>
         </div>
 
-        <button onClick={handleProcess} disabled={!files.length || processing}>
-          {processing ? `Processing... ${Math.round(progress)}%` : 'Start Processing'}
+        <button className={styles.btn} onClick={handleProcess} disabled={!files.length || processing}>
+          {processing ? `Processing... ${Math.round(progress)}%` : `Remove Background (${files.length} image${files.length !== 1 ? 's' : ''})`}
         </button>
 
-        {processing && <div className={styles.progressBar} style={{ width: `${progress}%` }} />}
+        {processing && (
+          <div className={styles.progressTrack}>
+            <div className={styles.progressBar} style={{ width: `${progress}%` }} />
+          </div>
+        )}
 
         {results.length > 0 && (
-          <button onClick={handleDownloadZip} className={styles.downloadBtn}>
-            Download ZIP ({results.length} images)
-          </button>
+          <div className={styles.results}>
+            <p>✅ {results.length} image(s) processed successfully</p>
+            <button className={styles.btnGreen} onClick={handleDownloadZip}>
+              ⬇️ Download ZIP ({results.length} images)
+            </button>
+            <div className={styles.previews}>
+              {results.map((r, i) => (
+                <img key={i} src={URL.createObjectURL(r.blob)} alt={r.name} className={styles.preview} />
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
