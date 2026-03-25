@@ -234,10 +234,7 @@
     document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
 
     async function signOut() {
-      await fetch('https://api.shopbgremover.com/auth/logout', { credentials: 'include', redirect: 'manual' }).catch(()=>{});
-      document.cookie = 'session=; Path=/; Domain=.shopbgremover.com; Max-Age=0';
-      document.cookie = 'session=; Path=/; Max-Age=0';
-      location.href = '/';
+      window.location.href = 'https://api.shopbgremover.com/auth/logout';
     }
 
     init();
