@@ -3,20 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ShopBG Remover – AI Background Removal for Shopify Sellers</title>
-  <meta name="description" content="AI-powered batch background removal for Shopify, Amazon and eBay product images. Upload 50 images, get clean white or transparent backgrounds in seconds." />
-  <meta name="keywords" content="background removal, remove background, Shopify product images, AI background remover, batch background removal, product photography" />
-  <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://www.shopbgremover.com/" />
-  <!-- Open Graph -->
-  <meta property="og:title" content="ShopBG Remover – AI Background Removal for Shopify" />
-  <meta property="og:description" content="Remove backgrounds from 50 product images at once. Perfect for Shopify, Amazon and eBay sellers." />
-  <meta property="og:url" content="https://www.shopbgremover.com/" />
-  <meta property="og:type" content="website" />
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="ShopBG Remover – AI Background Removal for Shopify" />
-  <meta name="twitter:description" content="Remove backgrounds from 50 product images at once. Perfect for Shopify, Amazon and eBay sellers." />
+  <title>ShopBG Remover – AI Background Removal for Shopify</title>
+  <meta name="description" content="AI-powered batch background removal for Shopify, Amazon and eBay product images. Remove backgrounds in seconds." />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://www.paypal.com/sdk/js?client-id=AcmSZ0H7fc4uqW1XqQeg-AkGKzXhm5XYESw6YktDytpJpyKlkf8xA6Fg5RTDgPqyiLNfxpF59wd7Ibtj&currency=USD"></script>
   <style>
