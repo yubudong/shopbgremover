@@ -80,14 +80,14 @@
     .pricing-section .sub { text-align: center; color: #64748b; margin-bottom: 36px; }
     .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     @media (max-width: 700px) { .pricing-grid { grid-template-columns: 1fr; } }
-    .plan-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 28px 24px; text-align: center; position: relative; }
+    .plan-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 28px 24px; text-align: center; position: relative; display: flex; flex-direction: column; }
     .plan-card.popular { border-color: #0070f3; }
     .popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #0070f3; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 14px; border-radius: 20px; white-space: nowrap; }
     .plan-name { font-size: 1rem; font-weight: 700; color: #374151; margin-bottom: 8px; }
     .plan-price { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
     .plan-price span { font-size: 1rem; font-weight: 400; color: #64748b; }
     .plan-credits { color: #64748b; font-size: 14px; margin: 8px 0 20px; }
-    .plan-features { list-style: none; text-align: left; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+    .plan-features { list-style: none; text-align: left; margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
     .plan-features li { font-size: 14px; color: #374151; }
     .plan-features li::before { content: '✓ '; color: #16a34a; font-weight: 700; }
     .btn-plan { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
