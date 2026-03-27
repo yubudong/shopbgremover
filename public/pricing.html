@@ -91,7 +91,6 @@
           <li>90-day history</li>
           <li>ZIP download</li>
         </ul>
-        <button class="btn-plan btn-plan-outline" onclick="startPayment('starter')">Get Starter</button>
         <div class="paypal-container" id="paypal-starter"></div>
       </div>
 
@@ -107,7 +106,6 @@
           <li>Priority support</li>
           <li>Best value per image</li>
         </ul>
-        <button class="btn-plan btn-plan-primary" onclick="startPayment('pro')">Get Pro</button>
         <div class="paypal-container" id="paypal-pro"></div>
       </div>
 
@@ -122,7 +120,6 @@
           <li>All features included</li>
           <li>Stack multiple packs</li>
         </ul>
-        <button class="btn-plan btn-plan-outline" onclick="startPayment('credits_25')">Buy Credits</button>
         <div class="paypal-container" id="paypal-credits_25"></div>
       </div>
     </div>
@@ -165,9 +162,10 @@
 
   <script src="https://www.paypal.com/sdk/js?client-id=AcmSZ0H7fc4uqW1XqQeg-AkGKzXhm5XYESw6YktDytpJpyKlkf8xA6Fg5RTDgPqyiLNfxpF59wd7Ibtj&currency=USD"></script>
   <script>
-    const WORKER = 'https://api.shopbgremover.com';
+    const WORKER = ''; // 相对路径，同域名
     let currentUser = null;
     let currentCredits = 0;
+    let paypalButtons = {}; // 缓存已渲染的 PayPal 按钮
 
     async function init() {
       try {
@@ -177,8 +175,11 @@
           currentUser = data.user;
           currentCredits = data.credits?.credits || 0;
           renderNav();
+          initPayPalButtons(); // 登录后立即初始化 PayPal 按钮
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error('Init error:', e);
+      }
     }
 
     function renderNav() {
@@ -191,43 +192,63 @@
       `;
     }
 
+    function initPayPalButtons() {
+      if (!currentUser) return;
+      
+      const plans = ['starter', 'pro', 'credits_25'];
+      plans.forEach(plan => {
+        const containerId = `paypal-${plan}`;
+        const container = document.getElementById(containerId);
+        if (!container || paypalButtons[plan]) return;
+
+        try {
+          paypalButtons[plan] = paypal.Buttons({
+            createOrder: async () => {
+              const res = await fetch(`${WORKER}/api/paypal/create-order`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan }),
+              });
+              const data = await res.json();
+              if (!data.orderId) throw new Error(data.error || 'Failed to create order');
+              return data.orderId;
+            },
+            onApprove: async (data) => {
+              const res = await fetch(`${WORKER}/api/paypal/capture-order`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: data.orderID }),
+              });
+              const result = await res.json();
+              if (result.ok) {
+                currentCredits += result.credits;
+                renderNav();
+                container.innerHTML = `<p style="color:#16a34a;font-weight:600;padding:8px 0">✅ ${result.credits} credits added!</p>`;
+              }
+            },
+            onError: (err) => {
+              console.error('PayPal error:', err);
+              container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Payment failed. Please try again or refresh the page.</p>';
+            },
+            onCancel: () => {
+              console.log('Payment cancelled');
+            }
+          });
+          paypalButtons[plan].render(`#${containerId}`);
+        } catch(e) {
+          console.error('Failed to init PayPal for', plan, e);
+          container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Failed to load PayPal. Please refresh.</p>';
+        }
+      });
+    }
+
     async function startPayment(plan) {
       if (!currentUser) { openModal('loginModal'); return; }
+      // 如果已经初始化了 PayPal 按钮，滚动到对应位置即可
       const containerId = `paypal-${plan}`;
       const container = document.getElementById(containerId);
-      container.innerHTML = '<p style="font-size:13px;color:#64748b;padding:8px 0">Loading PayPal...</p>';
-      try {
-        paypal.Buttons({
-          createOrder: async () => {
-            const res = await fetch(`${WORKER}/api/paypal/create-order`, {
-              method: 'POST', credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ plan }),
-            });
-            const data = await res.json();
-            if (!data.orderId) throw new Error(data.error || 'Failed to create order');
-            return data.orderId;
-          },
-          onApprove: async (data) => {
-            const res = await fetch(`${WORKER}/api/paypal/capture-order`, {
-              method: 'POST', credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: data.orderID }),
-            });
-            const result = await res.json();
-            if (result.ok) {
-              currentCredits += result.credits;
-              renderNav();
-              container.innerHTML = `<p style="color:#16a34a;font-weight:600;padding:8px 0">✅ ${result.credits} credits added!</p>`;
-            }
-          },
-          onError: (err) => {
-            console.error(err);
-            container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Payment failed. Please try again.</p>';
-          }
-        }).render(`#${containerId}`);
-      } catch(e) {
-        container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Failed to load PayPal. Please refresh.</p>';
+      if (container) {
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
 

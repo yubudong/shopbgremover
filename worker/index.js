@@ -9,11 +9,19 @@ const FREE_DAILY_LIMIT = 3;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
+  // 明确允许的 origin
+  const allowedOrigins = [
+    'https://www.shopbgremover.com',
+    'https://shopbgremover.com',
+  ];
+  const allowOrigin = allowedOrigins.includes(origin) ? origin : FRONTEND_URL;
+  
   return {
-    'Access-Control-Allow-Origin': origin || FRONTEND_URL,
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
   };
 }
 
@@ -69,7 +77,13 @@ export default {
     const origin = request.headers.get('Origin');
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: cors(origin) });
+      return new Response(null, { 
+        status: 200, // 有些浏览器不喜欢 204
+        headers: { 
+          ...cors(origin),
+          'Access-Control-Max-Age': '86400',
+        }
+      });
     }
 
     // GET /auth/login → redirect to Google
@@ -248,47 +262,60 @@ export default {
 
     // POST /api/paypal/create-order → create PayPal order
     if (url.pathname === '/api/paypal/create-order' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return json({ error: 'Unauthorized' }, 401, origin);
-      
-      const { plan } = await request.json();
-      const PLANS = {
-        starter: { amount: '9.90', credits: 50 },
-        pro: { amount: '19.90', credits: 100 },
-        credits_25: { amount: '5.00', credits: 25 },
-      };
-      
-      if (!PLANS[plan]) return json({ error: 'Invalid plan' }, 400, origin);
-      
-      const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
-      const orderRes = await fetch('https://api-m.sandbox.paypal.com/v2/checkout/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          intent: 'CAPTURE',
-          purchase_units: [{
-            amount: { currency_code: 'USD', value: PLANS[plan].amount },
-            description: `ShopBG Remover - ${plan}`,
-          }],
-          application_context: {
-            return_url: `${FRONTEND_URL}/payment/success`,
-            cancel_url: `${FRONTEND_URL}/payment/cancel`,
+      try {
+        const user = await getUser(request, env);
+        if (!user) return json({ error: 'Unauthorized' }, 401, origin);
+        
+        const { plan } = await request.json();
+        const PLANS = {
+          starter: { amount: '9.90', credits: 50 },
+          pro: { amount: '19.90', credits: 100 },
+          credits_25: { amount: '5.00', credits: 25 },
+        };
+        
+        if (!PLANS[plan]) return json({ error: 'Invalid plan' }, 400, origin);
+        
+        if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_SECRET) {
+          return json({ error: 'PayPal credentials not configured' }, 500, origin);
+        }
+        
+        const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
+        const orderRes = await fetch('https://api-m.sandbox.paypal.com/v2/checkout/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${auth}`,
           },
-        }),
-      });
-      
-      const order = await orderRes.json();
-      if (!order.id) return json({ error: 'PayPal order creation failed' }, 500, origin);
-      
-      // Save order to DB
-      await env.DB.prepare(
-        `INSERT INTO orders (id, user_id, plan, amount, status) VALUES (?, ?, ?, ?, 'pending')`
-      ).bind(order.id, user.sub, plan, PLANS[plan].amount).run();
-      
-      return json({ orderId: order.id, approveUrl: order.links.find(l => l.rel === 'approve')?.href }, 200, origin);
+          body: JSON.stringify({
+            intent: 'CAPTURE',
+            purchase_units: [{
+              amount: { currency_code: 'USD', value: PLANS[plan].amount },
+              description: `ShopBG Remover - ${plan}`,
+            }],
+          }),
+        });
+        
+        const orderText = await orderRes.text();
+        let order;
+        try {
+          order = JSON.parse(orderText);
+        } catch(e) {
+          return json({ error: 'PayPal API returned invalid JSON', raw: orderText }, 500, origin);
+        }
+        
+        if (!order.id) {
+          return json({ error: 'PayPal order creation failed', paypalError: order }, 500, origin);
+        }
+        
+        // Save order to DB
+        await env.DB.prepare(
+          `INSERT INTO orders (id, user_id, plan, amount, status) VALUES (?, ?, ?, ?, 'pending')`
+        ).bind(order.id, user.sub, plan, PLANS[plan].amount).run();
+        
+        return json({ orderId: order.id, approveUrl: order.links.find(l => l.rel === 'approve')?.href }, 200, origin);
+      } catch(e) {
+        return json({ error: 'Internal server error', message: e.message, stack: e.stack }, 500, origin);
+      }
     }
 
     // POST /api/paypal/capture-order → capture payment and add credits

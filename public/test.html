@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Test PayPal API</title>
+</head>
+<body>
+  <h1>Test PayPal API</h1>
+  <button onclick="testMe()">Test /api/me</button>
+  <button onclick="testCreateOrder()">Test /api/paypal/create-order</button>
+  <pre id="log"></pre>
+
+  <script>
+    const WORKER = ''; // 相对路径，同域名
+
+    function log(msg) {
+      document.getElementById('log').textContent += msg + '\n';
+    }
+
+    async function testMe() {
+      log('Testing /api/me...');
+      try {
+        const res = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
+        log('Status: ' + res.status);
+        log('Response: ' + JSON.stringify(await res.json(), null, 2));
+      } catch(e) {
+        log('Error: ' + e.message);
+        console.error(e);
+      }
+    }
+
+    async function testCreateOrder() {
+      log('Testing /api/paypal/create-order...');
+      try {
+        const res = await fetch(`${WORKER}/api/paypal/create-order`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'starter' }),
+        });
+        log('Status: ' + res.status);
+        log('Response: ' + JSON.stringify(await res.json(), null, 2));
+      } catch(e) {
+        log('Error: ' + e.message);
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>
