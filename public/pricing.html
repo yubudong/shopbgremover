@@ -65,7 +65,7 @@
 </head>
 <body>
   <nav>
-    <a class="nav-logo" href="/">🛒 ShopBG Remover</a>
+    <a class="nav-logo" href="/"><img src="/logo.svg" alt="ShopBG Remover" style="height:64px;" /></a>
     <div class="nav-right" id="navRight">
       <a href="/" class="btn-nav btn-nav-outline">← Back to App</a>
       <a href="https://api.shopbgremover.com/auth/login" class="btn-nav btn-nav-primary" id="loginBtn">Sign in with Google</a>
@@ -160,9 +160,9 @@
 
   <footer>ShopBG Remover · <a href="/" style="color:#94a3b8">Back to App</a></footer>
 
-  <script src="https://www.paypal.com/sdk/js?client-id=AcmSZ0H7fc4uqW1XqQeg-AkGKzXhm5XYESw6YktDytpJpyKlkf8xA6Fg5RTDgPqyiLNfxpF59wd7Ibtj&currency=USD"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=AZSlMaqcUdHvRQdaCALfi1d4tvCgf2nJiEjPpE9dJgRdHmhrSj1J-7CKfHEq4KWgwjt4k-yM9xTI_oW6&currency=USD"></script>
   <script>
-    const WORKER = ''; // 相对路径，同域名
+    const WORKER = 'https://api.shopbgremover.com';
     let currentUser = null;
     let currentCredits = 0;
     let paypalButtons = {}; // 缓存已渲染的 PayPal 按钮
@@ -175,11 +175,23 @@
           currentUser = data.user;
           currentCredits = data.credits?.credits || 0;
           renderNav();
-          initPayPalButtons(); // 登录后立即初始化 PayPal 按钮
+          initPayPalButtons(); // 登录后渲染 PayPal 按钮
+        } else {
+          renderSignInButtons(); // 未登录时渲染登录引导按钮
         }
       } catch(e) {
         console.error('Init error:', e);
+        renderSignInButtons();
       }
+    }
+
+    function renderSignInButtons() {
+      ['starter', 'pro', 'credits_25'].forEach(plan => {
+        const container = document.getElementById(`paypal-${plan}`);
+        if (container) {
+          container.innerHTML = `<a href="https://api.shopbgremover.com/auth/login" class="btn-plan btn-plan-primary" style="display:block;text-align:center;text-decoration:none;margin-top:4px;">Sign in to Pay</a>`;
+        }
+      });
     }
 
     function renderNav() {
