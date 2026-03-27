@@ -280,7 +280,7 @@ export default {
         }
         
         const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
-        const orderRes = await fetch('https://api-m.sandbox.paypal.com/v2/checkout/orders', {
+        const orderRes = await fetch('https://api-m.paypal.com/v2/checkout/orders', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -309,8 +309,8 @@ export default {
         
         // Save order to DB
         await env.DB.prepare(
-          `INSERT INTO orders (id, user_id, plan, amount, status) VALUES (?, ?, ?, ?, 'pending')`
-        ).bind(order.id, user.sub, plan, PLANS[plan].amount).run();
+          `INSERT INTO orders (id, user_id, plan, amount, credits, status) VALUES (?, ?, ?, ?, ?, 'pending')`
+        ).bind(order.id, user.sub, plan, PLANS[plan].amount, PLANS[plan].credits).run();
         
         return json({ orderId: order.id, approveUrl: order.links.find(l => l.rel === 'approve')?.href }, 200, origin);
       } catch(e) {
@@ -322,37 +322,38 @@ export default {
     if (url.pathname === '/api/paypal/capture-order' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return json({ error: 'Unauthorized' }, 401, origin);
-      
+
       const { orderId } = await request.json();
       const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
-      
-      const captureRes = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`, {
+
+      // Get order from DB first (to check for duplicate processing)
+      const order = await env.DB.prepare(`SELECT plan, credits, status FROM orders WHERE id = ?`).bind(orderId).first();
+      if (!order) return json({ error: 'Order not found' }, 404, origin);
+      if (order.status === 'completed') return json({ error: 'Order already processed' }, 400, origin);
+
+      const captureRes = await fetch(`https://api-m.paypal.com/v2/checkout/orders/${orderId}/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
       });
-      
+
       const capture = await captureRes.json();
-      if (capture.status !== 'COMPLETED') return json({ error: 'Payment not completed' }, 400, origin);
-      
-      // Get order from DB
-      const order = await env.DB.prepare(`SELECT plan FROM orders WHERE id = ?`).bind(orderId).first();
-      if (!order) return json({ error: 'Order not found' }, 404, origin);
-      
-      const PLANS = {
-        starter: 50,
-        pro: 100,
-        credits_25: 25,
-      };
-      
-      const credits = PLANS[order.plan];
+
+      // Handle already-captured orders (card payments captured instantly)
+      const isCompleted = capture.status === 'COMPLETED' ||
+        (capture.name === 'UNPROCESSABLE_ENTITY' &&
+         capture.details?.[0]?.issue === 'ORDER_ALREADY_CAPTURED');
+
+      if (!isCompleted) return json({ error: 'Payment not completed', detail: capture }, 400, origin);
+
+      const credits = order.credits;
       await env.DB.prepare(
         `UPDATE user_credits SET credits = credits + ? WHERE user_id = ?`
       ).bind(credits, user.sub).run();
-      
+
       await env.DB.prepare(
         `UPDATE orders SET status = 'completed' WHERE id = ?`
       ).bind(orderId).run();
-      
+
       return json({ ok: true, credits }, 200, origin);
     }
 
