@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PayPal 沙盒测试</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+    .section { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    .error { color: #dc2626; }
+    .success { color: #16a34a; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    pre { background: #fff; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>PayPal 沙盒支付测试</h1>
+
+  <div class="section">
+    <h2>1. 检查环境变量</h2>
+    <button onclick="checkEnv()">检查后端配置</button>
+    <pre id="envResult">点击按钮检查...</pre>
+  </div>
+
+  <div class="section">
+    <h2>2. 测试创建订单</h2>
+    <button onclick="testCreateOrder()">创建测试订单</button>
+    <pre id="orderResult">点击按钮测试...</pre>
+  </div>
+
+  <div class="section">
+    <h2>3. PayPal 按钮测试</h2>
+    <div id="paypal-button-container"></div>
+    <pre id="paypalResult">等待初始化...</pre>
+  </div>
+
+  <script src="https://www.paypal.com/sdk/js?client-id=AcmSZ0H7fc4uqW1XqQeg-AkGKzXhm5XYESw6YktDytpJpyKlkf8xA6Fg5RTDgPqyiLNfxpF59wd7Ibtj&currency=USD"></script>
+  <script>
+    const API = 'https://api.shopbgremover.com';
+
+    async function checkEnv() {
+      const result = document.getElementById('envResult');
+      result.textContent = '检查中...';
+
+      try {
+        const res = await fetch(`${API}/api/paypal/create-order`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'starter' })
+        });
+
+        const data = await res.json();
+        result.innerHTML = `<span class="${res.ok ? 'success' : 'error'}">
+状态码: ${res.status}
+响应: ${JSON.stringify(data, null, 2)}
+</span>`;
+      } catch(e) {
+        result.innerHTML = `<span class="error">错误: ${e.message}</span>`;
+      }
+    }
+
+    async function testCreateOrder() {
+      const result = document.getElementById('orderResult');
+      result.textContent = '测试中...';
+
+      try {
+        const res = await fetch(`${API}/api/paypal/create-order`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'starter' })
+        });
+
+        const data = await res.json();
+
+        if (data.orderId) {
+          result.innerHTML = `<span class="success">✅ 订单创建成功！
+订单ID: ${data.orderId}
+审批链接: ${data.approveUrl || '未返回'}
+</span>`;
+        } else {
+          result.innerHTML = `<span class="error">❌ 订单创建失败
+错误: ${data.error || '未知错误'}
+详情: ${JSON.stringify(data, null, 2)}
+</span>`;
+        }
+      } catch(e) {
+        result.innerHTML = `<span class="error">❌ 请求失败: ${e.message}</span>`;
+      }
+    }
+
+    // 初始化 PayPal 按钮
+    try {
+      paypal.Buttons({
+        createOrder: async () => {
+          const result = document.getElementById('paypalResult');
+          result.textContent = '正在创建订单...';
+
+          const res = await fetch(`${API}/api/paypal/create-order`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: 'starter' })
+          });
+
+          const data = await res.json();
+
+          if (!data.orderId) {
+            result.innerHTML = `<span class="error">创建订单失败: ${JSON.stringify(data, null, 2)}</span>`;
+            throw new Error(data.error || 'Failed to create order');
+          }
+
+          result.innerHTML = `<span class="success">订单创建成功: ${data.orderId}</span>`;
+          return data.orderId;
+        },
+        onApprove: async (data) => {
+          const result = document.getElementById('paypalResult');
+          result.textContent = '正在捕获支付...';
+
+          const res = await fetch(`${API}/api/paypal/capture-order`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: data.orderID })
+          });
+
+          const captureData = await res.json();
+          result.innerHTML = `<span class="success">✅ 支付成功！
+获得积分: ${captureData.credits}
+</span>`;
+        },
+        onError: (err) => {
+          const result = document.getElementById('paypalResult');
+          result.innerHTML = `<span class="error">❌ PayPal 错误: ${err.message || JSON.stringify(err)}</span>`;
+        }
+      }).render('#paypal-button-container');
+
+      document.getElementById('paypalResult').innerHTML = '<span class="success">PayPal 按钮已加载</span>';
+    } catch(e) {
+      document.getElementById('paypalResult').innerHTML = `<span class="error">PayPal 初始化失败: ${e.message}</span>`;
+    }
+  </script>
+</body>
+</html>

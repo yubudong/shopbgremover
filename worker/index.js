@@ -2,7 +2,7 @@
 // Handles: Google OAuth, session, credits, history
 
 // Secrets are injected via Cloudflare Worker environment variables
-// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REMOVE_BG_API_KEY, JWT_SECRET
+// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, FAL_API_KEY
 const REDIRECT_URI = 'https://api.shopbgremover.com/auth/callback';
 const FRONTEND_URL = 'https://www.shopbgremover.com';
 const FREE_DAILY_LIMIT = 3;
@@ -205,35 +205,109 @@ export default {
       return json({ ok: true, remaining: credits.credits - 1 }, 200, origin);
     }
 
-    // POST /api/remove-bg → proxy to Remove.bg with server-side API key
+    // GET /api/check-credit → 只检查额度，不扣除
+    if (url.pathname === '/api/check-credit') {
+      const user = await getUser(request, env);
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const today = new Date().toISOString().slice(0, 10);
+      if (!user) {
+        const row = await env.DB.prepare(
+          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
+        ).bind(ip, today).first();
+        if ((row?.count || 0) >= FREE_DAILY_LIMIT) {
+          return json({ ok: false, reason: 'free_limit' }, 200, origin);
+        }
+        return json({ ok: true }, 200, origin);
+      }
+      const credits = await env.DB.prepare(
+        `SELECT credits FROM user_credits WHERE user_id = ?`
+      ).bind(user.sub).first();
+      if (!credits || credits.credits <= 0) {
+        return json({ ok: false, reason: 'no_credits' }, 200, origin);
+      }
+      return json({ ok: true, remaining: credits.credits }, 200, origin);
+    }
+
+    // POST /api/remove-bg → fal.ai BiRefNet 抠图（成功后才扣积分）
     if (url.pathname === '/api/remove-bg' && request.method === 'POST') {
-      const creditRes = await fetch(`${url.origin}/api/use-credit`, {
-        method: 'POST',
-        headers: request.headers,
-      });
+      const user = await getUser(request, env);
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const today = new Date().toISOString().slice(0, 10);
 
-      const formData = await request.formData();
-      const removeForm = new FormData();
-      removeForm.append('image_file', formData.get('image_file'));
-      removeForm.append('type', 'product');
-      const bgColor = formData.get('bg_color');
-      if (bgColor) removeForm.append('bg_color', bgColor);
-
-      const res = await fetch('https://api.remove.bg/v1.0/removebg', {
-        method: 'POST',
-        headers: { 'X-Api-Key': env.REMOVE_BG_API_KEY },
-        body: removeForm,
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        return json({ error: txt }, res.status, origin);
+      // 1. 检查额度（不扣除）
+      if (!user) {
+        const row = await env.DB.prepare(
+          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
+        ).bind(ip, today).first();
+        if ((row?.count || 0) >= FREE_DAILY_LIMIT) {
+          return json({ ok: false, reason: 'free_limit', message: 'Daily free limit reached. Sign in for more.' }, 403, origin);
+        }
+      } else {
+        const credits = await env.DB.prepare(
+          `SELECT credits FROM user_credits WHERE user_id = ?`
+        ).bind(user.sub).first();
+        if (!credits || credits.credits <= 0) {
+          return json({ ok: false, reason: 'no_credits', message: 'No credits remaining.' }, 403, origin);
+        }
       }
 
-      const buffer = await res.arrayBuffer();
-      return new Response(buffer, {
-        headers: { 'Content-Type': 'image/png', ...cors(origin) },
-      });
+      try {
+        const body = await request.json();
+        const image_url = body?.image_url;
+        if (!image_url) return json({ error: '缺少 image_url' }, 400, origin);
+
+        // 直接调用 fal.ai，前端已压缩好
+        const falRes = await fetch('https://fal.run/fal-ai/birefnet', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Key ${env.FAL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_url: image_url,
+            model: 'General Use (Heavy)',
+            operating_resolution: '1024x1024',
+            output_format: 'png',
+          }),
+        });
+
+        if (!falRes.ok) {
+          const txt = await falRes.text();
+          return json({ error: 'fal.ai 调用失败', detail: txt }, 502, origin);
+        }
+
+        const falData = await falRes.json();
+        const resultUrl = falData?.image?.url;
+        if (!resultUrl) {
+          return json({ error: '未获取到结果图片', detail: falData }, 500, origin);
+        }
+
+        // 4. 下载结果图片
+        const imgRes = await fetch(resultUrl);
+        if (!imgRes.ok) {
+          return json({ error: '下载结果图片失败', status: imgRes.status }, 500, origin);
+        }
+
+        // 5. 成功后才扣积分
+        if (!user) {
+          await env.DB.prepare(
+            `INSERT INTO free_usage (ip, date, count) VALUES (?, ?, 1)
+             ON CONFLICT(ip) DO UPDATE SET count = count + 1, date = ?`
+          ).bind(ip, today, today).run();
+        } else {
+          await env.DB.prepare(
+            `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
+          ).bind(user.sub).run();
+        }
+
+        // 6. 返回图片
+        return new Response(imgRes.body, {
+          headers: { 'Content-Type': 'image/png', ...cors(origin) },
+        });
+
+      } catch (e) {
+        return json({ error: '处理失败', message: e.message }, 500, origin);
+      }
     }
 
     // GET /api/history → processing history
