@@ -251,37 +251,24 @@
     }
   }
 
-  // ── 图片压缩函数 ───────────────────────────────────────────────
-  async function compressImage(file, maxSizeMB = 2) {
+  // ── 图片压缩并转 base64 data URL ─────────────────────────────
+  async function compressToDataUrl(file) {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // 如果图片太大，按比例缩小
-          const maxDim = 2048;
+          let { width, height } = img;
+          const maxDim = 1024;
           if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = (height / width) * maxDim;
-              width = maxDim;
-            } else {
-              width = (width / height) * maxDim;
-              height = maxDim;
-            }
+            if (width > height) { height = (height / width) * maxDim; width = maxDim; }
+            else { width = (width / height) * maxDim; height = maxDim; }
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          }, 'image/jpeg', 0.85);
+          canvas.width = Math.round(width);
+          canvas.height = Math.round(height);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
         img.src = e.target.result;
       };
@@ -318,25 +305,20 @@
     let errors = 0;
 
     for (let i = 0; i < selectedFiles.length; i++) {
-      document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`;
+      document.getElementById('status').textContent = `Compressing ${selectedFiles[i].name}...`;
       document.getElementById('progressBar').style.width = `${(i / selectedFiles.length) * 100}%`;
 
-      const formData = new FormData();
-      // 压缩大图片
-      let fileToUpload = selectedFiles[i];
-      if (fileToUpload.size > 2 * 1024 * 1024) {
-        document.getElementById('status').textContent = `Compressing ${selectedFiles[i].name}...`;
-        fileToUpload = await compressImage(fileToUpload);
-      }
-      formData.append('image_file', fileToUpload);
-      if (bgColor === 'white') formData.append('bg_color', 'ffffff');
-
       try {
-        // remove-bg 内部处理额度扣除，成功才扣
+        // 前端压缩并转 base64，Worker 只做转发
+        const dataUrl = await compressToDataUrl(selectedFiles[i]);
+
+        document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`;
+
         const res = await fetch(`${API}/api/remove-bg`, {
           method: 'POST',
           credentials: 'include',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: dataUrl }),
         });
         if (res.ok) {
           const blob = await res.blob();
