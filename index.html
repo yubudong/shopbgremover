@@ -7,114 +7,354 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; min-height: 100vh; color: #1a1a1a; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      background: #F3F4F6;
+      min-height: 100vh;
+      color: #111827;
+    }
+
+    /* ── 顶栏 ────────────────────────────────────────────── */
     .navbar {
-      background: #fff;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 14px 24px;
+      background: #000000;
+      padding: 16px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .navbar .logo { font-size: 1.2rem; font-weight: 800; color: #0f172a; }
-    .navbar .right { display: flex; align-items: center; gap: 16px; }
+    .navbar .logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      letter-spacing: -0.02em;
+    }
+    .navbar .right { display: flex; align-items: center; gap: 20px; }
     .credits-badge {
-      background: #eff6ff;
-      color: #0070f3;
-      border: 1px solid #bfdbfe;
-      border-radius: 20px;
-      padding: 4px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      color: #3B82F6;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 24px;
+      padding: 6px 16px;
       font-size: 13px;
       font-weight: 600;
+      transition: all 0.3s;
+    }
+    .credits-badge.low {
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border-color: rgba(245, 158, 11, 0.4);
+      animation: shake 0.5s ease;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
     }
     .btn-sm {
-      padding: 7px 16px;
-      border-radius: 8px;
+      padding: 8px 18px;
+      border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       border: none;
       transition: all 0.2s;
     }
-    .btn-login { background: #0070f3; color: #fff; }
-    .btn-login:hover { background: #0051cc; }
-    .btn-logout { background: #f1f5f9; color: #475569; }
-    .btn-logout:hover { background: #e2e8f0; }
-    .user-name { font-size: 14px; color: #475569; }
+    .btn-login { background: #3B82F6; color: #fff; }
+    .btn-login:hover { background: #2563EB; transform: translateY(-1px); }
+    .btn-logout { background: rgba(255,255,255,0.1); color: #E5E7EB; }
+    .btn-logout:hover { background: rgba(255,255,255,0.15); }
+    .user-name { font-size: 13px; color: #D1D5DB; }
 
-    .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
-    .header { text-align: center; margin-bottom: 36px; }
-    .header h1 { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
-    .header p { color: #64748b; margin-top: 8px; }
+    /* ── 工作台布局 ──────────────────────────────────────── */
+    .workspace {
+      display: flex;
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      min-height: calc(100vh - 64px);
+    }
 
-    .card { background: #fff; border-radius: 16px; padding: 36px; box-shadow: 0 4px 24px rgba(0,0,0,0.07); margin-bottom: 24px; }
+    /* 左侧画布区 */
+    .canvas-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
 
-    .upload-area {
-      border: 2px dashed #cbd5e1;
-      border-radius: 10px;
-      padding: 48px 20px;
+    .upload-zone {
+      background: #FFFFFF;
+      border: 3px dashed #D1D5DB;
+      border-radius: 16px;
+      padding: 80px 40px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 24px;
-      background: #f8fafc;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
-    .upload-area:hover, .upload-area.drag-over { border-color: #0070f3; background: #eff6ff; }
-    .upload-area .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .upload-area p { color: #64748b; font-size: 0.95rem; }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: #3B82F6;
+      background: #EFF6FF;
+      transform: scale(1.01);
+    }
+    .upload-zone .icon { font-size: 4rem; margin-bottom: 20px; opacity: 0.6; }
+    .upload-zone h3 { font-size: 1.3rem; color: #111827; margin-bottom: 8px; font-weight: 600; }
+    .upload-zone p { color: #6B7280; font-size: 0.95rem; }
     #fileInput { display: none; }
 
-    .options { display: flex; gap: 16px; margin-bottom: 24px; }
-    .options > div { flex: 1; }
-    .options label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
-    .options select { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #1a1a1a; background: #fff; }
-
-    .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
-    .btn-primary { background: #0070f3; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #0051cc; }
-    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
-    .btn-green { background: #16a34a; color: #fff; }
-    .btn-green:hover { background: #15803d; }
-
-    .progress-track { height: 8px; background: #e2e8f0; border-radius: 4px; margin-bottom: 16px; overflow: hidden; display: none; }
-    .progress-bar { height: 100%; background: linear-gradient(90deg, #0070f3, #00b4d8); border-radius: 4px; width: 0%; transition: width 0.3s ease; }
-
-    .status { text-align: center; font-size: 14px; color: #64748b; margin-bottom: 16px; min-height: 20px; }
-    .status.success { color: #16a34a; font-weight: 600; }
-    .status.error { color: #dc2626; }
-
-    .previews { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-    .preview-item img {
-      width: 90px; height: 90px; object-fit: contain;
-      border: 1px solid #e2e8f0; border-radius: 8px;
-      background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 14px 14px;
+    /* 图片网格 */
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .image-card {
+      background: #FFFFFF;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+    }
+    .image-card.flipping {
+      animation: flip 0.6s ease-in-out;
+    }
+    @keyframes flip {
+      0% { transform: rotateY(0deg); }
+      50% { transform: rotateY(90deg); }
+      100% { transform: rotateY(0deg); }
+    }
+    .image-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: repeating-conic-gradient(#F3F4F6 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+    }
+    .image-card .status-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
-    /* History */
-    .history-list { list-style: none; }
-    .history-list li {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #475569;
+    /* 右侧参数面板 */
+    .settings-panel {
+      width: 340px;
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      height: fit-content;
+      position: sticky;
+      top: 32px;
     }
-    .history-list li:last-child { border-bottom: none; }
-
-    /* Upgrade banner */
-    .upgrade-banner {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: #fff; border-radius: 12px; padding: 20px 24px;
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 24px; display: none;
+    .settings-panel h2 {
+      font-size: 1.1rem;
+      color: #111827;
+      margin-bottom: 24px;
+      font-weight: 700;
     }
-    .upgrade-banner p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
-    .btn-upgrade { background: #fff; color: #667eea; padding: 8px 20px; border-radius: 8px; font-weight: 700; font-size: 14px; border: none; cursor: pointer; white-space: nowrap; margin-left: 16px; }
+    .setting-group {
+      margin-bottom: 24px;
+    }
+    .setting-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
 
-    .footer { text-align: center; margin-top: 28px; color: #94a3b8; font-size: 12px; }
+    /* 背景选择按钮组 */
+    .bg-options {
+      display: flex;
+      gap: 10px;
+    }
+    .bg-btn {
+      flex: 1;
+      padding: 16px 12px;
+      border: 2px solid #E5E7EB;
+      border-radius: 10px;
+      background: #FFFFFF;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6B7280;
+    }
+    .bg-btn:hover { border-color: #3B82F6; }
+    .bg-btn.active {
+      border-color: #3B82F6;
+      background: #EFF6FF;
+      color: #3B82F6;
+    }
+
+    /* 尺寸预设 */
+    .size-presets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .size-btn {
+      padding: 14px 10px;
+      border: 2px solid #E5E7EB;
+      border-radius: 10px;
+      background: #FFFFFF;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6B7280;
+    }
+    .size-btn:hover { border-color: #3B82F6; }
+    .size-btn.active {
+      border-color: #3B82F6;
+      background: #EFF6FF;
+      color: #3B82F6;
+    }
+    .size-btn .platform { display: block; font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+    /* 底部悬浮操作栏 */
+    .action-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #000000;
+      padding: 20px 32px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      z-index: 100;
+      display: none;
+    }
+    .action-bar.visible { display: block; }
+    .action-bar-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 18px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .action-btn-primary {
+      background: #3B82F6;
+      color: #FFFFFF;
+    }
+    .action-btn-primary:hover:not(:disabled) {
+      background: #2563EB;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+    }
+    .action-btn-primary:disabled {
+      background: #9CA3AF;
+      cursor: not-allowed;
+    }
+    .action-btn-download {
+      background: #10B981;
+      color: #FFFFFF;
+      animation: bounce 0.6s ease;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .action-btn-download:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3B82F6, #10B981);
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .status-text {
+      color: #D1D5DB;
+      font-size: 14px;
+      min-width: 200px;
+    }
+
+    /* Upgrade 弹窗 */
+    .upgrade-modal {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: #FFFFFF;
+      border-radius: 16px;
+      padding: 24px 32px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      z-index: 200;
+      display: none;
+      max-width: 500px;
+    }
+    .upgrade-modal.visible { display: block; animation: slideDown 0.4s ease; }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translate(-50%, -20px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .upgrade-modal h3 { font-size: 1.2rem; margin-bottom: 8px; }
+    .upgrade-modal p { opacity: 0.95; font-size: 14px; margin-bottom: 16px; }
+    .upgrade-modal button {
+      background: #FFFFFF;
+      color: #D97706;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .upgrade-modal button:hover { transform: scale(1.05); }
   </style>
 </head>
 <body>
 
 <nav class="navbar">
-  <div class="logo">🛒 ShopBG Remover</div>
+  <div class="logo">ShopBG Remover</div>
   <div class="right">
     <span class="credits-badge" id="creditsBadge" style="display:none"></span>
     <span class="user-name" id="userName"></span>
@@ -122,74 +362,101 @@
   </div>
 </nav>
 
-<div class="container">
-  <div class="header">
-    <h1>Remove Product Backgrounds</h1>
-    <p>AI-powered batch background removal for Shopify sellers</p>
-  </div>
+<!-- Upgrade 弹窗 -->
+<div class="upgrade-modal" id="upgradeBanner">
+  <h3>⚡ Credits Running Low</h3>
+  <p>Upgrade to Pro for 200 credits/month and unlimited batch processing.</p>
+  <button onclick="window.location='/pricing.html'">Upgrade to Pro →</button>
+</div>
 
-  <div class="upgrade-banner" id="upgradeBanner">
-    <div>
-      <strong>You're out of credits</strong>
-      <p>Upgrade to get 200 credits/month and batch processing</p>
-    </div>
-    <button class="btn-upgrade" onclick="window.location='/pricing.html'">Upgrade →</button>
-  </div>
+<!-- 工作台 -->
+<div class="workspace">
 
-  <div class="card">
-    <div class="upload-area" id="uploadArea">
-      <div class="icon">📁</div>
-      <p><strong>Click to upload</strong> or drag and drop here</p>
-      <p style="margin-top:6px">JPG, PNG, WebP · Max 50 images</p>
+  <!-- 左侧画布区 -->
+  <div class="canvas-area">
+    <div class="upload-zone" id="uploadArea">
+      <div class="icon">⬆</div>
+      <h3>Drop product images here</h3>
+      <p>JPG, PNG, WebP · Up to 50 images at once</p>
       <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp" />
     </div>
-
-    <div class="options">
-      <div>
-        <label>Background</label>
-        <select id="bgColor">
-          <option value="white">White (#FFFFFF) — Amazon / Shopify</option>
-          <option value="transparent">Transparent (PNG)</option>
-        </select>
-      </div>
-      <div>
-        <label>Output Size</label>
-        <select id="outputSize">
-          <option value="original">Original Size</option>
-          <option value="2048">Shopify (2048×2048)</option>
-          <option value="1000">Amazon (1000×1000)</option>
-          <option value="500">eBay (500×500)</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="status" id="status">Select images to get started</div>
-    <button class="btn btn-primary" id="processBtn" disabled>Remove Background</button>
-    <div class="progress-track" id="progressTrack">
-      <div class="progress-bar" id="progressBar"></div>
-    </div>
-
-    <div id="resultsArea" style="display:none">
-      <button class="btn btn-green" id="downloadBtn">⬇️ Download All as ZIP</button>
-      <div class="previews" id="previews"></div>
-    </div>
+    <div class="image-grid" id="imageGrid"></div>
   </div>
 
-  <div class="card" id="historyCard" style="display:none">
-    <h3 style="margin-bottom:16px;font-size:1rem;color:#0f172a">Processing History (last 90 days)</h3>
-    <ul class="history-list" id="historyList"></ul>
+  <!-- 右侧参数面板 -->
+  <div class="settings-panel">
+    <h2>Settings</h2>
+
+    <div class="setting-group">
+      <label>Background</label>
+      <div class="bg-options">
+        <button class="bg-btn active" data-bg="white" onclick="setBg(this,'white')">
+          ⬜ White<br><span style="font-size:11px;opacity:0.6">#FFFFFF</span>
+        </button>
+        <button class="bg-btn" data-bg="transparent" onclick="setBg(this,'transparent')">
+          ◻ Transparent<br><span style="font-size:11px;opacity:0.6">PNG</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label>Output Size</label>
+      <div class="size-presets">
+        <button class="size-btn" data-size="2048" onclick="setSize(this,'2048')">
+          Shopify<span class="platform">2048 × 2048</span>
+        </button>
+        <button class="size-btn" data-size="1000" onclick="setSize(this,'1000')">
+          Amazon<span class="platform">1000 × 1000</span>
+        </button>
+        <button class="size-btn" data-size="500" onclick="setSize(this,'500')">
+          eBay<span class="platform">500 × 500</span>
+        </button>
+        <button class="size-btn active" data-size="original" onclick="setSize(this,'original')">
+          Original<span class="platform">Keep size</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="setting-group" id="historySection" style="display:none">
+      <label>Recent History</label>
+      <ul class="history-list" id="historyList"></ul>
+    </div>
   </div>
 </div>
 
-<div class="footer">Powered by Remove.bg · ShopBG Remover v1.0</div>
+<!-- 底部悬浮操作栏 -->
+<div class="action-bar" id="actionBar">
+  <div class="action-bar-inner">
+    <div class="status-text" id="status">Ready</div>
+    <div class="progress-track" id="progressTrack" style="display:none">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <button class="action-btn action-btn-primary" id="processBtn" disabled>
+      Remove Background
+    </button>
+  </div>
+</div>
 
 <script>
-  const API = ''; // Use relative paths for Pages Functions
-  const REMOVE_BG_KEY = ''; // Key is managed server-side via Worker secrets
+  const API = 'https://api.shopbgremover.com';
 
   let selectedFiles = [];
   let processedResults = [];
   let currentUser = null;
+  let bgColor = 'white';
+  let outputSize = 'original';
+
+  // ── 参数选择 ──────────────────────────────────────────────
+  function setBg(el, val) {
+    bgColor = val;
+    document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function setSize(el, val) {
+    outputSize = val;
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
 
   // ── Auth ──────────────────────────────────────────────────
   function login() { window.location = `${API}/auth/login`; }
@@ -204,12 +471,17 @@
         document.getElementById('userName').textContent = currentUser.name;
         document.getElementById('authBtn').textContent = 'Sign out';
         document.getElementById('authBtn').onclick = logout;
+        document.getElementById('authBtn').className = 'btn-sm btn-logout';
         if (data.credits) {
           const badge = document.getElementById('creditsBadge');
-          badge.textContent = `${data.credits.credits} credits`;
+          const c = data.credits.credits;
+          badge.textContent = `${c} credits`;
           badge.style.display = 'inline-block';
-          if (data.credits.credits === 0) {
-            document.getElementById('upgradeBanner').style.display = 'flex';
+          if (c === 0) {
+            showUpgrade();
+          } else if (c <= 20) {
+            badge.classList.add('low');
+            setTimeout(() => badge.classList.remove('low'), 600);
           }
         }
         loadHistory();
@@ -217,19 +489,25 @@
     } catch (e) { console.error('loadUser error', e); }
   }
 
+  function showUpgrade() {
+    const m = document.getElementById('upgradeBanner');
+    m.classList.add('visible');
+    setTimeout(() => m.classList.remove('visible'), 8000);
+  }
+
   async function loadHistory() {
     try {
       const res = await fetch(`${API}/api/history`, { credentials: 'include' });
       const data = await res.json();
       if (data.history && data.history.length) {
-        document.getElementById('historyCard').style.display = 'block';
+        document.getElementById('historySection').style.display = 'block';
         const list = document.getElementById('historyList');
-        list.innerHTML = data.history.map(h => {
+        list.innerHTML = data.history.slice(0, 5).map(h => {
           const d = new Date(h.created_at * 1000).toLocaleDateString();
-          return `<li><span>${d}</span><span>${h.file_count} image(s) processed</span></li>`;
+          return `<li><span>${d}</span><span style="color:#111827;font-weight:600">${h.file_count} images</span></li>`;
         }).join('');
       }
-    } catch (e) { console.error('loadHistory error', e); }
+    } catch (e) {}
   }
 
   // ── Upload ────────────────────────────────────────────────
@@ -243,15 +521,47 @@
 
   function handleFiles(files) {
     selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
-    if (selectedFiles.length) {
-      uploadArea.querySelector('p').innerHTML = `<strong>${selectedFiles.length} file(s) selected</strong>`;
-      document.getElementById('processBtn').textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
-      document.getElementById('processBtn').disabled = false;
-      document.getElementById('status').textContent = 'Ready to process';
-    }
+    if (!selectedFiles.length) return;
+
+    // 缩小上传区，显示网格
+    uploadArea.style.minHeight = '80px';
+    uploadArea.style.padding = '20px';
+    uploadArea.querySelector('h3').textContent = `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
+    uploadArea.querySelector('p').textContent = 'Click to add more';
+
+    // 渲染预览卡片
+    const grid = document.getElementById('imageGrid');
+    grid.innerHTML = '';
+    selectedFiles.forEach((file, i) => {
+      const card = document.createElement('div');
+      card.className = 'image-card';
+      card.id = `card-${i}`;
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      const badge = document.createElement('div');
+      badge.className = 'status-badge';
+      badge.textContent = '⏳';
+      card.appendChild(img);
+      card.appendChild(badge);
+      grid.appendChild(card);
+    });
+
+    // 显示底部操作栏
+    const actionBar = document.getElementById('actionBar');
+    actionBar.classList.add('visible');
+    document.body.style.paddingBottom = '100px';
+
+    const btn = document.getElementById('processBtn');
+    btn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
+    btn.disabled = false;
+    setStatus('Ready to process');
   }
 
-  // ── 图片压缩并转 base64 data URL ─────────────────────────────
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  // ── 图片压缩 ──────────────────────────────────────────────
   async function compressToDataUrl(file) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -280,95 +590,96 @@
   document.getElementById('processBtn').addEventListener('click', async () => {
     if (!selectedFiles.length) return;
 
-    // 先检查额度（不扣除，只检查）
     const creditRes = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include' });
     if (creditRes.ok) {
       const creditData = await creditRes.json();
       if (creditData.reason === 'free_limit') {
-        document.getElementById('status').textContent = '⚠️ Daily free limit reached. Sign in for more credits.';
-        document.getElementById('status').className = 'status error';
+        setStatus('⚠️ Daily free limit reached. Sign in for more credits.');
         return;
       }
-      if (creditData.reason === 'no_credits') {
-        document.getElementById('upgradeBanner').style.display = 'flex';
-        return;
-      }
+      if (creditData.reason === 'no_credits') { showUpgrade(); return; }
     }
 
-    document.getElementById('processBtn').disabled = true;
+    const btn = document.getElementById('processBtn');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
     document.getElementById('progressTrack').style.display = 'block';
-    document.getElementById('resultsArea').style.display = 'none';
-    document.getElementById('previews').innerHTML = '';
     processedResults = [];
-
-    const bgColor = document.getElementById('bgColor').value;
     let errors = 0;
 
     for (let i = 0; i < selectedFiles.length; i++) {
-      document.getElementById('status').textContent = `Compressing ${selectedFiles[i].name}...`;
-      document.getElementById('progressBar').style.width = `${(i / selectedFiles.length) * 100}%`;
+      const card = document.getElementById(`card-${i}`);
+      const badge = card ? card.querySelector('.status-badge') : null;
+      if (badge) badge.textContent = '⏳';
+
+      setStatus(`Processing ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`);
+      document.getElementById('progressBar').style.width = `${((i) / selectedFiles.length) * 100}%`;
 
       try {
-        // 前端压缩并转 base64，Worker 只做转发
         const dataUrl = await compressToDataUrl(selectedFiles[i]);
-
-        document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`;
-
         const res = await fetch(`${API}/api/remove-bg`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image_url: dataUrl }),
         });
+
         if (res.ok) {
           const blob = await res.blob();
           const name = selectedFiles[i].name.replace(/\.[^.]+$/, '') + '.png';
           processedResults.push({ name, blob });
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(blob);
-          const item = document.createElement('div');
-          item.className = 'preview-item';
-          item.appendChild(img);
-          document.getElementById('previews').appendChild(item);
+
+          // 翻转揭晓动效
+          if (card) {
+            card.classList.add('flipping');
+            setTimeout(() => {
+              card.querySelector('img').src = URL.createObjectURL(blob);
+              card.classList.remove('flipping');
+              if (badge) badge.textContent = '✅';
+            }, 300);
+          }
         } else {
           const err = await res.json().catch(() => ({}));
-          if (err.reason === 'free_limit') {
-            document.getElementById('status').textContent = '⚠️ Daily free limit reached. Sign in for more credits.';
-            document.getElementById('status').className = 'status error';
-            break;
-          }
-          if (err.reason === 'no_credits') {
-            document.getElementById('upgradeBanner').style.display = 'flex';
-            break;
-          }
+          if (err.reason === 'free_limit') { setStatus('⚠️ Daily free limit reached.'); break; }
+          if (err.reason === 'no_credits') { showUpgrade(); break; }
           errors++;
+          if (badge) badge.textContent = '❌';
         }
-      } catch (e) { errors++; }
+      } catch (e) {
+        errors++;
+        if (badge) badge.textContent = '❌';
+      }
     }
 
     document.getElementById('progressBar').style.width = '100%';
     const ok = processedResults.length;
-    document.getElementById('status').textContent = `✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`;
-    document.getElementById('status').className = 'status success';
-    document.getElementById('resultsArea').style.display = 'block';
-    document.getElementById('processBtn').disabled = false;
+    setStatus(`✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`);
 
-    // Save history
+    // 计算 ZIP 大小估算
+    const totalBytes = processedResults.reduce((s, r) => s + r.blob.size, 0);
+    const sizeMB = (totalBytes / 1024 / 1024).toFixed(1);
+
+    // 按钮膨胀变绿动效
+    btn.className = 'action-btn action-btn-download';
+    btn.textContent = `📥 Download ZIP (${sizeMB} MB)`;
+    btn.disabled = false;
+    btn.onclick = downloadZip;
+
     if (currentUser && ok > 0) {
       fetch(`${API}/api/history`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_count: ok, settings: { bgColor } }),
       });
-      // Refresh credits
       loadUser();
     }
   });
 
   // ── Download ZIP ──────────────────────────────────────────
-  document.getElementById('downloadBtn').addEventListener('click', async () => {
+  async function downloadZip() {
     if (!processedResults.length) return;
-    document.getElementById('downloadBtn').textContent = 'Zipping...';
+    const btn = document.getElementById('processBtn');
+    btn.textContent = 'Zipping...';
     const zip = new JSZip();
     processedResults.forEach(r => zip.file(r.name, r.blob));
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -376,8 +687,10 @@
     const a = document.createElement('a');
     a.href = url; a.download = 'shopbg-processed.zip'; a.click();
     URL.revokeObjectURL(url);
-    document.getElementById('downloadBtn').textContent = '⬇️ Download All as ZIP';
-  });
+    const totalBytes = processedResults.reduce((s, r) => s + r.blob.size, 0);
+    const sizeMB = (totalBytes / 1024 / 1024).toFixed(1);
+    btn.textContent = `📥 Download ZIP (${sizeMB} MB)`;
+  }
 
   // ── Init ──────────────────────────────────────────────────
   loadUser();
