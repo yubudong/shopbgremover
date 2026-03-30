@@ -293,16 +293,16 @@
   document.getElementById('processBtn').addEventListener('click', async () => {
     if (!selectedFiles.length) return;
 
-    // Check credit before starting
-    const creditRes = await fetch(`${API}/api/use-credit`, { method: 'POST', credentials: 'include' });
-    if (!creditRes.ok) {
-      const err = await creditRes.json();
-      if (err.reason === 'free_limit') {
+    // 先检查额度（不扣除，只检查）
+    const creditRes = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include' });
+    if (creditRes.ok) {
+      const creditData = await creditRes.json();
+      if (creditData.reason === 'free_limit') {
         document.getElementById('status').textContent = '⚠️ Daily free limit reached. Sign in for more credits.';
         document.getElementById('status').className = 'status error';
         return;
       }
-      if (err.reason === 'no_credits') {
+      if (creditData.reason === 'no_credits') {
         document.getElementById('upgradeBanner').style.display = 'flex';
         return;
       }
@@ -321,12 +321,6 @@
       document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`;
       document.getElementById('progressBar').style.width = `${(i / selectedFiles.length) * 100}%`;
 
-      // Deduct credit for each image after the first (first was deducted above)
-      if (i > 0) {
-        const r = await fetch(`${API}/api/use-credit`, { method: 'POST', credentials: 'include' });
-        if (!r.ok) { errors++; continue; }
-      }
-
       const formData = new FormData();
       // 压缩大图片
       let fileToUpload = selectedFiles[i];
@@ -337,12 +331,13 @@
       formData.append('image_file', fileToUpload);
       if (bgColor === 'white') formData.append('bg_color', 'ffffff');
 
-        try {
-          const res = await fetch(`${API}/api/remove-bg`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData,
-          });
+      try {
+        // remove-bg 内部处理额度扣除，成功才扣
+        const res = await fetch(`${API}/api/remove-bg`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
         if (res.ok) {
           const blob = await res.blob();
           const name = selectedFiles[i].name.replace(/\.[^.]+$/, '') + '.png';
@@ -353,7 +348,19 @@
           item.className = 'preview-item';
           item.appendChild(img);
           document.getElementById('previews').appendChild(item);
-        } else { errors++; }
+        } else {
+          const err = await res.json().catch(() => ({}));
+          if (err.reason === 'free_limit') {
+            document.getElementById('status').textContent = '⚠️ Daily free limit reached. Sign in for more credits.';
+            document.getElementById('status').className = 'status error';
+            break;
+          }
+          if (err.reason === 'no_credits') {
+            document.getElementById('upgradeBanner').style.display = 'flex';
+            break;
+          }
+          errors++;
+        }
       } catch (e) { errors++; }
     }
 
