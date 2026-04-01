@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing – ShopBG Remover | AI Background Removal for Shopify</title>
+  <meta name="description" content="Simple, transparent pricing for AI background removal. Start free with 5 credits, upgrade for more. Plans from $9.9/month." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.shopbgremover.com/pricing.html" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; min-height: 100vh; color: #1a1a1a; }
+    nav { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-size: 18px; font-weight: 800; color: #0f172a; text-decoration: none; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .btn-nav { padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; display: inline-block; }
+    .btn-nav-outline { background: #f1f5f9; color: #334155; }
+    .btn-nav-outline:hover { background: #e2e8f0; }
+    .btn-nav-primary { background: #0070f3; color: #fff; }
+    .btn-nav-primary:hover { background: #0051cc; }
+    .credits-tag { background: #fef3c7; color: #92400e; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+
+    .hero { text-align: center; padding: 56px 20px 40px; }
+    .hero h1 { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
+    .hero p { color: #64748b; margin-top: 12px; font-size: 1.05rem; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 0 20px 60px; }
+
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 700px) { .pricing-grid { grid-template-columns: 1fr; } }
+
+    .plan-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 32px 24px; text-align: center; position: relative; display: flex; flex-direction: column; }
+    .plan-card.popular { border-color: #0070f3; box-shadow: 0 8px 32px rgba(0,112,243,0.12); }
+    .popular-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: #0070f3; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 16px; border-radius: 20px; white-space: nowrap; }
+    .plan-name { font-size: 1rem; font-weight: 700; color: #374151; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .plan-price { font-size: 2.6rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    .plan-price span { font-size: 1rem; font-weight: 400; color: #64748b; }
+    .plan-credits { color: #64748b; font-size: 14px; margin: 10px 0 24px; }
+    .plan-features { list-style: none; text-align: left; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+    .plan-features li { font-size: 14px; color: #374151; display: flex; align-items: center; gap: 8px; }
+    .plan-features li::before { content: '✓'; color: #16a34a; font-weight: 700; flex-shrink: 0; }
+    .btn-plan { width: 100%; padding: 13px; border: none; border-radius: 9px; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+    .btn-plan-primary { background: #0070f3; color: #fff; }
+    .btn-plan-primary:hover { background: #0051cc; }
+    .btn-plan-outline { background: #f1f5f9; color: #334155; }
+    .btn-plan-outline:hover { background: #e2e8f0; }
+
+    .paypal-container { margin-top: 12px; min-height: 0; }
+
+    .faq { margin-top: 60px; }
+    .faq h2 { text-align: center; font-size: 1.6rem; font-weight: 800; margin-bottom: 32px; }
+    .faq-item { background: #fff; border-radius: 10px; padding: 20px 24px; margin-bottom: 12px; }
+    .faq-item h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .faq-item p { font-size: 14px; color: #64748b; line-height: 1.6; }
+
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+    .modal.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 16px; padding: 36px; max-width: 420px; width: 90%; text-align: center; }
+    .modal-box h3 { font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; }
+    .modal-box p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+    footer { text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-logo" href="/"><img src="/logo.svg" alt="ShopBG Remover" style="height:64px;" /></a>
+    <div class="nav-right" id="navRight">
+      <a href="/" class="btn-nav btn-nav-outline">← Back to App</a>
+      <a href="https://api.shopbgremover.com/auth/login" class="btn-nav btn-nav-primary" id="loginBtn">Sign in with Google</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Simple, Transparent Pricing</h1>
+    <p>Pay per image. No hidden fees. Cancel anytime.</p>
+  </div>
+
+  <div class="container">
+    <div class="pricing-grid">
+      <!-- Starter -->
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">$9.9<span>/mo</span></div>
+        <div class="plan-credits">50 images / month</div>
+        <ul class="plan-features">
+          <li>All size presets (Shopify, Amazon, eBay)</li>
+          <li>Custom background color</li>
+          <li>Batch rename templates</li>
+          <li>90-day history</li>
+          <li>ZIP download</li>
+        </ul>
+        <div class="paypal-container" id="paypal-starter"></div>
+      </div>
+
+      <!-- Pro -->
+      <div class="plan-card popular">
+        <div class="popular-badge">Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$19.9<span>/mo</span></div>
+        <div class="plan-credits">100 images / month</div>
+        <ul class="plan-features">
+          <li>Everything in Starter</li>
+          <li>Concurrent batch processing</li>
+          <li>Priority support</li>
+          <li>Best value per image</li>
+        </ul>
+        <div class="paypal-container" id="paypal-pro"></div>
+      </div>
+
+      <!-- Credits Pack -->
+      <div class="plan-card">
+        <div class="plan-name">Credits Pack</div>
+        <div class="plan-price">$5<span>/pack</span></div>
+        <div class="plan-credits">25 images · Never expire</div>
+        <ul class="plan-features">
+          <li>No subscription required</li>
+          <li>Use anytime</li>
+          <li>All features included</li>
+          <li>Stack multiple packs</li>
+        </ul>
+        <div class="paypal-container" id="paypal-credits_25"></div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="faq">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq-item">
+        <h3>How are credits counted?</h3>
+        <p>Each image processed uses 1 credit. Uploading 10 images = 10 credits used. You'll see a confirmation before processing starts.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Do unused monthly credits roll over?</h3>
+        <p>Monthly plan credits reset each month and don't roll over. Credits Packs never expire.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What image formats are supported?</h3>
+        <p>JPG, PNG, and WebP. Output is always PNG (supports transparency).</p>
+      </div>
+      <div class="faq-item">
+        <h3>Can I try before buying?</h3>
+        <p>Yes — sign in with Google and get 5 free credits instantly. No credit card required.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div class="modal" id="loginModal">
+    <div class="modal-box">
+      <h3>🔐 Sign in to Purchase</h3>
+      <p>Sign in with Google to buy credits and access all features.</p>
+      <div class="modal-actions">
+        <button class="btn-nav btn-nav-outline" onclick="closeModal()">Cancel</button>
+        <a href="https://api.shopbgremover.com/auth/login" class="btn-nav btn-nav-primary">Sign in with Google</a>
+      </div>
+    </div>
+  </div>
+
+  <footer>ShopBG Remover · <a href="/" style="color:#94a3b8">Back to App</a></footer>
+
+  <script src="https://www.paypal.com/sdk/js?client-id=AZSlMaqcUdHvRQdaCALfi1d4tvCgf2nJiEjPpE9dJgRdHmhrSj1J-7CKfHEq4KWgwjt4k-yM9xTI_oW6&currency=USD"></script>
+  <script>
+    const WORKER = 'https://api.shopbgremover.com';
+    let currentUser = null;
+    let currentCredits = 0;
+    let paypalButtons = {}; // 缓存已渲染的 PayPal 按钮
+
+    async function init() {
+      try {
+        const res = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
+        const data = await res.json();
+        if (data.user) {
+          currentUser = data.user;
+          currentCredits = data.credits?.credits || 0;
+          renderNav();
+          initPayPalButtons(); // 登录后渲染 PayPal 按钮
+        } else {
+          renderSignInButtons(); // 未登录时渲染登录引导按钮
+        }
+      } catch(e) {
+        console.error('Init error:', e);
+        renderSignInButtons();
+      }
+    }
+
+    function renderSignInButtons() {
+      ['starter', 'pro', 'credits_25'].forEach(plan => {
+        const container = document.getElementById(`paypal-${plan}`);
+        if (container) {
+          container.innerHTML = `<a href="https://api.shopbgremover.com/auth/login" class="btn-plan btn-plan-primary" style="display:block;text-align:center;text-decoration:none;margin-top:4px;">Sign in to Pay</a>`;
+        }
+      });
+    }
+
+    function renderNav() {
+      const nav = document.getElementById('navRight');
+      nav.innerHTML = `
+        <span class="credits-tag">⚡ ${currentCredits} credits</span>
+        <span style="font-size:13px;color:#64748b">${currentUser.name}</span>
+        <a href="/" class="btn-nav btn-nav-outline">← Back to App</a>
+        <a href="#" onclick="signOut()" class="btn-nav btn-nav-outline">Sign out</a>
+      `;
+    }
+
+    function initPayPalButtons() {
+      if (!currentUser) return;
+      
+      const plans = ['starter', 'pro', 'credits_25'];
+      plans.forEach(plan => {
+        const containerId = `paypal-${plan}`;
+        const container = document.getElementById(containerId);
+        if (!container || paypalButtons[plan]) return;
+
+        try {
+          paypalButtons[plan] = paypal.Buttons({
+            createOrder: async () => {
+              const res = await fetch(`${WORKER}/api/paypal/create-order`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan }),
+              });
+              const data = await res.json();
+              if (!data.orderId) throw new Error(data.error || 'Failed to create order');
+              return data.orderId;
+            },
+            onApprove: async (data) => {
+              const res = await fetch(`${WORKER}/api/paypal/capture-order`, {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: data.orderID }),
+              });
+              const result = await res.json();
+              if (result.ok) {
+                currentCredits += result.credits;
+                renderNav();
+                container.innerHTML = `<p style="color:#16a34a;font-weight:600;padding:8px 0">✅ ${result.credits} credits added!</p>`;
+              }
+            },
+            onError: (err) => {
+              console.error('PayPal error:', err);
+              container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Payment failed. Please try again or refresh the page.</p>';
+            },
+            onCancel: () => {
+              console.log('Payment cancelled');
+            }
+          });
+          paypalButtons[plan].render(`#${containerId}`);
+        } catch(e) {
+          console.error('Failed to init PayPal for', plan, e);
+          container.innerHTML = '<p style="color:#dc2626;font-size:13px;padding:8px 0">Failed to load PayPal. Please refresh.</p>';
+        }
+      });
+    }
+
+    async function startPayment(plan) {
+      if (!currentUser) { openModal('loginModal'); return; }
+      // 如果已经初始化了 PayPal 按钮，滚动到对应位置即可
+      const containerId = `paypal-${plan}`;
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+    document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
+
+    async function signOut() {
+      window.location.href = 'https://api.shopbgremover.com/auth/logout';
+    }
+
+    init();
+  </script>
+</body>
+</html>

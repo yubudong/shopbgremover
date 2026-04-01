@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMM5Z81M3X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GMM5Z81M3X');
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopify Product Background Remover – Batch AI Tool | ShopBG Remover</title>
+  <meta name="description" content="Remove backgrounds from Shopify product photos in bulk. AI-powered, outputs perfect 2048×2048 white background images ready to upload. No design skills needed.">
+  <link rel="canonical" href="https://www.shopbgremover.com/shopify-background-remover.html">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ShopBG Remover for Shopify",
+    "url": "https://www.shopbgremover.com/shopify-background-remover.html",
+    "applicationCategory": "PhotographyApplication",
+    "operatingSystem": "Web",
+    "description": "AI batch background removal tool optimized for Shopify product images. Outputs 2048×2048 white background JPG/PNG ready to upload.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "3 free images per day, no sign-up required"
+    }
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #3B82F6; --blue-dark: #2563EB; --blue-light: #EFF6FF;
+      --green: #10B981; --text: #111827; --text-2: #4B5563;
+      --text-muted: #9CA3AF; --border: #E5E7EB; --bg: #F8FAFC;
+      --white: #FFFFFF; --dark: #0A0A0A;
+      --sh: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05);
+      --sh-lg: 0 8px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.07);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+    /* Navbar */
+    .navbar { position: sticky; top: 0; z-index: 50; background: var(--dark); border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo-mark { font-size: 18px; color: #fff; }
+    .nav-logo-text { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+    .nav-logo-text span { color: #60A5FA; }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a { color: #9CA3AF; text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .credits-badge { display: none; align-items: center; background: rgba(59,130,246,0.12); color: #60A5FA; border: 1px solid rgba(59,130,246,0.25); border-radius: 20px; padding: 5px 14px; font-size: 13px; font-weight: 600; }
+    .credits-badge.show { display: flex; }
+    .user-name { font-size: 13px; color: #D1D5DB; }
+    .btn-nav { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-nav-login { background: var(--blue); color: #fff; }
+    .btn-nav-login:hover { background: var(--blue-dark); transform: translateY(-1px); }
+    .btn-nav-out { background: rgba(255,255,255,0.08); color: #E5E7EB; border: 1px solid rgba(255,255,255,0.12); }
+    .btn-nav-out:hover { background: rgba(255,255,255,0.14); }
+    @media (max-width: 800px) { .nav-links { display: none; } .navbar { padding: 0 20px; } }
+
+    /* Hero */
+    .hero { background: #fff; padding: 80px 24px 72px; text-align: center; border-bottom: 1px solid var(--border); }
+    .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; border-radius: 20px; padding: 6px 16px; font-size: 13px; font-weight: 600; margin-bottom: 24px; }
+    .hero h1 { font-size: clamp(2rem, 4.5vw, 3rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; color: var(--text); max-width: 760px; margin: 0 auto 20px; }
+    .hero h1 em { font-style: normal; background: linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero-sub { font-size: 1.1rem; color: var(--text-2); max-width: 580px; margin: 0 auto 40px; line-height: 1.7; }
+    .hero-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #7C3AED; color: #fff; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+    .btn-primary:hover { background: #6D28D9; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,58,237,0.3); }
+    .btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text-2); padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 600; border: 2px solid var(--border); transition: all 0.2s; text-decoration: none; }
+    .btn-secondary:hover { border-color: #9CA3AF; color: var(--text); }
+    .hero-stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; }
+    .hero-stat-val { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+    .hero-stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+
+    /* Shopify spec banner */
+    .spec-bar { background: #F5F3FF; border-top: 1px solid #DDD6FE; border-bottom: 1px solid #DDD6FE; padding: 14px 24px; display: flex; justify-content: center; align-items: center; gap: 32px; flex-wrap: wrap; }
+    .spec-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #5B21B6; }
+    .spec-item .dot { width: 8px; height: 8px; background: #7C3AED; border-radius: 50%; flex-shrink: 0; }
+
+    /* Sections */
+    .section { padding: 72px 24px; }
+    .section-alt { background: #fff; }
+    .section-inner { max-width: 960px; margin: 0 auto; }
+    .section-eyebrow { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #7C3AED; margin-bottom: 12px; }
+    .section-title { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; letter-spacing: -0.02em; color: var(--text); margin-bottom: 16px; }
+    .section-sub { font-size: 1rem; color: var(--text-2); max-width: 600px; line-height: 1.7; }
+
+    /* Requirements cards */
+    .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-top: 40px; }
+    .req-card { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+    .req-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .req-icon { width: 36px; height: 36px; background: #F5F3FF; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .req-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    .req-card ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .req-card li { font-size: 14px; color: var(--text-2); display: flex; align-items: flex-start; gap: 8px; }
+    .req-card li::before { content: "✓"; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+    /* Steps */
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; margin-top: 48px; }
+    .step { text-align: center; }
+    .step-num { width: 48px; height: 48px; background: #7C3AED; color: #fff; border-radius: 50%; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    .step h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .step p { font-size: 14px; color: var(--text-2); line-height: 1.6; }
+
+    /* FAQ */
+    .faq-list { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+    .faq-item { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .faq-q { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .faq-a { font-size: 14px; color: var(--text-2); line-height: 1.7; }
+
+    /* CTA */
+    .cta-section { background: linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%); padding: 72px 24px; text-align: center; }
+    .cta-section h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; color: #fff; letter-spacing: -0.02em; margin-bottom: 16px; }
+    .cta-section p { font-size: 1rem; color: rgba(255,255,255,0.85); margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .btn-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #7C3AED; padding: 15px 32px; border-radius: 10px; font-size: 16px; font-weight: 700; text-decoration: none; transition: all 0.2s; }
+    .btn-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+
+    /* Footer */
+    .footer { background: var(--dark); padding: 40px 24px; text-align: center; }
+    .footer-logo { font-size: 15px; font-weight: 700; color: white; margin-bottom: 16px; }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 18px; }
+    .footer-links a { color: #6B7280; text-decoration: none; font-size: 13px; transition: color 0.2s; }
+    .footer-links a:hover { color: #9CA3AF; }
+    .footer-copy { color: #4B5563; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="nav-logo" href="/">
+    <div class="nav-logo-mark">✂</div>
+    <span class="nav-logo-text">ShopBG<span>Remover</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="/#how">How it works</a>
+    <a href="/pricing.html">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay</a>
+  </div>
+  <div class="nav-right">
+    <div class="credits-badge" id="creditsBadge">
+      <span id="creditsText">— credits</span>
+    </div>
+    <span class="user-name" id="userName"></span>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/'">Sign in</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">🟣 Built for Shopify Sellers</div>
+  <h1>Remove product backgrounds<br><em>for your Shopify store</em></h1>
+  <p class="hero-sub">
+    AI batch processing that outputs Shopify-ready 2048×2048 white background images.
+    Upload 50 product photos at once — done in minutes, not hours.
+  </p>
+  <div class="hero-ctas">
+    <a class="btn-primary" href="/#tool">Try Free — No signup needed →</a>
+    <a class="btn-secondary" href="/pricing.html">See pricing</a>
+  </div>
+  <div class="hero-stats">
+    <div>
+      <div class="hero-stat-val">2048×2048</div>
+      <div class="hero-stat-label">Shopify-ready output size</div>
+    </div>
+    <div>
+      <div class="hero-stat-val">50 images</div>
+      <div class="hero-stat-label">Batch per upload</div>
+    </div>
+    <div>
+      <div class="hero-stat-val">3 free</div>
+      <div class="hero-stat-label">Images per day, no signup</div>
+    </div>
+  </div>
+</section>
+
+<!-- Shopify spec bar -->
+<div class="spec-bar">
+  <div class="spec-item"><div class="dot"></div>2048×2048 px output</div>
+  <div class="spec-item"><div class="dot"></div>Pure white background (RGB 255,255,255)</div>
+  <div class="spec-item"><div class="dot"></div>JPG & PNG supported</div>
+  <div class="spec-item"><div class="dot"></div>Shopify CDN-ready file size</div>
+</div>
+
+<!-- Shopify requirements -->
+<section class="section section-alt">
+  <div class="section-inner">
+    <span class="section-eyebrow">Shopify image guidelines</span>
+    <h2 class="section-title">What Shopify requires for product images</h2>
+    <p class="section-sub">Shopify recommends specific image standards to maximize conversions and ensure your store looks professional across all devices.</p>
+    <div class="req-grid">
+      <div class="req-card">
+        <div class="req-card-head">
+          <div class="req-icon">📐</div>
+          <div class="req-title">Size & Resolution</div>
+        </div>
+        <ul>
+          <li>2048×2048 px recommended (square)</li>
+          <li>Minimum 800×800 px</li>
+          <li>Maximum 4472×4472 px</li>
+          <li>Under 20 MB per image</li>
+        </ul>
+      </div>
+      <div class="req-card">
+        <div class="req-card-head">
+          <div class="req-icon">🎨</div>
+          <div class="req-title">Background</div>
+        </div>
+        <ul>
+          <li>White or light neutral background</li>
+          <li>Consistent across all products</li>
+          <li>No shadows or gradients on main image</li>
+          <li>Product fills 80–90% of frame</li>
+        </ul>
+      </div>
+      <div class="req-card">
+        <div class="req-card-head">
+          <div class="req-icon">📁</div>
+          <div class="req-title">File Format</div>
+        </div>
+        <ul>
+          <li>JPG (best for white backgrounds)</li>
+          <li>PNG (if you need transparency)</li>
+          <li>WebP supported</li>
+          <li>GIF for animated product views</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section">
+  <div class="section-inner">
+    <span class="section-eyebrow">How it works</span>
+    <h2 class="section-title">From raw photos to Shopify-ready in 3 steps</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Upload product photos</h3>
+        <p>Drag and drop up to 50 images at once. JPG, PNG, or WebP — any background, any product type.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>AI removes backgrounds</h3>
+        <p>Our AI instantly detects the product and removes the background with clean, sharp edges — even for apparel, jewelry, and complex shapes.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Download Shopify-ready ZIP</h3>
+        <p>Get all images as 2048×2048 white background JPGs in one ZIP. Upload directly to your Shopify product listings.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="section-inner">
+    <span class="section-eyebrow">FAQ</span>
+    <h2 class="section-title">Common questions from Shopify sellers</h2>
+    <div class="faq-list">
+      <div class="faq-item">
+        <div class="faq-q">Does the output meet Shopify's image requirements?</div>
+        <div class="faq-a">Yes. ShopBG Remover outputs 2048×2048 px images with a pure white background (RGB 255,255,255) — the recommended format for Shopify product listings to maximize zoom quality and look professional on all device sizes.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Can I process all my product photos in one go?</div>
+        <div class="faq-a">Yes. You can upload up to 50 images per batch. All images are processed in parallel and delivered as a single ZIP file, ready to bulk-upload to Shopify.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Does it work for clothing, jewelry, and shoes?</div>
+        <div class="faq-a">Absolutely. The AI handles complex product shapes including apparel on mannequins, jewelry with fine details, footwear, and accessories — all common categories for Shopify stores.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Is there a free trial?</div>
+        <div class="faq-a">Yes — 3 free images per day, no account required. Sign in to unlock more credits and batch processing.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2>Ready to upgrade your Shopify product photos?</h2>
+  <p>Join thousands of Shopify sellers saving hours on product image editing every week.</p>
+  <a class="btn-cta" href="/#tool">Start for free — no signup needed</a>
+</section>
+
+<footer class="footer">
+  <div class="footer-logo">ShopBG Remover</div>
+  <div class="footer-links">
+    <a href="/pricing.html">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify Guide</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay Guide</a>
+    <a href="/contact.html">Contact</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/terms.html">Terms of Service</a>
+  </div>
+  <div class="footer-copy">© 2026 ShopBG Remover. Built for e-commerce sellers worldwide.</div>
+</footer>
+
+</body>
+</html>

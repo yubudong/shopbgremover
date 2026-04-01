@@ -160,6 +160,113 @@ export default {
       });
     }
 
+    // POST /api/auth/email/send-otp → generate & email a 6-digit code
+    if (url.pathname === '/api/auth/email/send-otp' && request.method === 'POST') {
+      const { email } = await request.json().catch(() => ({}));
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json({ error: 'Invalid email address' }, 400, origin);
+      }
+
+      // Rate-limit: don't re-send if a fresh OTP (>1 min old) still exists
+      const existing = await env.DB.prepare(
+        `SELECT expires_at FROM email_otps WHERE email = ?`
+      ).bind(email).first();
+      if (existing && existing.expires_at > Math.floor(Date.now() / 1000) + 540) {
+        return json({ error: 'Please wait 60 seconds before requesting another code.' }, 429, origin);
+      }
+
+      // 6-digit OTP via crypto
+      const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+      const expiresAt = Math.floor(Date.now() / 1000) + 600; // 10 min
+
+      await env.DB.prepare(
+        `INSERT INTO email_otps (email, code, expires_at, attempts) VALUES (?, ?, ?, 0)
+         ON CONFLICT(email) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, attempts=0`
+      ).bind(email, code, expiresAt).run();
+
+      // Send via Resend
+      const sendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: `ShopBG Remover <${env.RESEND_FROM || 'onboarding@resend.dev'}>`,
+          to: [email],
+          subject: 'Your ShopBG Remover login code',
+          html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+            <h2 style="margin:0 0 8px;font-size:22px;color:#111827">Your login code</h2>
+            <p style="color:#6B7280;margin:0 0 28px;font-size:15px">Use this code to sign in to ShopBG Remover. It expires in 10 minutes.</p>
+            <div style="background:#F3F4F6;border-radius:12px;padding:28px;text-align:center;margin-bottom:28px">
+              <span style="font-size:42px;font-weight:800;letter-spacing:0.15em;color:#111827;font-family:monospace">${code}</span>
+            </div>
+            <p style="color:#9CA3AF;font-size:13px;margin:0">Didn't request this? You can safely ignore this email.</p>
+          </div>`,
+        }),
+      });
+
+      if (!sendRes.ok) {
+        const err = await sendRes.json().catch(() => ({}));
+        return json({ error: 'Failed to send email. Please try again.', detail: err }, 500, origin);
+      }
+      return json({ ok: true }, 200, origin);
+    }
+
+    // POST /api/auth/email/verify → verify OTP, issue session
+    if (url.pathname === '/api/auth/email/verify' && request.method === 'POST') {
+      const { email, code } = await request.json().catch(() => ({}));
+      if (!email || !code) return json({ error: 'Email and code are required.' }, 400, origin);
+
+      const otp = await env.DB.prepare(
+        `SELECT code, expires_at, attempts FROM email_otps WHERE email = ?`
+      ).bind(email).first();
+
+      if (!otp) return json({ error: 'No code found for this email. Request a new one.' }, 400, origin);
+      if (otp.expires_at < Math.floor(Date.now() / 1000)) {
+        await env.DB.prepare(`DELETE FROM email_otps WHERE email = ?`).bind(email).run();
+        return json({ error: 'Code expired. Please request a new one.' }, 400, origin);
+      }
+      if (otp.attempts >= 5) {
+        return json({ error: 'Too many incorrect attempts. Please request a new code.' }, 429, origin);
+      }
+
+      await env.DB.prepare(`UPDATE email_otps SET attempts = attempts + 1 WHERE email = ?`).bind(email).run();
+
+      if (otp.code !== String(code).trim()) {
+        const left = 4 - otp.attempts;
+        return json({ error: `Incorrect code. ${left} attempt${left !== 1 ? 's' : ''} remaining.` }, 400, origin);
+      }
+
+      // Valid — consume OTP
+      await env.DB.prepare(`DELETE FROM email_otps WHERE email = ?`).bind(email).run();
+
+      // Find or create user by email (shared table with Google users)
+      let user = await env.DB.prepare(`SELECT id, name FROM users WHERE email = ?`).bind(email).first();
+      if (!user) {
+        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email));
+        const userId  = 'em_' + Array.from(new Uint8Array(hashBuf)).slice(0, 8)
+                          .map(b => b.toString(16).padStart(2, '0')).join('');
+        const name    = email.split('@')[0];
+        await env.DB.prepare(`INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)`)
+          .bind(userId, email, name).run();
+        await env.DB.prepare(`INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 5)`)
+          .bind(userId).run();
+        user = { id: userId, name };
+      }
+
+      const token = await signJWT(
+        { sub: user.id, email, name: user.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
+        env.JWT_SECRET
+      );
+
+      return new Response(JSON.stringify({ ok: true, name: user.name }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...cors(origin),
+          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
+        },
+      });
+    }
+
     // GET /api/me → current user info + credits
     if (url.pathname === '/api/me') {
       const user = await getUser(request, env);
@@ -342,9 +449,19 @@ export default {
         
         const { plan } = await request.json();
         const PLANS = {
-          starter: { amount: '9.90', credits: 50 },
-          pro: { amount: '19.90', credits: 100 },
-          credits_25: { amount: '5.00', credits: 25 },
+          // Monthly subscriptions
+          starter_monthly:  { amount: '4.90',   credits: 100  },
+          pro_monthly:      { amount: '9.90',   credits: 300  },
+          business_monthly: { amount: '24.90',  credits: 1000 },
+          // Annual subscriptions (billed as one-time yearly payment)
+          starter_annual:   { amount: '46.80',  credits: 1200 },
+          pro_annual:       { amount: '94.80',  credits: 3600 },
+          business_annual:  { amount: '238.80', credits: 12000 },
+          // Pay-as-you-go
+          payg_10:          { amount: '1.50',   credits: 10   },
+          payg_50:          { amount: '4.90',   credits: 50   },
+          payg_200:         { amount: '12.90',  credits: 200  },
+          payg_500:         { amount: '24.90',  credits: 500  },
         };
         
         if (!PLANS[plan]) return json({ error: 'Invalid plan' }, 400, origin);
@@ -352,9 +469,12 @@ export default {
         if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_SECRET) {
           return json({ error: 'PayPal credentials not configured' }, 500, origin);
         }
-        
+
+        const ppBase = env.PAYPAL_MODE === 'sandbox'
+          ? 'https://api-m.sandbox.paypal.com'
+          : 'https://api-m.paypal.com';
         const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
-        const orderRes = await fetch('https://api-m.paypal.com/v2/checkout/orders', {
+        const orderRes = await fetch(`${ppBase}/v2/checkout/orders`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -398,6 +518,9 @@ export default {
       if (!user) return json({ error: 'Unauthorized' }, 401, origin);
 
       const { orderId } = await request.json();
+      const ppBase = env.PAYPAL_MODE === 'sandbox'
+        ? 'https://api-m.sandbox.paypal.com'
+        : 'https://api-m.paypal.com';
       const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
 
       // Get order from DB first (to check for duplicate processing)
@@ -405,7 +528,7 @@ export default {
       if (!order) return json({ error: 'Order not found' }, 404, origin);
       if (order.status === 'completed') return json({ error: 'Order already processed' }, 400, origin);
 
-      const captureRes = await fetch(`https://api-m.paypal.com/v2/checkout/orders/${orderId}/capture`, {
+      const captureRes = await fetch(`${ppBase}/v2/checkout/orders/${orderId}/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
       });
