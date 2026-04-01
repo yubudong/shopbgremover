@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMM5Z81M3X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GMM5Z81M3X');
+  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact – ShopBG Remover</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0e;--surface:#161619;--surface2:#1e1e22;
+  --text:#e8e8e6;--text2:#9a9a96;--text3:#6a6a66;
+  --border:#2a2a2e;--border2:#3a3a3e;
+  --accent:#6c5ce7;--accent2:#a29bfe;
+  --green:#00b894;--green-bg:rgba(0,184,148,0.1);
+  --r:12px;--font:'Outfit',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.navbar{position:sticky;top:0;z-index:50;background:#0A0A0A;border-bottom:1px solid rgba(255,255,255,0.07);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-mark{font-size:18px;color:#fff}
+.nav-logo-text{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+.nav-logo-text span{color:#60A5FA}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:#9CA3AF;text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:#fff}
+.nav-right{display:flex;align-items:center;gap:12px}
+.credits-badge{display:none;align-items:center;background:rgba(59,130,246,0.12);color:#60A5FA;border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600}
+.credits-badge.show{display:flex}
+.user-name{font-size:13px;color:#D1D5DB}
+.btn-nav{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}
+.btn-nav-login{background:#3B82F6;color:#fff}
+.btn-nav-login:hover{background:#2563EB;transform:translateY(-1px)}
+.btn-nav-out{background:rgba(255,255,255,0.08);color:#E5E7EB;border:1px solid rgba(255,255,255,0.12)}
+.btn-nav-out:hover{background:rgba(255,255,255,0.14)}
+@media(max-width:800px){.nav-links{display:none}.navbar{padding:0 20px}}
+
+.container{max-width:580px;margin:0 auto;padding:80px 24px 96px;text-align:center}
+
+.icon{font-size:48px;margin-bottom:24px;display:block}
+h1{font-size:clamp(28px,4vw,38px);font-weight:800;letter-spacing:-.03em;margin-bottom:14px}
+.subtitle{font-size:16px;color:var(--text2);margin-bottom:48px;max-width:420px;margin-left:auto;margin-right:auto}
+
+.contact-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;margin-bottom:24px;text-align:left}
+.contact-card-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:16px}
+.contact-email{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:16px 20px;margin-bottom:16px}
+.contact-email-icon{font-size:20px;flex-shrink:0}
+.contact-email-info{flex:1}
+.contact-email-label{font-size:12px;color:var(--text3);margin-bottom:2px}
+.contact-email-addr{font-size:15px;font-weight:600;color:var(--text)}
+.contact-email-addr a{color:var(--text);text-decoration:none}
+.contact-email-addr a:hover{color:var(--accent2)}
+
+.mailto-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;padding:13px 28px;border-radius:100px;text-decoration:none;transition:all .15s;margin-top:8px}
+.mailto-btn:hover{background:var(--accent2);color:var(--bg);text-decoration:none}
+
+.faq-hint{background:var(--green-bg);border:1px solid rgba(0,184,148,.2);border-radius:var(--r);padding:20px 24px;margin-top:24px;text-align:left}
+.faq-hint-title{font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px}
+.faq-hint p{font-size:14px;color:var(--text2);margin:0}
+.faq-hint a{color:var(--green)}
+
+.response-time{font-size:13px;color:var(--text3);margin-top:20px}
+
+.footer{background:#0A0A0A;border-top:1px solid rgba(255,255,255,0.07);padding:40px 24px;text-align:center}
+.footer-logo{font-size:15px;font-weight:700;color:white;margin-bottom:16px}
+.footer-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-bottom:18px}
+.footer-links a{color:#6B7280;text-decoration:none;font-size:13px;transition:color 0.2s}
+.footer-links a:hover{color:#9CA3AF}
+.footer-copy{color:#4B5563;font-size:12px}
+.footer a{color:var(--text2)}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="nav-logo" href="/">
+    
+    <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
+  </a>
+  <div class="nav-links">
+    <a href="/#how">How it works</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay</a>
+  </div>
+  <div class="nav-right">
+    <div class="credits-badge" id="creditsBadge"><span id="creditsText">— credits</span></div>
+    <span class="user-name" id="userName"></span>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/'">Sign in</button>
+  </div>
+</nav>
+
+<div class="container">
+  <span class="icon">✉️</span>
+  <h1>Get in touch</h1>
+  <p class="subtitle">Have a question about your credits, a payment issue, or just want to say hi? We're here to help.</p>
+
+  <div class="contact-card">
+    <div class="contact-card-title">Email support</div>
+    <div class="contact-email">
+      <span class="contact-email-icon">📬</span>
+      <div class="contact-email-info">
+        <div class="contact-email-label">Send us an email at</div>
+        <div class="contact-email-addr"><a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a></div>
+      </div>
+    </div>
+    <a class="mailto-btn" href="mailto:yubudong2023@gmail.com?subject=ShopBG Remover Support">
+      ✉️ &nbsp;Send email
+    </a>
+    <p class="response-time">We typically reply within 1–2 business days.</p>
+  </div>
+
+  <div class="faq-hint">
+    <div class="faq-hint-title">💡 Check pricing FAQ first</div>
+    <p>Answers to common questions about credits, refunds, and plans are on the <a href="/pricing">Pricing page</a> — you might find your answer faster there.</p>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-logo">ShopBG Remover</div>
+  <div class="footer-links">
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify Guide</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay Guide</a>
+    <a href="/contact">Contact</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </div>
+  <div class="footer-copy">© 2026 ShopBG Remover. Built for e-commerce sellers worldwide.</div>
+</footer>
+
+</body>
+</html>
