@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS processing_history (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Email OTP table (passwordless login)
+CREATE TABLE IF NOT EXISTS email_otps (
+  email      TEXT PRIMARY KEY,
+  code       TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts   INTEGER DEFAULT 0
+);
+
 -- Orders table
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,

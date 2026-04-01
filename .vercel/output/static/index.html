@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopBG Remover – AI Background Removal for Shopify Sellers</title>
+  <meta name="description" content="AI-powered batch background removal for Shopify, Amazon and eBay product images. Upload 50 images, get clean white or transparent backgrounds in seconds." />
+  <meta name="keywords" content="background removal, remove background, Shopify product images, AI background remover, batch background removal, product photography" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.shopbgremover.com/" />
+  <meta property="og:title" content="ShopBG Remover – AI Background Removal for Shopify" />
+  <meta property="og:description" content="Remove backgrounds from 50 product images at once. Perfect for Shopify, Amazon and eBay sellers." />
+  <meta property="og:url" content="https://www.shopbgremover.com/" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; min-height: 100vh; color: #1a1a1a; }
+
+    /* ── NAV ── */
+    nav {
+      background: #0f172a;
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo { font-size: 18px; font-weight: 800; color: #fff; text-decoration: none; letter-spacing: -0.3px; }
+    .nav-logo span { color: #60a5fa; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .credits-tag { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .nav-user { font-size: 13px; color: #94a3b8; }
+    .btn-nav { padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; display: inline-block; transition: all 0.18s; }
+    .btn-nav-ghost { background: rgba(255,255,255,0.08); color: #e2e8f0; }
+    .btn-nav-ghost:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .btn-nav-primary { background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; }
+    .btn-nav-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    /* ── HERO SPLIT ── */
+    .hero-section {
+      background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #0f2a4a 100%);
+      padding: 72px 40px 80px;
+      overflow: hidden;
+    }
+    .hero-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+    @media (max-width: 860px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 48px; }
+      .hero-section { padding: 48px 20px 56px; }
+    }
+
+    /* Left: Demo */
+    .hero-demo { position: relative; user-select: none; }
+    .demo-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #60a5fa;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .demo-label::before { content: ''; display: inline-block; width: 20px; height: 2px; background: #60a5fa; border-radius: 2px; }
+
+    .before-after {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+      cursor: col-resize;
+    }
+    .ba-img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .ba-after {
+      background: #ffffff;
+    }
+    .ba-after img { mix-blend-mode: normal; }
+    .ba-clip {
+      position: absolute; inset: 0;
+      clip-path: inset(0 50% 0 0);
+      transition: clip-path 0.05s;
+    }
+    .ba-divider {
+      position: absolute; top: 0; bottom: 0;
+      left: 50%; width: 3px;
+      background: #fff;
+      transform: translateX(-50%);
+      pointer-events: none;
+      transition: left 0.05s;
+      box-shadow: 0 0 12px rgba(0,0,0,0.4);
+    }
+    .ba-handle {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 40px;
+      background: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      pointer-events: none;
+      transition: left 0.05s;
+    }
+    .ba-handle svg { width: 20px; height: 20px; color: #334155; }
+    .ba-tag {
+      position: absolute; bottom: 14px;
+      font-size: 11px; font-weight: 700; padding: 4px 10px;
+      border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .ba-tag-before { left: 14px; background: rgba(0,0,0,0.6); color: #94a3b8; }
+    .ba-tag-after { right: 14px; background: rgba(59,130,246,0.85); color: #fff; }
+
+    /* thumbnail strip */
+    .demo-thumbs {
+      display: flex; gap: 10px; margin-top: 16px;
+    }
+    .demo-thumb {
+      flex: 1; aspect-ratio: 1;
+      border-radius: 10px; overflow: hidden;
+      border: 2px solid transparent;
+      cursor: pointer; transition: border-color 0.18s, transform 0.18s;
+      background: #1e293b;
+    }
+    .demo-thumb.active { border-color: #3b82f6; transform: scale(1.05); }
+    .demo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* Right: Upload panel */
+    .hero-panel {}
+    .hero-eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #60a5fa;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .hero-eyebrow::before { content: ''; display: inline-block; width: 20px; height: 2px; background: #60a5fa; border-radius: 2px; }
+    .hero-title {
+      font-size: 2.6rem; font-weight: 800; color: #f1f5f9;
+      line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 14px;
+    }
+    .hero-title .grad {
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    @media (max-width: 860px) { .hero-title { font-size: 2rem; } }
+    .hero-sub { font-size: 1rem; color: #94a3b8; line-height: 1.65; margin-bottom: 28px; }
+
+    /* upload area */
+    .upload-zone {
+      background: rgba(255,255,255,0.04);
+      border: 1.5px dashed rgba(255,255,255,0.15);
+      border-radius: 14px;
+      padding: 22px 20px 18px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone.drag-over {
+      border-color: #3b82f6;
+      background: rgba(59,130,246,0.07);
+    }
+    .upload-drop-hint {
+      text-align: center;
+      padding: 10px 0 16px;
+      pointer-events: none;
+    }
+    .upload-drop-hint .drop-icon { font-size: 1.8rem; margin-bottom: 6px; }
+    .upload-drop-hint p { color: #64748b; font-size: 13px; }
+    .upload-drop-hint strong { color: #94a3b8; }
+    .upload-btns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .upload-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: #cbd5e1;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.18s;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .upload-btn:hover {
+      background: rgba(59,130,246,0.15);
+      border-color: #3b82f6;
+      color: #93c5fd;
+      transform: translateY(-2px);
+    }
+    .upload-btn .btn-icon { display: flex; align-items: center; justify-content: center; }
+    .upload-btn .btn-icon svg { width: 26px; height: 26px; stroke: currentColor; transition: stroke 0.18s; }
+    .upload-drop-hint .drop-icon svg { width: 28px; height: 28px; stroke: #475569; }
+    .upload-btn .btn-sub { font-size: 10px; color: #475569; font-weight: 400; margin-top: 1px; }
+    #fileInput, #fileFolderInput, #fileBatchInput { display: none; }
+    .upload-selected {
+      text-align: center;
+      font-size: 13px;
+      color: #60a5fa;
+      font-weight: 600;
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    /* options row */
+    .options-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin: 14px 0;
+    }
+    @media (max-width: 480px) { .options-row { grid-template-columns: 1fr; } }
+    .opt-group { display: flex; flex-direction: column; gap: 5px; }
+    .opt-group label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .opt-group select {
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #e2e8f0;
+      appearance: none;
+      cursor: pointer;
+    }
+    .opt-group select:focus { outline: none; border-color: #3b82f6; }
+    .opt-group select option { background: #1e293b; color: #e2e8f0; }
+    .color-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+    .color-row input[type='color'] { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; background: none; padding: 0; }
+    .color-hex { flex: 1; padding: 7px 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; font-size: 12px; color: #e2e8f0; font-family: monospace; }
+
+    .credit-warn { font-size: 13px; color: #fbbf24; margin-bottom: 10px; background: rgba(251,191,36,0.08); border-radius: 8px; padding: 8px 12px; }
+    .status-bar { text-align: center; font-size: 13px; color: #64748b; min-height: 18px; margin-bottom: 10px; }
+    .status-bar.success { color: #34d399; font-weight: 600; }
+
+    .btn-process {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff;
+      transition: opacity 0.18s, transform 0.18s;
+      letter-spacing: 0.01em;
+    }
+    .btn-process:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    .btn-process:disabled { background: #334155; color: #64748b; cursor: not-allowed; transform: none; }
+
+    .progress-track { height: 5px; background: rgba(255,255,255,0.08); border-radius: 4px; margin-bottom: 12px; overflow: hidden; display: none; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #a78bfa); border-radius: 4px; width: 0%; transition: width 0.3s; }
+
+    /* results */
+    .results-area { display: none; margin-top: 16px; }
+    .result-badge { display: inline-block; background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+    .btn-dl { width: 100%; padding: 11px; border: none; border-radius: 9px; background: rgba(52,211,153,0.15); color: #34d399; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid rgba(52,211,153,0.3); transition: background 0.18s; }
+    .btn-dl:hover { background: rgba(52,211,153,0.25); }
+    .previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .preview-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .preview-item img { width: 72px; height: 72px; object-fit: contain; border-radius: 8px; background: repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 0 0 / 14px 14px; border: 1px solid rgba(255,255,255,0.08); }
+    .preview-name { font-size: 10px; color: #64748b; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── FEATURES ── */
+    .features-section {
+      padding: 80px 40px;
+      background: #fff;
+    }
+    @media (max-width: 640px) { .features-section { padding: 56px 20px; } }
+    .section-tag {
+      text-align: center;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #6366f1;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      text-align: center;
+      font-size: 2rem; font-weight: 800; color: #0f172a;
+      letter-spacing: -0.4px; margin-bottom: 48px;
+    }
+    .features-grid {
+      max-width: 1000px; margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 760px) { .features-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .features-grid { grid-template-columns: 1fr; } }
+    .feature-card {
+      padding: 28px 24px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #a5b4fc;
+      box-shadow: 0 8px 32px rgba(99,102,241,0.1);
+      transform: translateY(-3px);
+    }
+    .feat-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+    .feat-icon.blue { background: #eff6ff; }
+    .feat-icon.purple { background: #f5f3ff; }
+    .feat-icon.green { background: #f0fdf4; }
+    .feat-icon.amber { background: #fffbeb; }
+    .feat-icon.rose { background: #fff1f2; }
+    .feature-card h3 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 7px; }
+    .feature-card p { font-size: 13.5px; color: #64748b; line-height: 1.6; }
+
+    /* ── HOW IT WORKS ── */
+    .how-section {
+      padding: 80px 40px;
+      background: #f8fafc;
+    }
+    @media (max-width: 640px) { .how-section { padding: 56px 20px; } }
+    .steps {
+      max-width: 760px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+    @media (max-width: 620px) { .steps { grid-template-columns: 1fr; gap: 24px; } }
+    .step { text-align: center; padding: 0 20px; position: relative; }
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute; top: 28px; right: -4px;
+      width: calc(100% - 56px); height: 2px;
+      background: linear-gradient(90deg, #e2e8f0, #e2e8f0);
+      border-top: 2px dashed #e2e8f0;
+      left: calc(50% + 28px);
+      width: calc(100% - 56px);
+    }
+    @media (max-width: 620px) { .step:not(:last-child)::after { display: none; } }
+    .step-num {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: #fff;
+      margin: 0 auto 16px;
+      box-shadow: 0 8px 24px rgba(99,102,241,0.3);
+    }
+    .step h3 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .step p { font-size: 13.5px; color: #64748b; line-height: 1.6; }
+
+    /* ── MODAL ── */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal.open { display: flex; }
+    .modal-box { background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 40px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.5); }
+    .modal-box h3 { font-size: 1.25rem; font-weight: 800; color: #f1f5f9; margin-bottom: 10px; }
+    .modal-box p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+    /* ── FOOTER ── */
+    footer { background: #0f172a; text-align: center; padding: 28px 20px; color: #475569; font-size: 13px; }
+    footer a { color: #64748b; text-decoration: none; }
+    footer a:hover { color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="/"><img src="/logo.svg" alt="ShopBG Remover" style="height:64px;" /></a>
+    <div class="nav-right" id="navRight">
+      <a href="/pricing.html" class="btn-nav btn-nav-ghost">Pricing</a>
+      <a href="https://api.shopbgremover.com/auth/login" class="btn-nav btn-nav-primary">Sign in with Google</a>
+    </div>
+  </nav>
+
+  <!-- HERO SPLIT -->
+  <section class="hero-section">
+    <div class="hero-inner">
+
+      <!-- Left: Before / After demo -->
+      <div class="hero-demo">
+        <div class="demo-label">Live Demo</div>
+        <div class="before-after" id="baContainer">
+          <!-- After layer: white bg + removed-bg product image -->
+          <div class="ba-after" style="position:absolute;inset:0;">
+            <img class="ba-img" id="baAfterImg"
+              src="/demo/1.png"
+              alt="after" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <!-- Before layer: original image, clipped by divider -->
+          <div class="ba-clip" id="baClip">
+            <img class="ba-img" id="baBeforeImg"
+              src="/demo/1.jpg"
+              alt="before" />
+          </div>
+          <div class="ba-divider" id="baDivider"></div>
+          <div class="ba-handle" id="baHandle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M8 9l-4 3 4 3M16 9l4 3-4 3"/>
+            </svg>
+          </div>
+          <span class="ba-tag ba-tag-before">Before</span>
+          <span class="ba-tag ba-tag-after">After</span>
+        </div>
+
+        <!-- Thumbnail strip -->
+        <div class="demo-thumbs" id="demoThumbs">
+          <div class="demo-thumb active" data-idx="0">
+            <img src="/demo/1.jpg" alt="watch" />
+          </div>
+          <div class="demo-thumb" data-idx="1">
+            <img src="/demo/2.jpg" alt="sneakers" />
+          </div>
+          <div class="demo-thumb" data-idx="2">
+            <img src="/demo/3.jpg" alt="bag" />
+          </div>
+          <div class="demo-thumb" data-idx="3">
+            <img src="/demo/4.jpg" alt="watch" />
+          </div>
+          <div class="demo-thumb" data-idx="4">
+            <img src="/demo/5.jpg" alt="perfume" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Upload panel -->
+      <div class="hero-panel">
+        <div class="hero-eyebrow">AI Background Remover</div>
+        <h1 class="hero-title">Remove backgrounds<br>from <span class="grad">50 images</span><br>in seconds</h1>
+        <p class="hero-sub">Built for Shopify, Amazon & eBay sellers. Batch process, choose your background, download as ZIP — all in one click.</p>
+
+        <div class="upload-zone" id="uploadArea">
+          <!-- 三按钮 -->
+          <div class="upload-btns">
+            <div class="upload-btn" id="btnSingle">
+              <span class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <path d="M21 15l-5-5L5 21"/>
+                </svg>
+              </span>
+              <span>Single Image</span>
+              <span class="btn-sub">Select 1 file</span>
+            </div>
+            <div class="upload-btn" id="btnBatch">
+              <span class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1"/>
+                  <path d="M12 12V4m0 0L9 7m3-3l3 3"/>
+                  <rect x="2" y="11" width="20" height="2" rx="1" fill="currentColor" opacity="0.15" stroke="none"/>
+                  <path d="M2 20h20"/>
+                  <path d="M2 16h20"/>
+                </svg>
+              </span>
+              <span>Batch Upload</span>
+              <span class="btn-sub">Multiple files</span>
+            </div>
+            <div class="upload-btn" id="btnFolder">
+              <span class="btn-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                  <path d="M12 11v6m0 0l-2-2m2 2l2-2"/>
+                </svg>
+              </span>
+              <span>Folder Upload</span>
+              <span class="btn-sub">Entire folder</span>
+            </div>
+          </div>
+          <!-- 拖放提示 -->
+          <div class="upload-drop-hint">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4m0 0L8 8m4-4l4 4"/>
+                <path d="M4 20h16"/>
+                <path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/>
+              </svg>
+            </div>
+            <p><strong>Drag & drop</strong> images here · JPG · PNG · WebP · Max 50</p>
+          </div>
+          <div class="upload-selected" id="uploadSelected"></div>
+          <!-- hidden inputs -->
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" />
+          <input type="file" id="fileBatchInput" multiple accept="image/jpeg,image/png,image/webp" />
+          <input type="file" id="fileFolderInput" multiple accept="image/jpeg,image/png,image/webp" webkitdirectory />
+        </div>
+
+        <div class="options-row">
+          <div class="opt-group">
+            <label>Background</label>
+            <select id="bgColor">
+              <option value="white">White</option>
+              <option value="transparent">Transparent</option>
+              <option value="custom">Custom</option>
+            </select>
+            <div class="color-row" id="colorPicker" style="display:none;">
+              <input type="color" id="colorInput" value="#ffffff" />
+              <input type="text" id="colorHex" class="color-hex" value="#ffffff" placeholder="#ffffff" />
+            </div>
+          </div>
+          <div class="opt-group">
+            <label>Output Size</label>
+            <select id="sizePreset">
+              <option value="original">Original</option>
+              <option value="shopify">Shopify 2048²</option>
+              <option value="amazon">Amazon 1000²</option>
+              <option value="ebay">eBay 500²</option>
+            </select>
+          </div>
+          <div class="opt-group">
+            <label>File Naming</label>
+            <select id="renameTemplate">
+              <option value="original">Keep name</option>
+              <option value="sequence">01, 02…</option>
+              <option value="date_seq">Date + seq</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="credit-warn" id="creditWarning" style="display:none;"></div>
+        <div class="status-bar" id="status">Select images to get started</div>
+        <button class="btn-process" id="processBtn" disabled>Remove Background</button>
+
+        <div class="progress-track" id="progressTrack">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="results-area" id="resultsArea">
+          <div class="result-badge" id="resultBadge"></div>
+          <button class="btn-dl" id="downloadBtn">⬇️ Download All as ZIP</button>
+          <div class="previews" id="previews"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features-section">
+    <div class="section-tag">Why ShopBG Remover</div>
+    <h2 class="section-title">Everything you need to ship faster</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feat-icon blue">⚡</div>
+        <h3>Batch Processing</h3>
+        <p>Upload up to 50 images at once. Our AI removes backgrounds concurrently — what used to take hours takes seconds.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon purple">📦</div>
+        <h3>One-Click ZIP Download</h3>
+        <p>All processed images packaged into a single ZIP file, ready to upload straight to your store.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon green">🛍️</div>
+        <h3>Platform Size Presets</h3>
+        <p>Shopify (2048×2048), Amazon (1000×1000), eBay (500×500) — one click to match any marketplace spec.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon amber">🎨</div>
+        <h3>Flexible Backgrounds</h3>
+        <p>White, transparent, or any custom hex color. Switch instantly to match your brand guidelines.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon rose">🔁</div>
+        <h3>Re-download Anytime</h3>
+        <p>Logged-in users get 90-day history. Re-download any previous batch without reprocessing.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon blue">✏️</div>
+        <h3>Smart File Naming</h3>
+        <p>Keep original names, switch to sequential numbering, or use date-stamped filenames — your choice.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-section">
+    <div class="section-tag">How it works</div>
+    <h2 class="section-title">Three steps to perfect product images</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Upload</h3>
+        <p>Drag & drop up to 50 product images. JPG, PNG and WebP all supported.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Configure</h3>
+        <p>Pick your background color, output size preset, and file naming style.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Download</h3>
+        <p>AI processes all images in parallel. Download your ZIP and you're done.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- UPGRADE MODAL -->
+  <div class="modal" id="upgradeModal">
+    <div class="modal-box">
+      <h3>⚡ Out of Credits</h3>
+      <p>You've used all your credits. Upgrade to keep processing images.</p>
+      <div class="modal-actions">
+        <button class="btn-nav btn-nav-ghost" onclick="closeModal()">Maybe later</button>
+        <a href="/pricing.html" class="btn-nav btn-nav-primary">See Plans</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN MODAL -->
+  <div class="modal" id="loginModal">
+    <div class="modal-box">
+      <h3>🔐 Sign in to Continue</h3>
+      <p>Sign in with Google to get 5 free credits and access all features.</p>
+      <div class="modal-actions">
+        <button class="btn-nav btn-nav-ghost" onclick="closeModal()">Cancel</button>
+        <a href="https://api.shopbgremover.com/auth/login" class="btn-nav btn-nav-primary">Sign in with Google</a>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Powered by Remove.bg &nbsp;·&nbsp; ShopBG Remover v2.0
+    &nbsp;·&nbsp; <a href="/pricing.html">Pricing</a>
+  </footer>
+
+<script>
+const WORKER = 'https://api.shopbgremover.com';
+const SIZE_PRESETS = { shopify: '2048x2048', amazon: '1000x1000', ebay: '500x500', original: null };
+
+let currentUser = null;
+let currentCredits = 0;
+let selectedFiles = [];
+let processedResults = [];
+let freeUsed = parseInt(localStorage.getItem('freeUsed') || '0');
+const FREE_LIMIT = 3;
+
+// ── Before/After Demo ────────────────────────────────────────
+// 使用本地处理后的真实抠图对比图片
+const DEMO_IMGS = [
+  { before: '/demo/1.jpg', after: '/demo/1.png', thumb: '/demo/1.jpg' },
+  { before: '/demo/2.jpg', after: '/demo/2.png', thumb: '/demo/2.jpg' },
+  { before: '/demo/3.jpg', after: '/demo/3.png', thumb: '/demo/3.jpg' },
+  { before: '/demo/4.jpg', after: '/demo/4.png', thumb: '/demo/4.jpg' },
+  { before: '/demo/5.jpg', after: '/demo/5.png', thumb: '/demo/5.jpg' },
+];
+let baPos = 50; // percent
+let baDragging = false;
+
+const baContainer = document.getElementById('baContainer');
+const baClip = document.getElementById('baClip');
+const baDivider = document.getElementById('baDivider');
+const baHandle = document.getElementById('baHandle');
+const baBeforeImg = document.getElementById('baBeforeImg');
+const baAfterImg = document.getElementById('baAfterImg');
+
+function setBA(pct) {
+  baPos = Math.max(2, Math.min(98, pct));
+  baClip.style.clipPath = `inset(0 ${100 - baPos}% 0 0)`;
+  baDivider.style.left = baPos + '%';
+  baHandle.style.left = baPos + '%';
+}
+setBA(50);
+
+function getPct(e) {
+  const rect = baContainer.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  return (x / rect.width) * 100;
+}
+baContainer.addEventListener('mousedown', e => { baDragging = true; setBA(getPct(e)); });
+baContainer.addEventListener('touchstart', e => { baDragging = true; setBA(getPct(e)); }, { passive: true });
+window.addEventListener('mousemove', e => { if (baDragging) setBA(getPct(e)); });
+window.addEventListener('touchmove', e => { if (baDragging) setBA(getPct(e)); }, { passive: true });
+window.addEventListener('mouseup', () => baDragging = false);
+window.addEventListener('touchend', () => baDragging = false);
+
+// Auto-animate on load
+let autoDir = -1, autoPos = 50;
+let autoTimer = setInterval(() => {
+  autoPos += autoDir * 0.6;
+  if (autoPos <= 20) autoDir = 1;
+  if (autoPos >= 80) autoDir = -1;
+  setBA(autoPos);
+}, 16);
+baContainer.addEventListener('mousedown', () => clearInterval(autoTimer));
+baContainer.addEventListener('touchstart', () => clearInterval(autoTimer), { passive: true });
+
+// Thumbnail switching
+document.querySelectorAll('.demo-thumb').forEach(thumb => {
+  thumb.addEventListener('click', () => {
+    document.querySelectorAll('.demo-thumb').forEach(t => t.classList.remove('active'));
+    thumb.classList.add('active');
+    const idx = parseInt(thumb.dataset.idx);
+    const img = DEMO_IMGS[idx];
+    baBeforeImg.src = img.before;
+    baAfterImg.src = img.after;
+    clearInterval(autoTimer);
+    setBA(50);
+  });
+});
+
+// ── Auth ──────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
+    const data = await res.json();
+    if (data.user) {
+      currentUser = data.user;
+      currentCredits = data.credits?.credits || 0;
+      renderNav();
+    }
+  } catch(e) {}
+}
+
+function renderNav() {
+  const nav = document.getElementById('navRight');
+  nav.innerHTML = `
+    <span class="credits-tag">⚡ ${currentCredits} credits</span>
+    <span class="nav-user">${currentUser.name}</span>
+    <a href="/pricing.html" class="btn-nav btn-nav-ghost">Pricing</a>
+    <a href="#" onclick="signOut()" class="btn-nav btn-nav-ghost">Sign out</a>
+  `;
+}
+
+async function signOut() { window.location.href = 'https://api.shopbgremover.com/auth/logout'; }
+
+// ── Upload ────────────────────────────────────────────────────
+const uploadArea      = document.getElementById('uploadArea');
+const fileInput       = document.getElementById('fileInput');
+const fileBatchInput  = document.getElementById('fileBatchInput');
+const fileFolderInput = document.getElementById('fileFolderInput');
+const processBtn      = document.getElementById('processBtn');
+const bgColorSel      = document.getElementById('bgColor');
+const colorPicker     = document.getElementById('colorPicker');
+const colorInput      = document.getElementById('colorInput');
+const colorHex        = document.getElementById('colorHex');
+
+bgColorSel.addEventListener('change', () => {
+  colorPicker.style.display = bgColorSel.value === 'custom' ? 'flex' : 'none';
+});
+colorInput.addEventListener('input', e => colorHex.value = e.target.value);
+colorHex.addEventListener('input', e => { if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) colorInput.value = e.target.value; });
+
+// 三按钮各自触发对应 input
+document.getElementById('btnSingle').addEventListener('click', () => fileInput.click());
+document.getElementById('btnBatch').addEventListener('click', () => fileBatchInput.click());
+document.getElementById('btnFolder').addEventListener('click', () => fileFolderInput.click());
+
+fileInput.addEventListener('change',       () => handleFiles(Array.from(fileInput.files)));
+fileBatchInput.addEventListener('change',  () => handleFiles(Array.from(fileBatchInput.files)));
+fileFolderInput.addEventListener('change', () => handleFiles(Array.from(fileFolderInput.files)));
+
+// 整个上传区支持拖放
+uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  const items = e.dataTransfer.items;
+  let files = [];
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') files.push(items[i].getAsFile());
+    }
+  } else {
+    files = Array.from(e.dataTransfer.files);
+  }
+  handleFiles(files);
+});
+
+function handleFiles(files) {
+  selectedFiles = files.filter(f => f && f.type.startsWith('image/')).slice(0, 50);
+  if (!selectedFiles.length) return;
+  const sel = document.getElementById('uploadSelected');
+  sel.textContent = `✓ ${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
+  processBtn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
+  processBtn.disabled = false;
+  document.getElementById('status').textContent = 'Ready to process';
+  updateCreditWarning();
+}
+
+function updateCreditWarning() {
+  const warn = document.getElementById('creditWarning');
+  if (!selectedFiles.length) { warn.style.display = 'none'; return; }
+  if (currentUser) {
+    warn.style.display = 'block';
+    warn.textContent = `This will use ${selectedFiles.length} credits. You have ${currentCredits} remaining.`;
+  } else {
+    const remaining = FREE_LIMIT - freeUsed;
+    warn.style.display = 'block';
+    warn.textContent = `Free quota: ${remaining} image${remaining !== 1 ? 's' : ''} remaining today. Sign in for more.`;
+  }
+}
+
+function getFileName(originalName, index) {
+  const t = document.getElementById('renameTemplate').value;
+  if (t === 'sequence') return String(index + 1).padStart(2, '0') + '.png';
+  if (t === 'date_seq') {
+    const d = new Date();
+    const date = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    return `${date}_${String(index + 1).padStart(2, '0')}.png`;
+  }
+  return originalName.replace(/\.[^.]+$/, '') + '.png';
+}
+
+// ── Process ───────────────────────────────────────────────────
+processBtn.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+  if (!currentUser && freeUsed >= FREE_LIMIT) { openModal('loginModal'); return; }
+
+  processBtn.disabled = true;
+  document.getElementById('progressTrack').style.display = 'block';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('previews').innerHTML = '';
+  processedResults = [];
+  let errors = 0;
+
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const file = selectedFiles[i];
+    document.getElementById('status').textContent = `Processing ${i + 1} / ${selectedFiles.length}: ${file.name}`;
+    document.getElementById('progressBar').style.width = (i / selectedFiles.length * 100) + '%';
+
+    const creditRes = await fetch(`${WORKER}/api/use-credit`, { method: 'POST', credentials: 'include' });
+    const creditData = await creditRes.json();
+    if (!creditData.ok) {
+      if (creditData.reason === 'no_credits') { openModal('upgradeModal'); break; }
+      if (creditData.reason === 'free_limit') { openModal('loginModal'); break; }
+      break;
+    }
+    if (!currentUser) { freeUsed++; localStorage.setItem('freeUsed', freeUsed); }
+    else { currentCredits = creditData.remaining; renderNav(); }
+
+    const formData = new FormData();
+    formData.append('image_file', file);
+    formData.append('type', 'product');
+    const bg = bgColorSel.value;
+    if (bg === 'white') formData.append('bg_color', 'ffffff');
+    else if (bg === 'custom') formData.append('bg_color', colorHex.value.replace('#', ''));
+    const size = SIZE_PRESETS[document.getElementById('sizePreset').value];
+    if (size) formData.append('size', size);
+
+    try {
+      const res = await fetch(`${WORKER}/api/remove-bg`, { method: 'POST', credentials: 'include', body: formData });
+      if (res.ok) {
+        const blob = await res.blob();
+        const name = getFileName(file.name, i);
+        processedResults.push({ name, blob });
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(blob);
+        const span = document.createElement('span');
+        span.className = 'preview-name';
+        span.textContent = name;
+        item.append(img, span);
+        document.getElementById('previews').appendChild(item);
+      } else { errors++; }
+    } catch { errors++; }
+  }
+
+  document.getElementById('progressBar').style.width = '100%';
+  const ok = processedResults.length;
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = `✅ Done! ${ok} processed${errors ? `, ${errors} failed` : ''}`;
+  statusEl.className = 'status-bar success';
+  document.getElementById('resultBadge').textContent = `${ok} image${ok !== 1 ? 's' : ''} ready`;
+  document.getElementById('resultsArea').style.display = 'block';
+  processBtn.disabled = false;
+
+  if (currentUser && ok > 0) {
+    fetch(`${WORKER}/api/history`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_count: ok, settings: { bgColor: bg, sizePreset: document.getElementById('sizePreset').value } }),
+    });
+  }
+});
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  if (!processedResults.length) return;
+  document.getElementById('downloadBtn').textContent = 'Zipping...';
+  const zip = new JSZip();
+  processedResults.forEach(r => zip.file(r.name, r.blob));
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'shopbg-processed.zip'; a.click();
+  URL.revokeObjectURL(url);
+  document.getElementById('downloadBtn').textContent = '⬇️ Download All as ZIP';
+});
+
+// ── Modal ─────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
+
+// ── Boot ──────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMM5Z81M3X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GMM5Z81M3X');
+  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing – ShopBG Remover | AI Background Removal for E-commerce</title>
+<meta name="description" content="Affordable AI background removal for Shopify, Amazon & eBay sellers. Free tier included. Starter from $4.9/mo for 100 HD images. No commitment, cancel anytime.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://www.shopbgremover.com/pricing">
+<meta property="og:title" content="ShopBG Remover Pricing – Background Removal from $0.025/image">
+<meta property="og:description" content="5× more images than remove.bg at half the price. Free tier included. Plans for every seller size.">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0e;--surface:#161619;--surface2:#1e1e22;--surface3:#26262b;
+  --text:#e8e8e6;--text2:#9a9a96;--text3:#6a6a66;
+  --border:#2a2a2e;--border2:#3a3a3e;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-bg:rgba(108,92,231,0.1);
+  --green:#00b894;--green-bg:rgba(0,184,148,0.1);
+  --amber:#fdcb6e;--amber-bg:rgba(253,203,110,0.1);
+  --r:12px;--r-sm:8px;--r-lg:16px;
+  --font:'Outfit',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none}
+
+/* ── Nav ── */
+.navbar{position:sticky;top:0;z-index:50;background:#0A0A0A;border-bottom:1px solid rgba(255,255,255,0.07);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-mark{font-size:18px;color:#fff}
+.nav-logo-text{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+.nav-logo-text span{color:#60A5FA}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:#9CA3AF;text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:#fff}
+.nav-right{display:flex;align-items:center;gap:12px}
+.credits-badge{display:none;align-items:center;background:rgba(59,130,246,0.12);color:#60A5FA;border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600}
+.credits-badge.show{display:flex}
+.user-name{font-size:13px;color:#D1D5DB}
+.btn-nav{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}
+.btn-nav-login{background:#3B82F6;color:#fff}
+.btn-nav-login:hover{background:#2563EB;transform:translateY(-1px)}
+.btn-nav-out{background:rgba(255,255,255,0.08);color:#E5E7EB;border:1px solid rgba(255,255,255,0.12)}
+.btn-nav-out:hover{background:rgba(255,255,255,0.14)}
+@media(max-width:800px){.nav-links{display:none}.navbar{padding:0 20px}}
+
+/* ── Hero ── */
+.hero{text-align:center;padding:64px 24px 24px;max-width:680px;margin:0 auto}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;padding:6px 16px;border-radius:100px;margin-bottom:24px;border:1px solid rgba(0,184,148,0.2)}
+.hero h1{font-size:clamp(32px,5vw,52px);font-weight:800;letter-spacing:-0.035em;line-height:1.1;margin-bottom:16px}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:17px;color:var(--text2);max-width:480px;margin:0 auto}
+
+/* ── Toggle ── */
+.toggle-section{display:flex;align-items:center;justify-content:center;gap:14px;padding:32px 0 40px}
+.toggle-label{font-size:15px;font-weight:500;color:var(--text3);cursor:pointer;transition:color .15s}
+.toggle-label.active{color:var(--text)}
+.toggle-track{width:52px;height:28px;background:var(--surface3);border-radius:100px;cursor:pointer;position:relative;transition:background .2s;border:1px solid var(--border)}
+.toggle-track.on{background:var(--accent);border-color:var(--accent)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.toggle-track.on .toggle-thumb{transform:translateX(24px)}
+.save-pill{font-size:12px;font-weight:700;color:var(--green);background:var(--green-bg);padding:4px 12px;border-radius:100px;border:1px solid rgba(0,184,148,0.2)}
+
+/* ── Plans ── */
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1100px;margin:0 auto;padding:0 24px 48px}
+@media(max-width:900px){.plans{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.plans{grid-template-columns:1fr;max-width:380px}}
+
+.plan{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;position:relative;transition:transform .15s,box-shadow .15s,border-color .15s}
+.plan:hover{transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,.3);border-color:var(--border2)}
+.plan.featured{border-color:var(--accent);background:linear-gradient(180deg,rgba(108,92,231,.06) 0%,var(--surface) 100%);box-shadow:0 0 0 1px var(--accent),0 8px 32px rgba(108,92,231,.12)}
+.plan-tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 14px;border-radius:100px;letter-spacing:.02em;white-space:nowrap}
+
+.plan-name{font-size:16px;font-weight:600;margin-bottom:2px}
+.plan-desc{font-size:12px;color:var(--text3);margin-bottom:16px;min-height:32px}
+.plan-original{font-size:12px;color:var(--text3);text-decoration:line-through;margin-bottom:4px;height:16px}
+.plan-price-row{display:flex;align-items:baseline;gap:3px;margin-bottom:2px}
+.plan-dollar{font-size:16px;font-weight:700;opacity:.5;position:relative;top:-14px}
+.plan-amount{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.plan-period{font-size:14px;color:var(--text3);font-weight:400}
+.plan-per{font-family:var(--mono);font-size:12px;color:var(--accent2);margin-bottom:20px;height:16px}
+
+.plan-cta{display:block;width:100%;padding:12px;border:none;border-radius:var(--r-sm);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;margin-bottom:20px;text-align:center;text-decoration:none}
+.cta-ghost{background:transparent;color:var(--text);border:1.5px solid var(--border)}
+.cta-ghost:hover{border-color:var(--text2);background:var(--surface2)}
+.cta-primary{background:var(--accent);color:#fff;border:1.5px solid var(--accent)}
+.cta-primary:hover{background:var(--accent2);border-color:var(--accent2);color:var(--bg)}
+
+.plan-features{list-style:none}
+.plan-features li{font-size:13px;color:var(--text2);padding:5px 0;display:flex;align-items:flex-start;gap:8px}
+.plan-features li .ico{flex-shrink:0;font-size:12px;margin-top:2px}
+.plan-features li .ico.yes{color:var(--green)}
+.plan-features li .ico.no{color:var(--text3);opacity:.4}
+.plan-features li.off{color:var(--text3);opacity:.45}
+
+/* ── Comparison ── */
+.compare{max-width:740px;margin:0 auto 48px;padding:0 24px}
+.compare-box{background:var(--amber-bg);border:1px solid rgba(253,203,110,.2);border-radius:var(--r);padding:20px 24px;display:flex;align-items:flex-start;gap:14px}
+.compare-icon{font-size:24px;flex-shrink:0;line-height:1}
+.compare-text{font-size:14px;color:var(--amber);line-height:1.7}
+.compare-text strong{font-weight:700}
+.compare-hook{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(135deg,rgba(108,92,231,.14),rgba(162,155,254,.07));
+  border:1px solid rgba(108,92,231,.35);border-radius:var(--r);
+  padding:16px 20px;margin-top:10px;
+}
+.hook-emoji{font-size:20px;flex-shrink:0}
+.hook-text{flex:1;font-size:14px;color:var(--accent2);font-weight:500;line-height:1.55;min-width:200px}
+.hook-btn{
+  background:var(--accent);color:#fff;
+  padding:10px 22px;border-radius:8px;
+  font-size:13px;font-weight:700;
+  text-decoration:none;white-space:nowrap;
+  transition:all .15s;flex-shrink:0;
+  box-shadow:0 4px 14px rgba(108,92,231,.35);
+}
+.hook-btn:hover{background:var(--accent2);color:var(--bg);transform:translateY(-1px)}
+
+/* ── PAYG ── */
+.payg{max-width:900px;margin:0 auto;padding:0 24px 56px}
+.section-head{text-align:center;margin-bottom:28px}
+.section-head h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+.section-head p{font-size:15px;color:var(--text2)}
+.payg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:700px){.payg-grid{grid-template-columns:1fr 1fr}}
+.payg-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:all .15s}
+.payg-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.payg-amount{font-size:22px;font-weight:800;margin-bottom:2px}
+.payg-images{font-size:13px;color:var(--text2);margin-bottom:6px}
+.payg-per{font-family:var(--mono);font-size:12px;color:var(--accent2)}
+.payg-valid{font-size:11px;color:var(--text3);margin-top:6px}
+
+/* ── Trust ── */
+.trust{max-width:900px;margin:0 auto;padding:0 24px 56px}
+.trust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:600px){.trust-grid{grid-template-columns:1fr}}
+.trust-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center}
+.trust-card .icon{font-size:28px;margin-bottom:12px}
+.trust-card h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.trust-card p{font-size:13px;color:var(--text2);line-height:1.6}
+
+/* ── FAQ ── */
+.faq{max-width:680px;margin:0 auto;padding:0 24px 80px}
+.faq-item{border-bottom:1px solid var(--border);padding:18px 0}
+.faq-q{font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--text);transition:color .15s}
+.faq-q:hover{color:var(--accent2)}
+.faq-q::after{content:'+';font-size:20px;color:var(--text3);flex-shrink:0;transition:transform .2s}
+.faq-item.open .faq-q::after{transform:rotate(45deg);color:var(--accent2)}
+.faq-a{font-size:14px;color:var(--text2);line-height:1.7;max-height:0;overflow:hidden;transition:max-height .3s,padding .3s}
+.faq-item.open .faq-a{max-height:400px;padding-top:12px}
+
+/* ── Footer ── */
+.footer{background:#0A0A0A;border-top:1px solid rgba(255,255,255,0.07);padding:40px 24px;text-align:center}
+.footer-logo{font-size:15px;font-weight:700;color:white;margin-bottom:16px}
+.footer-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-bottom:18px}
+.footer-links a{color:#6B7280;text-decoration:none;font-size:13px;transition:color 0.2s}
+.footer-links a:hover{color:#9CA3AF}
+.footer-copy{color:#4B5563;font-size:12px}
+.footer a{color:var(--text2)}
+
+/* ── PayPal buttons ── */
+.paypal-wrap{margin-bottom:20px;min-height:48px;border-radius:var(--r-sm);overflow:hidden}
+.pp-login-hint{font-size:12px;color:var(--text3);text-align:center;margin-top:6px}
+.payg-card .paypal-wrap{margin:10px 0 0;min-height:40px}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.plan{animation:fadeUp .5s ease both}
+.plan:nth-child(1){animation-delay:.05s}
+.plan:nth-child(2){animation-delay:.1s}
+.plan:nth-child(3){animation-delay:.15s}
+.plan:nth-child(4){animation-delay:.2s}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ShopBGRemover",
+  "applicationCategory": "DesignApplication",
+  "operatingSystem": "Web",
+  "url": "https://www.shopbgremover.com",
+  "offers": [
+    {"@type":"Offer","name":"Free",    "price":"0",    "priceCurrency":"USD"},
+    {"@type":"Offer","name":"Starter", "price":"4.90", "priceCurrency":"USD","billingDuration":"P1M"},
+    {"@type":"Offer","name":"Pro",     "price":"9.90", "priceCurrency":"USD","billingDuration":"P1M"},
+    {"@type":"Offer","name":"Business","price":"24.90","priceCurrency":"USD","billingDuration":"P1M"}
+  ]
+}
+</script>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <a class="nav-logo" href="/">
+    <div class="nav-logo-mark">✂</div>
+    <span class="nav-logo-text">ShopBG<span>Remover</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="/#how">How it works</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay</a>
+  </div>
+  <div class="nav-right">
+    <div class="credits-badge" id="creditsBadge"><span id="creditsText">— credits</span></div>
+    <span class="user-name" id="userName"></span>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/'">Sign in</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">⚡ 5× more images than remove.bg — half the price</div>
+  <h1>Plans that <em>scale with you</em></h1>
+  <p>Start free, upgrade when you're ready. No hidden fees, cancel anytime, every plan includes batch processing.</p>
+</section>
+
+<!-- Toggle -->
+<div class="toggle-section">
+  <span class="toggle-label active" id="lbl-m" onclick="setBilling(false)">Monthly</span>
+  <div class="toggle-track" id="toggle" onclick="toggleBilling()"><div class="toggle-thumb"></div></div>
+  <span class="toggle-label" id="lbl-a" onclick="setBilling(true)">Annual</span>
+  <span class="save-pill">Save 20%</span>
+</div>
+
+<!-- Plans -->
+<div class="plans">
+
+  <!-- Free -->
+  <div class="plan">
+    <div class="plan-name">Free</div>
+    <div class="plan-desc">Test it out — zero risk</div>
+    <div class="plan-original">&nbsp;</div>
+    <div class="plan-price-row">
+      <span class="plan-dollar">$</span>
+      <span class="plan-amount">0</span>
+    </div>
+    <div class="plan-per">&nbsp;</div>
+    <a href="/#tool" class="plan-cta cta-ghost">Get started free</a>
+    <ul class="plan-features">
+      <li><span class="ico yes">✓</span> 2 images / day without signup</li>
+      <li><span class="ico yes">✓</span> 3 HD / day with free account</li>
+      <li><span class="ico yes">✓</span> 10 bonus HD credits on signup</li>
+      <li><span class="ico yes">✓</span> White &amp; transparent backgrounds</li>
+      <li><span class="ico yes">✓</span> Batch upload up to 2 images</li>
+      <li class="off"><span class="ico no">—</span> Custom background color</li>
+      <li class="off"><span class="ico no">—</span> ZIP download</li>
+      <li class="off"><span class="ico no">—</span> Processing history</li>
+    </ul>
+  </div>
+
+  <!-- Starter -->
+  <div class="plan">
+    <div class="plan-name">Starter</div>
+    <div class="plan-desc">For sellers with 50–100 products / mo</div>
+    <div class="plan-original" data-monthly="&nbsp;" data-annual="$4.9/mo">&nbsp;</div>
+    <div class="plan-price-row">
+      <span class="plan-dollar">$</span>
+      <span class="plan-amount" data-monthly="4.9" data-annual="3.9">4.9</span>
+      <span class="plan-period">/ mo</span>
+    </div>
+    <div class="plan-per" data-monthly="$0.049 per image" data-annual="$0.039 per image">$0.049 per image</div>
+    <div class="paypal-wrap" id="pp-starter"></div>
+    <div class="pp-login-hint" id="hint-starter"></div>
+    <ul class="plan-features">
+      <li><span class="ico yes">✓</span> <strong>100</strong> HD credits / month</li>
+      <li><span class="ico yes">✓</span> Batch up to 20 images</li>
+      <li><span class="ico yes">✓</span> Full HD quality output</li>
+      <li><span class="ico yes">✓</span> Custom background color</li>
+      <li><span class="ico yes">✓</span> File renaming templates</li>
+      <li><span class="ico yes">✓</span> ZIP batch download</li>
+      <li><span class="ico yes">✓</span> 30-day processing history</li>
+      <li class="off"><span class="ico no">—</span> Priority processing</li>
+    </ul>
+  </div>
+
+  <!-- Pro -->
+  <div class="plan featured">
+    <div class="plan-tag">Most Popular</div>
+    <div class="plan-name">Pro</div>
+    <div class="plan-desc">For growing shops, 200–300 products / mo</div>
+    <div class="plan-original" data-monthly="&nbsp;" data-annual="$9.9/mo">&nbsp;</div>
+    <div class="plan-price-row">
+      <span class="plan-dollar">$</span>
+      <span class="plan-amount" data-monthly="9.9" data-annual="7.9">9.9</span>
+      <span class="plan-period">/ mo</span>
+    </div>
+    <div class="plan-per" data-monthly="$0.033 per image" data-annual="$0.026 per image">$0.033 per image</div>
+    <div class="paypal-wrap" id="pp-pro"></div>
+    <div class="pp-login-hint" id="hint-pro"></div>
+    <ul class="plan-features">
+      <li><span class="ico yes">✓</span> <strong>300</strong> HD credits / month</li>
+      <li><span class="ico yes">✓</span> Batch up to 50 images</li>
+      <li><span class="ico yes">✓</span> Full HD quality output</li>
+      <li><span class="ico yes">✓</span> All background options</li>
+      <li><span class="ico yes">✓</span> Platform size presets</li>
+      <li><span class="ico yes">✓</span> ZIP batch download</li>
+      <li><span class="ico yes">✓</span> 90-day processing history</li>
+      <li><span class="ico yes">✓</span> Priority processing queue</li>
+      <li><span class="ico yes">✓</span> Rollover up to 150 credits</li>
+    </ul>
+  </div>
+
+  <!-- Business -->
+  <div class="plan">
+    <div class="plan-name">Business</div>
+    <div class="plan-desc">For high-volume sellers &amp; agencies</div>
+    <div class="plan-original" data-monthly="&nbsp;" data-annual="$24.9/mo">&nbsp;</div>
+    <div class="plan-price-row">
+      <span class="plan-dollar">$</span>
+      <span class="plan-amount" data-monthly="24.9" data-annual="19.9">24.9</span>
+      <span class="plan-period">/ mo</span>
+    </div>
+    <div class="plan-per" data-monthly="$0.025 per image" data-annual="$0.020 per image">$0.025 per image</div>
+    <div class="paypal-wrap" id="pp-business"></div>
+    <div class="pp-login-hint" id="hint-business"></div>
+    <ul class="plan-features">
+      <li><span class="ico yes">✓</span> <strong>1,000</strong> HD credits / month</li>
+      <li><span class="ico yes">✓</span> Everything in Pro</li>
+      <li><span class="ico yes">✓</span> API access</li>
+      <li><span class="ico yes">✓</span> Rollover up to 500 credits</li>
+      <li><span class="ico yes">✓</span> Priority support</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- Comparison -->
+<div class="compare">
+  <div class="compare-box">
+    <div class="compare-icon">⚡</div>
+    <div class="compare-text">
+      <strong>How we compare:</strong> Our Pro plan gives you 300 images for $9.9/mo. Other leading background removers charge $9/mo for just 40 images. You get up to 20x more images per dollar — with industry-leading AI quality.
+    </div>
+  </div>
+  <div class="compare-hook">
+    <span class="hook-emoji">👉</span>
+    <span class="hook-text">Limited time offer: Upgrade now to lock in this early-bird pricing forever. Your price will never go up.</span>
+    <a href="/pricing#plans" class="hook-btn" onclick="document.querySelector('.plans').scrollIntoView({behavior:'smooth'});return false;">Lock in my price →</a>
+  </div>
+</div>
+
+<!-- Pay-as-you-go -->
+<section class="payg">
+  <div class="section-head">
+    <h2>Pay-as-you-go</h2>
+    <p>No subscription, no commitment. Buy credits and use them anytime within 12 months.</p>
+  </div>
+  <div class="payg-grid">
+    <div class="payg-card">
+      <div class="payg-amount">$1.50</div>
+      <div class="payg-images">10 images</div>
+      <div class="payg-per">$0.150 / image</div>
+      <div class="payg-valid">Valid 12 months</div>
+      <div class="paypal-wrap" id="pp-payg-10"></div>
+    </div>
+    <div class="payg-card">
+      <div class="payg-amount">$4.90</div>
+      <div class="payg-images">50 images</div>
+      <div class="payg-per">$0.098 / image</div>
+      <div class="payg-valid">Valid 12 months</div>
+      <div class="paypal-wrap" id="pp-payg-50"></div>
+    </div>
+    <div class="payg-card">
+      <div class="payg-amount">$12.90</div>
+      <div class="payg-images">200 images</div>
+      <div class="payg-per">$0.065 / image</div>
+      <div class="payg-valid">Valid 12 months</div>
+      <div class="paypal-wrap" id="pp-payg-200"></div>
+    </div>
+    <div class="payg-card">
+      <div class="payg-amount">$24.90</div>
+      <div class="payg-images">500 images</div>
+      <div class="payg-per">$0.050 / image</div>
+      <div class="payg-valid">Valid 12 months</div>
+      <div class="paypal-wrap" id="pp-payg-500"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust -->
+<section class="trust">
+  <div class="section-head">
+    <h2>Why sellers trust ShopBGRemover</h2>
+  </div>
+  <div class="trust-grid">
+    <div class="trust-card">
+      <div class="icon">🔒</div>
+      <h3>No risk to try</h3>
+      <p>Start with free images daily — no credit card, no signup. Buy a small pay-as-you-go pack to test before committing to a subscription.</p>
+    </div>
+    <div class="trust-card">
+      <div class="icon">↩️</div>
+      <h3>Cancel anytime</h3>
+      <p>No contracts, no penalties. Cancel your subscription with one click and keep using remaining credits until the billing period ends.</p>
+    </div>
+    <div class="trust-card">
+      <div class="icon">🛡️</div>
+      <h3>Secure &amp; private</h3>
+      <p>Images are processed in real-time and automatically deleted. We never store or share your photos. Payments secured by PayPal.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq">
+  <div class="section-head">
+    <h2>Frequently asked questions</h2>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What image formats are supported?</div>
+    <div class="faq-a">We support JPG, JPEG, PNG, and WebP. Maximum file size is 5 MB for free users, 10 MB for registered and paid users. Output is always high-quality PNG with transparency support.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long does each image take to process?</div>
+    <div class="faq-a">Most images are processed in 3–8 seconds. Pro and Business subscribers enjoy priority processing for faster results, especially during peak hours.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try before subscribing?</div>
+    <div class="faq-a">Absolutely. You get free images per day without even signing up. Create a free account for 10 bonus HD credits. Or buy a small pay-as-you-go pack (10 images for $1.50) to test with your actual product photos — no subscription required.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What's the difference between monthly and annual billing?</div>
+    <div class="faq-a">Annual billing saves you 20% compared to monthly. For example, Pro is $9.9/mo monthly but only $7.9/mo on annual billing — that's $24 saved per year. You can switch between billing periods at any time.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What counts as one credit?</div>
+    <div class="faq-a">One credit = one background removal, regardless of image size or output format. Resizing to a platform preset (Shopify, Amazon, eBay) does not cost an extra credit.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do unused credits roll over?</div>
+    <div class="faq-a">Pro subscribers can roll over up to 150 unused credits to the next month. Business can roll over up to 500. Starter credits don't roll over. Pay-as-you-go credits are valid for 12 months from purchase.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I cancel or change my plan?</div>
+    <div class="faq-a">Yes, cancel or change your plan anytime with one click — no penalties. When you cancel, you keep access until the end of your current billing period. Remaining credits stay available until they expire.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is my data safe?</div>
+    <div class="faq-a">Your images are processed in real-time on Cloudflare's global edge network and deleted immediately after. We never store, analyze, or share your photos. All payments are processed through PayPal with bank-level encryption.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What payment methods do you accept?</div>
+    <div class="faq-a">We accept Visa, Mastercard, American Express, and PayPal through PayPal's secure payment gateway. All transactions are encrypted and PCI-compliant.</div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-logo">ShopBG Remover</div>
+  <div class="footer-links">
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify Guide</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay Guide</a>
+    <a href="/contact">Contact</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </div>
+  <div class="footer-copy">© 2026 ShopBG Remover. Built for e-commerce sellers worldwide.</div>
+</footer>
+
+<!-- PayPal JS SDK — replace PAYPAL_CLIENT_ID with your actual Client ID -->
+<script src="https://www.paypal.com/sdk/js?client-id=AZSlMaqcUdHvRQdaCALfi1d4tvCgf2nJiEjPpE9dJgRdHmhrSj1J-7CKfHEq4KWgwjt4k-yM9xTI_oW6&currency=USD&intent=capture" data-sdk-integration-source="button-factory"></script>
+
+<script>
+const API = 'https://api.shopbgremover.com';
+let annual = false;
+let currentUser = null;
+
+// ── Billing toggle ────────────────────────────────────────
+function toggleBilling() { setBilling(!annual); }
+
+function setBilling(isAnnual) {
+  annual = isAnnual;
+  document.getElementById('toggle').classList.toggle('on', annual);
+  document.getElementById('lbl-m').classList.toggle('active', !annual);
+  document.getElementById('lbl-a').classList.toggle('active',  annual);
+
+  document.querySelectorAll('.plan-amount[data-monthly]').forEach(el => {
+    el.textContent = annual ? el.dataset.annual : el.dataset.monthly;
+  });
+  document.querySelectorAll('.plan-per[data-monthly]').forEach(el => {
+    el.textContent = annual ? el.dataset.annual : el.dataset.monthly;
+  });
+  document.querySelectorAll('.plan-original[data-monthly]').forEach(el => {
+    el.innerHTML = annual ? el.dataset.annual : el.dataset.monthly;
+  });
+}
+
+// ── Auth ──────────────────────────────────────────────────
+async function loadUser() {
+  try {
+    const res  = await fetch(`${API}/api/me`, { credentials: 'include' });
+    const data = await res.json();
+    currentUser = data.user || null;
+  } catch(e) {}
+  renderPayPalButtons();
+}
+
+// ── PayPal button factory ─────────────────────────────────
+function makeButton(containerId, planKey, hintId) {
+  if (!window.paypal) return;
+
+  paypal.Buttons({
+    style: {
+      layout: 'horizontal',
+      color:  'blue',
+      shape:  'rect',
+      label:  'pay',
+      height: 44,
+      tagline: false,
+    },
+
+    createOrder: async () => {
+      // Must be logged in
+      if (!currentUser) {
+        window.location = `${API}/auth/login?redirect=/pricing`;
+        return;
+      }
+      const plan = planKey(); // planKey is a fn so it reads latest `annual`
+      const res  = await fetch(`${API}/api/paypal/create-order`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.orderId) {
+        alert(data.error || 'Failed to create order. Please try again.');
+        return;
+      }
+      return data.orderId;
+    },
+
+    onApprove: async (ppData) => {
+      const res = await fetch(`${API}/api/paypal/capture-order`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: ppData.orderID }),
+      });
+      const result = await res.json();
+      if (res.ok && result.credits != null) {
+        window.location = `/?payment=success&credits=${result.credits}`;
+      } else {
+        alert(result.error || 'Payment captured but something went wrong. Contact support.');
+      }
+    },
+
+    onError: (err) => {
+      console.error('PayPal error', err);
+      alert('PayPal encountered an error. Please try again or contact support.');
+    },
+  }).render('#' + containerId);
+
+  // Login hint for non-logged-in users
+  if (hintId) {
+    const hint = document.getElementById(hintId);
+    if (hint && !currentUser) {
+      hint.textContent = '* Sign in required to complete purchase';
+    }
+  }
+}
+
+function renderPayPalButtons() {
+  if (!window.paypal) {
+    // SDK not loaded yet — retry once
+    setTimeout(renderPayPalButtons, 800);
+    return;
+  }
+
+  // Subscription plans
+  makeButton('pp-starter',  () => annual ? 'starter_annual'  : 'starter_monthly',  'hint-starter');
+  makeButton('pp-pro',      () => annual ? 'pro_annual'       : 'pro_monthly',      'hint-pro');
+  makeButton('pp-business', () => annual ? 'business_annual'  : 'business_monthly', 'hint-business');
+
+  // Pay-as-you-go
+  makeButton('pp-payg-10',  () => 'payg_10',  null);
+  makeButton('pp-payg-50',  () => 'payg_50',  null);
+  makeButton('pp-payg-200', () => 'payg_200', null);
+  makeButton('pp-payg-500', () => 'payg_500', null);
+}
+
+// ── Init ─────────────────────────────────────────────────
+loadUser();
+</script>
+
+</body>
+</html>
