@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMM5Z81M3X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-GMM5Z81M3X');
+  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy – ShopBG Remover</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0e;--surface:#161619;--surface2:#1e1e22;
+  --text:#e8e8e6;--text2:#9a9a96;--text3:#6a6a66;
+  --border:#2a2a2e;
+  --accent:#6c5ce7;--accent2:#a29bfe;
+  --r:12px;--font:'Outfit',sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.navbar{position:sticky;top:0;z-index:50;background:#0A0A0A;border-bottom:1px solid rgba(255,255,255,0.07);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-mark{font-size:18px;color:#fff}
+.nav-logo-text{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+.nav-logo-text span{color:#60A5FA}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:#9CA3AF;text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:#fff}
+.nav-right{display:flex;align-items:center;gap:12px}
+.credits-badge{display:none;align-items:center;background:rgba(59,130,246,0.12);color:#60A5FA;border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600}
+.credits-badge.show{display:flex}
+.user-name{font-size:13px;color:#D1D5DB}
+.btn-nav{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}
+.btn-nav-login{background:#3B82F6;color:#fff}
+.btn-nav-login:hover{background:#2563EB;transform:translateY(-1px)}
+.btn-nav-out{background:rgba(255,255,255,0.08);color:#E5E7EB;border:1px solid rgba(255,255,255,0.12)}
+.btn-nav-out:hover{background:rgba(255,255,255,0.14)}
+@media(max-width:800px){.nav-links{display:none}.navbar{padding:0 20px}}
+
+.container{max-width:720px;margin:0 auto;padding:64px 24px 96px}
+
+.page-tag{display:inline-block;font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.03em;margin-bottom:12px}
+.meta{font-size:14px;color:var(--text3);margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--border)}
+
+h2{font-size:18px;font-weight:700;margin:40px 0 12px;color:var(--text)}
+p{font-size:15px;color:var(--text2);margin-bottom:14px}
+ul{font-size:15px;color:var(--text2);padding-left:20px;margin-bottom:14px}
+ul li{margin-bottom:6px}
+
+.highlight-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:var(--r);padding:20px 24px;margin:32px 0}
+.highlight-box p{margin:0;font-size:14px}
+
+.footer{background:#0A0A0A;border-top:1px solid rgba(255,255,255,0.07);padding:40px 24px;text-align:center}
+.footer-logo{font-size:15px;font-weight:700;color:white;margin-bottom:16px}
+.footer-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-bottom:18px}
+.footer-links a{color:#6B7280;text-decoration:none;font-size:13px;transition:color 0.2s}
+.footer-links a:hover{color:#9CA3AF}
+.footer-copy{color:#4B5563;font-size:12px}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="nav-logo" href="/">
+    
+    <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
+  </a>
+  <div class="nav-links">
+    <a href="/#how">How it works</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay</a>
+  </div>
+  <div class="nav-right">
+    <div class="credits-badge" id="creditsBadge"><span id="creditsText">— credits</span></div>
+    <span class="user-name" id="userName"></span>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/'">Sign in</button>
+  </div>
+</nav>
+
+<div class="container">
+  <span class="page-tag">Legal</span>
+  <h1>Privacy Policy</h1>
+  <p class="meta">Last updated: March 31, 2026 &nbsp;·&nbsp; ShopBG Remover (operated by shopbgremover)</p>
+
+  <div class="highlight-box">
+    <p>We keep this simple: we collect only what's necessary to run the service, we don't sell your data, and your product images are never stored after processing is complete.</p>
+  </div>
+
+  <h2>1. Who We Are</h2>
+  <p>ShopBG Remover is an AI-powered background removal tool for e-commerce sellers, operated under the brand <strong>shopbgremover</strong>. You can reach us at <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.</p>
+
+  <h2>2. Information We Collect</h2>
+  <p>We collect the minimum information needed to provide the service:</p>
+  <ul>
+    <li><strong>Account information:</strong> Your email address and display name when you sign in via Google OAuth or email OTP.</li>
+    <li><strong>Usage data:</strong> Number of images processed, timestamps, and credit balance — to manage your account and enforce plan limits.</li>
+    <li><strong>Payment information:</strong> Order ID, plan purchased, and payment amount. We do <em>not</em> store your card number or full PayPal credentials — payments are handled entirely by PayPal.</li>
+    <li><strong>Technical data:</strong> Browser type, IP address, and access logs collected automatically by Cloudflare for security and performance purposes.</li>
+  </ul>
+
+  <h2>3. Your Images</h2>
+  <p>Your product images are sent to our AI processing API solely for background removal. <strong>Images are not stored on our servers after processing is complete.</strong> Processed results are returned directly to your browser and are never retained or used for any other purpose.</p>
+
+  <h2>4. How We Use Your Information</h2>
+  <ul>
+    <li>To authenticate you and manage your account</li>
+    <li>To track credit usage and process payments</li>
+    <li>To send OTP verification codes via email (using Resend)</li>
+    <li>To respond to support inquiries</li>
+    <li>To detect and prevent abuse</li>
+  </ul>
+  <p>We do not use your data for advertising, and we do not sell or share it with third parties for marketing purposes.</p>
+
+  <h2>5. Third-Party Services</h2>
+  <p>We use the following third-party services to operate ShopBG Remover:</p>
+  <ul>
+    <li><strong>Cloudflare</strong> — hosting, CDN, DNS, and DDoS protection</li>
+    <li><strong>Google OAuth</strong> — optional sign-in method; governed by Google's Privacy Policy</li>
+    <li><strong>PayPal</strong> — payment processing; governed by PayPal's Privacy Policy</li>
+    <li><strong>Resend</strong> — transactional email delivery (OTP codes)</li>
+  </ul>
+
+  <h2>6. Cookies &amp; Local Storage</h2>
+  <p>We use a session cookie (<code>session</code>) to keep you logged in. It is set on <code>.shopbgremover.com</code> and expires after 30 days. We also use browser <code>localStorage</code> to track free usage limits for anonymous users. We do not use third-party advertising cookies.</p>
+
+  <h2>7. Data Retention</h2>
+  <p>We retain your account and usage records for as long as your account is active. You may request deletion of your account and associated data at any time by emailing <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. We will process deletion requests within 30 days.</p>
+
+  <h2>8. Your Rights</h2>
+  <p>Depending on your location, you may have rights under GDPR, CCPA, or other applicable laws, including the right to access, correct, or delete your personal data. To exercise any of these rights, contact us at <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.</p>
+
+  <h2>9. Children's Privacy</h2>
+  <p>ShopBG Remover is not directed at children under 13. We do not knowingly collect personal information from children.</p>
+
+  <h2>10. Changes to This Policy</h2>
+  <p>We may update this policy from time to time. The "Last updated" date at the top of this page will reflect any changes. Continued use of the service after changes constitutes acceptance of the updated policy.</p>
+
+  <h2>11. Contact</h2>
+  <p>For privacy-related questions or requests, email us at <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.</p>
+</div>
+
+<footer class="footer">
+  <div class="footer-logo">ShopBG Remover</div>
+  <div class="footer-links">
+    <a href="/pricing">Pricing</a>
+    <a href="/shopify-background-remover.html">Shopify Guide</a>
+    <a href="/amazon-ebay-product-images.html">Amazon & eBay Guide</a>
+    <a href="/contact">Contact</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </div>
+  <div class="footer-copy">© 2026 ShopBG Remover. Built for e-commerce sellers worldwide.</div>
+</footer>
+
+</body>
+</html>
