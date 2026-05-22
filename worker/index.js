@@ -5,7 +5,7 @@
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, FAL_API_KEY
 const REDIRECT_URI = 'https://api.shopbgremover.com/auth/callback';
 const FRONTEND_URL = 'https://www.shopbgremover.com';
-const FREE_DAILY_LIMIT = 3;
+const FREE_TOTAL_LIMIT = 10;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -281,22 +281,21 @@ export default {
     if (url.pathname === '/api/use-credit' && request.method === 'POST') {
       const user = await getUser(request, env);
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const today = new Date().toISOString().slice(0, 10);
 
       if (!user) {
-        // Free quota check
+        // Free quota check (total per IP, not daily)
         const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
-        ).bind(ip, today).first();
+          `SELECT count FROM free_usage WHERE ip = ?`
+        ).bind(ip).first();
         const count = row?.count || 0;
-        if (count >= FREE_DAILY_LIMIT) {
-          return json({ ok: false, reason: 'free_limit', message: 'Daily free limit reached. Sign in for more.' }, 403, origin);
+        if (count >= FREE_TOTAL_LIMIT) {
+          return json({ ok: false, reason: 'free_limit', message: 'Free limit reached. Sign up for 20 free credits.' }, 403, origin);
         }
         await env.DB.prepare(
-          `INSERT INTO free_usage (ip, date, count) VALUES (?, ?, 1)
-           ON CONFLICT(ip) DO UPDATE SET count = count + 1, date = ?`
-        ).bind(ip, today, today).run();
-        return json({ ok: true, remaining: FREE_DAILY_LIMIT - count - 1 }, 200, origin);
+          `INSERT INTO free_usage (ip, count) VALUES (?, 1)
+           ON CONFLICT(ip) DO UPDATE SET count = count + 1`
+        ).bind(ip).run();
+        return json({ ok: true, remaining: FREE_TOTAL_LIMIT - count - 1 }, 200, origin);
       }
 
       // Paid user: deduct credit
@@ -316,12 +315,11 @@ export default {
     if (url.pathname === '/api/check-credit') {
       const user = await getUser(request, env);
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const today = new Date().toISOString().slice(0, 10);
       if (!user) {
         const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
-        ).bind(ip, today).first();
-        if ((row?.count || 0) >= FREE_DAILY_LIMIT) {
+          `SELECT count FROM free_usage WHERE ip = ?`
+        ).bind(ip).first();
+        if ((row?.count || 0) >= FREE_TOTAL_LIMIT) {
           return json({ ok: false, reason: 'free_limit' }, 200, origin);
         }
         return json({ ok: true }, 200, origin);
@@ -339,15 +337,14 @@ export default {
     if (url.pathname === '/api/remove-bg' && request.method === 'POST') {
       const user = await getUser(request, env);
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-      const today = new Date().toISOString().slice(0, 10);
 
       // 1. 检查额度（不扣除）
       if (!user) {
         const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ? AND date = ?`
-        ).bind(ip, today).first();
-        if ((row?.count || 0) >= FREE_DAILY_LIMIT) {
-          return json({ ok: false, reason: 'free_limit', message: 'Daily free limit reached. Sign in for more.' }, 403, origin);
+          `SELECT count FROM free_usage WHERE ip = ?`
+        ).bind(ip).first();
+        if ((row?.count || 0) >= FREE_TOTAL_LIMIT) {
+          return json({ ok: false, reason: 'free_limit', message: 'Free limit reached. Sign up for 20 free credits.' }, 403, origin);
         }
       } else {
         const credits = await env.DB.prepare(
@@ -398,9 +395,9 @@ export default {
         // 5. 成功后才扣积分
         if (!user) {
           await env.DB.prepare(
-            `INSERT INTO free_usage (ip, date, count) VALUES (?, ?, 1)
-             ON CONFLICT(ip) DO UPDATE SET count = count + 1, date = ?`
-          ).bind(ip, today, today).run();
+            `INSERT INTO free_usage (ip, count) VALUES (?, 1)
+             ON CONFLICT(ip) DO UPDATE SET count = count + 1`
+          ).bind(ip).run();
         } else {
           await env.DB.prepare(
             `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
