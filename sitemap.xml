@@ -1,38 +1,424 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.shopbgremover.com/</loc>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/pricing.html</loc>
+    <loc>https://www.shopbgremover.com/es/</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pt-br/</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/shopify-background-remover</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/shopify-background-remover" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/es/shopify-background-remover</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/shopify-background-remover" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pt-br/shopify-background-remover</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/shopify-background-remover" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/shopify-background-remover</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/shopify-background-remover" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/shopify-background-remover</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/shopify-background-remover" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/shopify-background-remover" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/amazon-ebay-product-images</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/es/amazon-ebay-product-images</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pt-br/amazon-ebay-product-images</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/amazon-ebay-product-images</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/amazon-ebay-product-images</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/amazon-ebay-product-images" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/amazon-ebay-product-images" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pricing</loc>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/pricing" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/pricing" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/pricing" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/contact.html</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <loc>https://www.shopbgremover.com/es/pricing</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/pricing" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/pricing" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/pricing" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/privacy.html</loc>
+    <loc>https://www.shopbgremover.com/pt-br/pricing</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/pricing" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/pricing" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/pricing" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/pricing</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/pricing" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/pricing" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/pricing" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/pricing</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/pricing" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/pricing" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/pricing" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/contact</loc>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/contact" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/contact" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/contact" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/contact" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/terms.html</loc>
+    <loc>https://www.shopbgremover.com/es/contact</loc>
+    <lastmod>2026-05-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/contact" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/contact" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/contact" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/contact" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/shopify-background-remover.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+    <loc>https://www.shopbgremover.com/pt-br/contact</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/contact" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/contact" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/contact" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/contact" />
   </url>
   <url>
-    <loc>https://www.shopbgremover.com/amazon-ebay-product-images.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+    <loc>https://www.shopbgremover.com/de/contact</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/contact" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/contact" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/contact" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/contact" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/contact</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/contact" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/contact" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/contact" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/contact" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/contact" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/contact" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/privacy</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/privacy" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/es/privacy</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/privacy" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pt-br/privacy</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/privacy" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/privacy</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/privacy" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/privacy</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/privacy" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/privacy" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/privacy" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/privacy" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/privacy" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/privacy" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/terms</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/terms" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/terms" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/es/terms</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/terms" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/terms" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/pt-br/terms</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/terms" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/terms" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/de/terms</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/terms" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/terms" />
+  </url>
+  <url>
+    <loc>https://www.shopbgremover.com/fr/terms</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/terms" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/terms" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/terms" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/terms" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/terms" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/terms" />
   </url>
 </urlset>
