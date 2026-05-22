@@ -234,18 +234,28 @@
     .upgrade-toast p { font-size: 12px; opacity: 0.92; margin-bottom: 12px; line-height: 1.4; }
     .upgrade-toast button { background: white; color: #D97706; border: none; padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
     .upgrade-toast button:hover { transform: scale(1.04); }
-    @media (max-width: 800px) {
+    @media (max-width: 1100px) {
       .workspace { flex-direction: column; }
       .settings-panel { width: 100%; position: static; }
+    }
+    @media (max-width: 800px) {
       .nav-links { display: none; }
       .tool-features { grid-template-columns: 1fr; }
-      .tool-pricing-cards { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-      .tp-price { font-size: 1.1rem; }
       .action-bar { padding: 14px 16px; }
       .action-bar-inner { flex-wrap: wrap; }
       .action-btn { width: 100%; min-width: unset; }
       .status-text { min-width: unset; }
     }
+    /* ── Trust / Why us ─────────────────────────────────── */
+    .trust-section { padding: 72px 24px; background: var(--bg); border-top: 1px solid var(--border); }
+    .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 960px; margin: 40px auto 0; }
+    @media (max-width: 700px) { .trust-grid { grid-template-columns: 1fr; max-width: 380px; } }
+    .trust-card { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+    .trust-card:hover { transform: translateY(-3px); box-shadow: var(--sh-lg); }
+    .trust-icon { font-size: 32px; margin-bottom: 14px; display: block; }
+    .trust-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .trust-card p { font-size: 14px; color: var(--text-2); line-height: 1.6; }
+
     .lang-switcher { position: relative; }
     .lang-btn { background: rgba(255,255,255,0.08); color: #E5E7EB; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; }
     .lang-btn:hover { background: rgba(255,255,255,0.14); }
@@ -357,28 +367,6 @@
         </div>
       </div>
 
-      <div class="tool-pricing">
-        <div class="tool-pricing-title">Preços simples, sem custos ocultos</div>
-        <div class="tool-pricing-cards">
-          <div class="tp-card">
-            <div class="tp-plan">Starter</div>
-            <div class="tp-price">$4.9<span>/mês</span></div>
-            <div class="tp-detail">100 imagens &middot; $0.049/imagem</div>
-          </div>
-          <div class="tp-card tp-popular">
-            <div class="tp-badge">Melhor valor</div>
-            <div class="tp-plan">Pro</div>
-            <div class="tp-price">$9.9<span>/mês</span></div>
-            <div class="tp-detail">300 imagens &middot; $0.033/imagem</div>
-          </div>
-          <div class="tp-card">
-            <div class="tp-plan">Business</div>
-            <div class="tp-price">$24.9<span>/mês</span></div>
-            <div class="tp-detail">1000 imagens &middot; $0.025/imagem</div>
-          </div>
-        </div>
-        <a href="/pt-br/pricing" class="tp-link">Ver todos os planos e opções pré-pagas →</a>
-      </div>
     </div>
 
     <div class="settings-panel">
@@ -538,6 +526,31 @@
       <div class="step-num">3</div>
       <div class="step-title">Baixe seu arquivo ZIP</div>
       <div class="step-desc">A IA processa cada imagem (3–8 s cada). Quando terminar, baixe tudo em um único ZIP — sem upload no servidor.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust / Why us -->
+<section class="trust-section">
+  <div class="section-head">
+    <span class="section-eyebrow">Por que ShopBG Remover</span>
+    <h2 class="section-title">Feito para vendedores de e-commerce sérios</h2>
+  </div>
+  <div class="trust-grid">
+    <div class="trust-card">
+      <span class="trust-icon">🔒</span>
+      <h3>Sem armazenamento</h3>
+      <p>Imagens processadas em tempo real e excluídas na hora. Compatível com LGPD/GDPR. Nunca vemos, guardamos ou compartilhamos suas fotos.</p>
+    </div>
+    <div class="trust-card">
+      <span class="trust-icon">💰</span>
+      <h3>5× mais por menos</h3>
+      <p>Até 5× mais imagens que remove.bg pela metade do preço. Sem marca d'água, sem limite de resolução nos planos pagos.</p>
+    </div>
+    <div class="trust-card">
+      <span class="trust-icon">⚡</span>
+      <h3>Pronto para marketplace</h3>
+      <p>Saídas no tamanho exato para Shopify (2048), Amazon (1000) e eBay (500). Suba, processe, baixe.</p>
     </div>
   </div>
 </section>
