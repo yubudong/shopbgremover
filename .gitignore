@@ -4,3 +4,5 @@ dist/
 *.log
 .env.local
 .env.*.local
+.wrangler/
+.vercel/output/

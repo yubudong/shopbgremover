@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "shopbgremover-db"
 database_id = "f9c622b0-9360-48c1-a2a6-36e51b93d3de"
+migrations_dir = "worker/migrations"
 
 [vars]
 FRONTEND_URL = "https://www.shopbgremover.com"

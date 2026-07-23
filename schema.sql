@@ -1,3 +1,7 @@
+-- LEGACY COMPATIBILITY SCHEMA
+-- The canonical production schema is worker/schema.sql.
+-- Do not use this file for new production database initialization.
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

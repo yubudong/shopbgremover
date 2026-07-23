@@ -1,53 +1,49 @@
-# Phase 3 部署说明
+# Phase 3 历史部署说明（已停用）
 
-## 已完成
-✅ Google OAuth 登录集成
-✅ D1 数据库 schema（4 张表）
-✅ 积分系统 API（查询 + 扣减）
-✅ 历史记录 API（查询 + 保存）
-✅ 前端登录界面 + 积分显示 + 历史弹窗
-✅ 批量处理（并发 5 张）
+此文件记录的是早期 Next.js / Pages Functions 方案，不能再作为当前生产部署手册。
 
-## 部署前必做
+当前生产基线请阅读：
 
-### 1. 初始化 D1 数据库表
-在 Cloudflare Dashboard 执行 `schema.sql`：
+- `README.md`
+- `docs/PRODUCT-SPEC-AND-PROGRESS.md`
+- `worker/schema.sql`
+- `worker/migrations/README.md`
+- `wrangler.toml`
+
+## 安全说明
+
+此文件过去曾包含明文 API 和 OAuth 凭据。明文值已从当前版本移除，但
+Git 历史仍可能保留旧值。所有曾在此处出现过的凭据都必须视为已泄露并完成轮换。
+
+需要通过 Cloudflare Secret 管理的变量包括：
+
+- `FAL_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `JWT_SECRET`
+- `PAYPAL_CLIENT_ID`
+- `PAYPAL_SECRET`
+- `PAYPAL_MODE`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
+
+不要把凭据写入命令参数、Markdown、Shell 脚本或 Git。使用交互式命令：
+
 ```bash
-# 方式 1：命令行（需要 CLOUDFLARE_API_TOKEN）
-wrangler d1 execute shopbgremover-db --file=schema.sql --remote
-
-# 方式 2：Dashboard 手动执行
-# 访问 https://dash.cloudflare.com -> D1 -> shopbgremover-db -> Console
-# 复制粘贴 schema.sql 内容并执行
+npx wrangler secret put SECRET_NAME
 ```
 
-### 2. 配置 Cloudflare Pages 环境变量
-在 Pages 项目设置中添加：
-- `REMOVE_BG_API_KEY` = [REVOKED_REMOVE_BG_API_KEY]
-- `GOOGLE_CLIENT_ID` = 346511510193-lbstnvotup93lfumjci8c7us1ooj542s.apps.googleusercontent.com
-- `GOOGLE_CLIENT_SECRET` = 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
-- `NEXTAUTH_SECRET` = L0L7tZy5A0SagIGKkjoXnMrrbHGA5fhyvCcq1XIsrSA=
-- `NEXTAUTH_URL` = https://shopbgremover.com
+## 当前部署入口
 
-### 3. Google OAuth 回调 URL
-在 Google Cloud Console 添加授权回调：
-```
-https://shopbgremover.com/api/auth/callback/google
-```
+- 前端：Cloudflare Pages，静态页面源文件位于仓库根目录及语言目录。
+- API：`worker/index.js`。
+- D1：`shopbgremover-db`，当前结构以 `worker/schema.sql` 为准。
 
-### 4. 部署
-```bash
-npm run pages:deploy
-```
+部署前必须：
 
-## 测试清单
-- [ ] 访问 shopbgremover.com，点击 "Sign in with Google"
-- [ ] 登录后查看右上角积分显示（新用户应该是 20）
-- [ ] 上传 1 张图片处理，积分减 1
-- [ ] 点击 History 查看历史记录
-- [ ] 上传 5 张图片批量处理，积分减 5
-
-## 下一步（Phase 4）
-- 尺寸预设（Shopify/Amazon/eBay）
-- 自定义背景色（HEX 输入）
-- 批量重命名模板
+1. 确认工作区干净且目标提交已推送。
+2. 备份生产 D1。
+3. 在隔离数据库验证迁移。
+4. 运行语法、差异和关键业务测试。
+5. 部署后验证登录、AI 成功扣费、失败不扣费、支付幂等和 ZIP 下载。
+6. 更新 `docs/PRODUCT-SPEC-AND-PROGRESS.md`，未部署内容不得标记为上线。
