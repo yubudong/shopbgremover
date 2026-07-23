@@ -11,8 +11,8 @@
 > 5. 下一步计划
 
 - 创建日期：2026-07-23
-- 最后更新：2026-07-23
-- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1、Worker 和 Pages 已部署，PayPal Webhook 注册、CNY 真实支付与退款验证尚未完成
+- 最后更新：2026-07-24
+- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1、Worker 和 Pages 已部署，独立 PayPal Live 应用、Webhook 和 Worker 密钥已配置；新 Client ID 的 Pages 部署、CNY 真实支付与退款验证尚未完成
 - 当前原则：本文档记录方案，不代表所有功能均已开发上线
 
 ---
@@ -1059,7 +1059,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 
 ### 阶段 1：统一计费与积分模型
 
-状态：🟡 进行中。生产 D1、Worker 和 5 种语言前端已部署；PayPal 商户 CNY 真实支付、Webhook 注册与退款仍需真实环境验证。
+状态：🟡 进行中。生产 D1、Worker 和 5 种语言前端已部署，独立 PayPal Live 应用、Webhook 和 Worker 密钥已配置；新 Client ID 的 Pages 部署、CNY 真实支付和退款仍需真实环境验证。
 
 - 移除订阅套餐
 - 新增 100/300/1000 积分包
@@ -1722,3 +1722,38 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 本次没有触发 fal.ai，也没有产生真实 PayPal 付款
 - Git/GitHub 状态：阶段 1 实现、迁移与部署记录已推送至 `origin/main`，部署记录提交为 `bec48fe`；用户原有 `docs/SEO-Roadmap-2026-05-22.md` 未提交
 - 下一步：登录 PayPal 开发者后台，创建指向 `https://api.shopbgremover.com/api/paypal/webhook` 的生产 Webhook，配置 Worker secret，然后完成 CNY 订单、捕获与退款验证
+
+### 2026-07-24：阶段 1 第六部分——独立 PayPal Live 应用与 Webhook
+
+- 本次目标：消除生产 PayPal 应用归属不一致，注册退款/撤销 Webhook，并让 Worker 使用同一套 Live 凭据
+- 实际完成：
+  - PayPal Live 账户中原来只有 `ecomsellerkit` 应用，其 Client ID 与 ShopBG Remover 生产页面使用的 Client ID 不一致；没有复用或修改该应用
+  - 经用户确认，创建独立的 `ShopBG Remover` Live REST API 应用
+  - 创建生产 Webhook，地址为 `https://api.shopbgremover.com/api/paypal/webhook`
+  - Webhook 只订阅 Worker 当前实际处理的 `PAYMENT.CAPTURE.REFUNDED` 和 `PAYMENT.CAPTURE.REVERSED`
+  - 将新应用的 `PAYPAL_CLIENT_ID`、`PAYPAL_SECRET` 和 `PAYPAL_WEBHOOK_ID` 写入 Cloudflare Worker 加密密钥
+  - 临时密钥材料仅在权限为 600 的临时目录中用于一次批量写入，成功后立即删除；密钥值没有进入代码、日志或本文档
+  - 5 个现行价格页和本地 `test-paypal.html` 已切换到新应用的公开 Client ID
+- 修改文件：5 个现行 `pricing.html`、`test-paypal.html`、`tests/frontend-stage1.test.mjs` 和本文档
+- 数据库/配置调整：没有修改 D1；生产 Worker 新增 `PAYPAL_WEBHOOK_ID`，并替换 `PAYPAL_CLIENT_ID`、`PAYPAL_SECRET`
+- 测试结果：
+  - `npm test` 全部通过：备份保护 3 项、前端 6 项、Worker/D1 集成 16 项，共 25 项
+  - 前端回归新增校验，确认 5 个现行价格页全部使用独立 ShopBG Remover Client ID
+  - 静态 Pages 产物仍为 59 个白名单文件；5 个产物价格页均使用新 Client ID 和 CNY
+  - `git diff --check` 通过
+- 是否部署：
+  - PayPal Live 应用、Webhook 和 Worker 密钥已配置到生产
+  - 新 Client ID 的 Pages 页面尚未部署，因此当前生产前端仍不能标记为已切换
+- 生产验证：
+  - PayPal 后台显示 Webhook 创建成功，事件列表精确为 capture refunded 和 capture reversed
+  - Cloudflare 密钥清单已出现 `PAYPAL_WEBHOOK_ID`
+  - 对生产 Webhook 发送空 JSON 后返回 400 `Invalid webhook event`，不再返回 503 `PayPal webhook is not configured`，证明 Worker 已加载 Webhook ID 且在签名校验前正确拒绝无效事件
+- 踩坑：
+  - 原生产页面使用的 PayPal Client ID 不属于当前 Live 应用列表；把 Webhook 建在 `ecomsellerkit` 下会导致订单应用与 Webhook 应用不一致
+  - PayPal Webhook 事件的隐藏 checkbox 不能通过常规 `check()` 正确改变状态；改为操作当前可见控件，并在保存前目视确认两个事件均已选中
+  - 单项 `wrangler secret put` 通过命名管道等待输入时没有正常结束；中止该未完成进程后，改用权限受限的临时 JSON 和 `wrangler secret bulk`，三项密钥一次成功写入并立即清理文件
+- 与原计划的调整：新增独立 ShopBG Remover Live 应用，而不是把两个产品混在 `ecomsellerkit` 应用中
+- 遗留问题：
+  - 需要提交并部署新 Client ID 的 5 种语言 Pages
+  - CNY 订单创建、真实捕获和全额退款/撤销 Webhook 尚未验证，阶段 1 仍不能标记完成
+- 下一步：提交并部署 Pages，使用登录账户创建 CNY 订单；只有在真实捕获和退款/撤销验证完成后才能结束阶段 1

@@ -9,6 +9,8 @@ const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/'];
 const indexFiles = locales.map((locale) => `${locale}index.html`);
 const pricingFiles = locales.map((locale) => `${locale}pricing.html`);
 const termsFiles = locales.map((locale) => `${locale}terms.html`);
+const paypalClientId =
+  'BAA4Ojux0LcQewVNqMfn8B0s2TQzAn7gr9MEsZ-oRCY7hDN1vulONcWILFXQK3lEHftqQBISBEXfDDUuWg';
 const root = path.resolve(import.meta.dirname, '..');
 const execFileAsync = promisify(execFile);
 
@@ -69,6 +71,7 @@ test('ZIP download is local-only and never invokes the AI endpoint', async () =>
 test('localized pricing exposes only the three confirmed CNY packs', async () => {
   for (const file of pricingFiles) {
     const html = await read(file);
+    assert.ok(html.includes(`client-id=${paypalClientId}`), file);
     assert.match(html, /currency=CNY/, file);
     assert.match(html, /credits_100/, file);
     assert.match(html, /credits_300/, file);
