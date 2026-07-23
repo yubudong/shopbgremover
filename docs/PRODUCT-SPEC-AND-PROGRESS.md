@@ -12,7 +12,7 @@
 
 - 创建日期：2026-07-23
 - 最后更新：2026-07-24
-- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1、Worker 和 Pages 已部署，独立 PayPal Live 应用、Webhook 和 Worker 密钥已配置；新 Client ID 的 Pages 部署、CNY 真实支付与退款验证尚未完成
+- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1、Worker、Pages、独立 PayPal Live 应用和 Webhook 已部署；PayPal JavaScript SDK 已确认拒绝 CNY，REST 订单能力、币种调整和真实退款验证尚未完成
 - 当前原则：本文档记录方案，不代表所有功能均已开发上线
 
 ---
@@ -1059,7 +1059,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 
 ### 阶段 1：统一计费与积分模型
 
-状态：🟡 进行中。生产 D1、Worker 和 5 种语言前端已部署，独立 PayPal Live 应用、Webhook 和 Worker 密钥已配置；新 Client ID 的 Pages 部署、CNY 真实支付和退款仍需真实环境验证。
+状态：🟡 进行中。生产 D1、Worker、5 种语言前端、独立 PayPal Live 应用和 Webhook 已部署；PayPal JavaScript SDK 已确认拒绝 CNY，REST 订单能力、币种调整和真实退款仍需验证。
 
 - 移除订阅套餐
 - 新增 100/300/1000 积分包
@@ -1757,3 +1757,29 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 需要提交并部署新 Client ID 的 5 种语言 Pages
   - CNY 订单创建、真实捕获和全额退款/撤销 Webhook 尚未验证，阶段 1 仍不能标记完成
 - 下一步：提交并部署 Pages，使用登录账户创建 CNY 订单；只有在真实捕获和退款/撤销验证完成后才能结束阶段 1
+
+### 2026-07-24：阶段 1 第七部分——新 PayPal Client ID 上线与 CNY SDK 验证
+
+- 本次目标：把独立 ShopBG Remover PayPal Client ID 部署到 5 种语言生产价格页，并验证 CNY 结账能力
+- 实际完成：
+  - 提交 `cb3fabc` 后部署 59 个白名单静态文件
+  - Pages 生产部署为 `bcbfaa5f-defe-46c1-bd40-28e3f0670757`
+  - 生产 `/pricing` 与本地 `.pages-dist/pricing.html` 逐字一致，包含独立 ShopBG Remover Client ID、`currency=CNY` 和三档新积分包
+- 修改文件：本小节只更新状态文档；价格页和测试变更记录在阶段 1 第六部分
+- 数据库/配置调整：没有修改 D1 或 Worker 密钥
+- 测试结果：
+  - Pages 部署成功，5 个更新文件上传、54 个未变化文件复用
+  - Wrangler 部署列表确认新版本为 Production、分支 `main`、来源 `cb3fabc`
+  - 对生产价格页的公开 PayPal SDK 地址执行请求，PayPal 返回 HTTP 400
+  - PayPal 明确返回 `SDK Validation error: Invalid query value for currency: CNY`，debug ID 为 `f56397053fff3`
+- 是否部署：新 Client ID 的 Pages 已部署到生产；CNY 支付没有部署成功，因为 PayPal SDK 在运行时拒绝该币种
+- 生产验证：页面文件本身正确上线，但 PayPal 按钮无法加载；这意味着“页面写了 CNY”不能视为“PayPal 支持 CNY”
+- 踩坑：
+  - Live 应用创建成功不代表所有 SDK 币种都可用；必须请求真实 SDK 才能确认
+  - 直接用 HTTP 状态检查发现 400 后继续读取响应体，才定位到 CNY 参数被 PayPal SDK 校验拒绝
+- 与原计划的调整：不再假设 CNY 可用；先验证 REST Orders API。如果 REST 也拒绝 CNY，需要由产品决策明确改用 PayPal 支持的币种和对应价格，不能擅自把阶段 1 标记完成
+- 遗留问题：
+  - 生产 PayPal 按钮当前因 CNY SDK 400 无法显示
+  - 需要使用登录用户验证 Worker 的 CNY REST 订单创建，区分“仅 SDK 拒绝”还是“SDK 与 Orders API 都拒绝”
+  - 真实捕获、全额退款和 Webhook 仍未执行
+- 下一步：登录 ShopBG Remover 测试账户并创建一笔未支付 CNY 订单；根据 REST 结果决定币种调整方案
