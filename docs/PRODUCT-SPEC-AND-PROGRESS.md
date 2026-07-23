@@ -12,7 +12,7 @@
 
 - 创建日期：2026-07-23
 - 最后更新：2026-07-23
-- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1 已应用 `0003` 并验证余额守恒，Worker、Pages 和 PayPal Webhook 尚未部署
+- 当前阶段：阶段 1 统一计费与积分模型进行中；生产 D1、Worker 和 Pages 已部署，PayPal Webhook 注册、CNY 真实支付与退款验证尚未完成
 - 当前原则：本文档记录方案，不代表所有功能均已开发上线
 
 ---
@@ -1059,7 +1059,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 
 ### 阶段 1：统一计费与积分模型
 
-状态：🟡 进行中。生产 D1 已应用 `0003`；Worker、5 种语言前端尚未部署，PayPal 商户 CNY 与 Webhook 仍需真实环境验证。
+状态：🟡 进行中。生产 D1、Worker 和 5 种语言前端已部署；PayPal 商户 CNY 真实支付、Webhook 注册与退款仍需真实环境验证。
 
 - 移除订阅套餐
 - 新增 100/300/1000 积分包
@@ -1685,3 +1685,38 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 与原计划的调整：无
 - 遗留问题：旧 Worker 仍在使用聚合余额路径，但新表为向后兼容增加，不影响当前请求；需尽快部署新 Worker，避免迁移与运行逻辑长期分离
 - 下一步：配置 PayPal Webhook ID，部署 Worker，再部署 Pages 并进行生产冒烟验证
+
+### 2026-07-23：阶段 1 第五部分——Worker 与 Pages 生产部署
+
+- 本次目标：部署阶段 1 Worker 和 5 种语言静态前端，并对不产生 AI 成本或真实付款的关键路径执行生产冒烟
+- 实际完成：
+  - 部署 Worker 生产版本 `cd846318-4b5f-49b6-8f20-148a99822d36`
+  - 新增 `scripts/build_static_pages.mjs`，将生产 Pages 产物明确限制为根目录现行页面、4 个本地化目录和公开图片/图标，共 59 个文件
+  - 将 `pages:build`、`pages:deploy` 从旧 `@cloudflare/next-on-pages` 构建链切换到上述静态白名单产物
+  - 部署 Pages 生产版本 `b130f4a8-d961-4b9d-9b17-7ca40540f96f`，来源提交 `a63e8a4`
+- 修改文件：`.gitignore`、`package.json`、`scripts/build_static_pages.mjs`、`tests/frontend-stage1.test.mjs` 和本文档
+- 数据库/配置调整：没有再次修改生产 D1；没有新增或改变密钥。`PAYPAL_WEBHOOK_ID` 仍未配置
+- 测试结果：
+  - 备份脚本测试 3 项、前端测试 6 项、Worker/D1 集成测试 16 项分别通过，共 25 项
+  - 新增前端测试验证 Pages 产物包含 5 种语言现行页面和必要资源，同时排除 `worker/index.js`、`test-paypal.html` 与 `public/index.html`
+  - `node --check scripts/build_static_pages.mjs` 与 `git diff --check` 通过
+  - 受限沙箱内一次组合 `npm test` 在启动本地 workerd 时因 `127.0.0.1 EPERM` 和 Wrangler 日志目录权限失败；允许本地进程后单独运行 Worker 测试，16 项全部通过。这是执行环境限制，不是测试断言失败
+- 是否部署：Worker 与 Pages 均已部署到生产；PayPal Webhook 配置尚未部署
+- 生产验证：
+  - `GET /api/me` 匿名请求返回 200 和 `user:null`
+  - `GET /api/check-credit` 返回 200、游客总额度 `limit:3`；当前测试出口 IP 的历史免费额度已耗尽，因此 `remaining:0`
+  - `POST /api/use-credit` 返回 410，确认前端不能绕过抠图任务直接扣费
+  - 未登录 `POST /api/paypal/create-order` 返回 401
+  - 未配置 Webhook 时 `POST /api/paypal/webhook` 返回 503，按设计失败关闭
+  - 生产首页、德语首页和规范化 `/pricing` 内容与本地 `.pages-dist` 逐字一致；价格页包含 `currency=CNY` 和 100/300/1000 积分包
+  - `/test-paypal.html` 与 `/test.html` 均返回 404，没有把调试页带入生产
+- 踩坑：
+  - 根 `wrangler.toml` 属于 Worker，缺少 Pages 的 `pages_build_output_dir`；Wrangler 部署 Pages 时会忽略该配置并提示警告
+  - 仓库存在用户原有未跟踪文件 `docs/SEO-Roadmap-2026-05-22.md`，Wrangler 因此提示工作区不干净；实际上传源是隔离且经测试的 `.pages-dist`，该文件未进入产物或提交
+  - 旧 `pages:deploy` 仍构建 legacy Next.js 路径，与当前生产静态架构不一致；已改为可复现的白名单静态构建
+- 与原计划的调整：为了避免把旧 Next.js、Pages Functions、脚本、文档或测试上传生产，增加了独立静态产物构建，而不是直接部署仓库根目录
+- 遗留问题：
+  - PayPal 开发者后台当前需要重新登录，尚未创建生产 Webhook，也未取得并配置 `PAYPAL_WEBHOOK_ID`
+  - CNY 订单创建、真实捕获、全额退款/撤销 Webhook 尚未在真实账户完成，因此阶段 1 不能标记完成
+  - 本次没有触发 fal.ai，也没有产生真实 PayPal 付款
+- 下一步：登录 PayPal 开发者后台，创建指向 `https://api.shopbgremover.com/api/paypal/webhook` 的生产 Webhook，配置 Worker secret，然后完成 CNY 订单、捕获与退款验证
