@@ -1700,6 +1700,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 备份脚本测试 3 项、前端测试 6 项、Worker/D1 集成测试 16 项分别通过，共 25 项
   - 新增前端测试验证 Pages 产物包含 5 种语言现行页面和必要资源，同时排除 `worker/index.js`、`test-paypal.html` 与 `public/index.html`
   - `node --check scripts/build_static_pages.mjs` 与 `git diff --check` 通过
+  - GitHub Actions 运行 `30022969147` 成功，完整回归和 Worker bundle 校验均通过
   - 受限沙箱内一次组合 `npm test` 在启动本地 workerd 时因 `127.0.0.1 EPERM` 和 Wrangler 日志目录权限失败；允许本地进程后单独运行 Worker 测试，16 项全部通过。这是执行环境限制，不是测试断言失败
 - 是否部署：Worker 与 Pages 均已部署到生产；PayPal Webhook 配置尚未部署
 - 生产验证：
@@ -1719,4 +1720,5 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - PayPal 开发者后台当前需要重新登录，尚未创建生产 Webhook，也未取得并配置 `PAYPAL_WEBHOOK_ID`
   - CNY 订单创建、真实捕获、全额退款/撤销 Webhook 尚未在真实账户完成，因此阶段 1 不能标记完成
   - 本次没有触发 fal.ai，也没有产生真实 PayPal 付款
+- Git/GitHub 状态：阶段 1 实现、迁移与部署记录已推送至 `origin/main`，部署记录提交为 `bec48fe`；用户原有 `docs/SEO-Roadmap-2026-05-22.md` 未提交
 - 下一步：登录 PayPal 开发者后台，创建指向 `https://api.shopbgremover.com/api/paypal/webhook` 的生产 Webhook，配置 Worker secret，然后完成 CNY 订单、捕获与退款验证
