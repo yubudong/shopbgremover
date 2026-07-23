@@ -1521,7 +1521,7 @@
     btn.textContent = `Quitar fondo (${selectedFiles.length} ${selectedFiles.length > 1 ? 'imágenes' : 'imagen'})`;
     btn.disabled = false;
     btn.className = 'action-btn action-btn-primary';
-    btn.onclick = null;
+    btn.onclick = startProcessing;
     setStatus('Listo para procesar');
     processedResults = [];
   }
@@ -1624,7 +1624,7 @@
 
   // ── Process ───────────────────────────────────────────────
 
-  document.getElementById('processBtn').addEventListener('click', startProcessing);
+  document.getElementById('processBtn').onclick = startProcessing;
 
   async function startProcessing() {
     if (!selectedFiles.length) return;

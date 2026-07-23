@@ -938,7 +938,7 @@
     btn.textContent = `Supprimer l'arrière-plan (${selectedFiles.length} ${selectedFiles.length > 1 ? 'images' : 'image'})`;
     btn.disabled = false;
     btn.className = 'action-btn action-btn-primary';
-    btn.onclick = null;
+    btn.onclick = startProcessing;
     setStatus('Prêt à traiter');
     processedResults = [];
   }
@@ -1026,7 +1026,7 @@
     }
   }
 
-  document.getElementById('processBtn').addEventListener('click', startProcessing);
+  document.getElementById('processBtn').onclick = startProcessing;
 
   async function startProcessing() {
     if (!selectedFiles.length) return;

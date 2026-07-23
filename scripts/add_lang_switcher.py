@@ -244,7 +244,8 @@ def process_file(filename, slug):
             changes.append("footer-langs")
 
     # ===== 5. </body> 前插 script =====
-    if "toggleLangMenu" not in html:
+    # 注：nav 里 onclick="toggleLangMenu(..)" 也含这个字符串，所以用 "function toggleLangMenu" 作精确锚点
+    if "function toggleLangMenu" not in html:
         new_html = html.replace("</body>", LANG_SCRIPT + "\n</body>", 1)
         if new_html != html:
             html = new_html

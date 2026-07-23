@@ -362,5 +362,26 @@
   <div class="footer-copy">© 2026 ShopBG Remover. Built for e-commerce sellers worldwide.</div>
 </footer>
 
+
+<script>
+  function toggleLangMenu(e) {
+    e.stopPropagation();
+    document.getElementById('langMenu').classList.toggle('open');
+  }
+  document.addEventListener('click', function(e) {
+    var menu = document.getElementById('langMenu');
+    var switcher = document.querySelector('.lang-switcher');
+    if (menu && switcher && !switcher.contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var menu = document.getElementById('langMenu');
+      if (menu) menu.classList.remove('open');
+    }
+  });
+</script>
+
 </body>
 </html>

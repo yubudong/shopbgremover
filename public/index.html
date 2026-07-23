@@ -1459,7 +1459,7 @@
     btn.textContent = `Remove Background (${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''})`;
     btn.disabled = false;
     btn.className = 'action-btn action-btn-primary';
-    btn.onclick = null;
+    btn.onclick = startProcessing;
     setStatus('Ready to process');
     processedResults = [];
   }
@@ -1567,7 +1567,7 @@
 
   // ── Process ───────────────────────────────────────────────
 
-  document.getElementById('processBtn').addEventListener('click', startProcessing);
+  document.getElementById('processBtn').onclick = startProcessing;
 
   async function startProcessing() {
     if (!selectedFiles.length) return;
