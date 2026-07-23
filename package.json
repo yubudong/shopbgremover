@@ -5,10 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "d1:backup": "bash scripts/backup_d1.sh",
+    "d1:migrate:remote": "bash scripts/migrate_d1_remote.sh",
     "pages:build": "npx @cloudflare/next-on-pages",
     "pages:deploy": "npm run pages:build && wrangler pages deploy",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npm run test:backup && npm run test:worker",
+    "test:backup": "node --test tests/d1-backup.test.mjs",
+    "test:worker": "vitest run --config vitest.config.mjs"
   },
   "dependencies": {
     "@auth/d1-adapter": "^1.11.1",
@@ -20,8 +25,10 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
+    "@cloudflare/vitest-pool-workers": "^0.18.7",
     "eslint": "^8.0.0",
     "eslint-config-next": "^15.0.0",
-    "wrangler": "^4.77.0"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.113.0"
   }
 }

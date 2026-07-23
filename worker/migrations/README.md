@@ -21,7 +21,12 @@ production changes must:
 1. start with migration number `0003`;
 2. be tested against a copy of production data;
 3. include rollback or forward-repair notes;
-4. be backed up before remote application;
+4. be applied with `npm run d1:migrate:remote`, which aborts unless a fresh
+   export passes local restore and integrity validation;
 5. be recorded in `docs/PRODUCT-SPEC-AND-PROGRESS.md`.
+
+Use `npm run d1:backup` when a verified backup is needed without applying
+migrations. The backup SQL and metadata are stored outside the repository in
+`~/.shopbgremover-backups` by default.
 
 No migration in this directory has been applied by the current Stage 0 work.

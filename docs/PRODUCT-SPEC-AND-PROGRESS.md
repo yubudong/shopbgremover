@@ -12,7 +12,7 @@
 
 - 创建日期：2026-07-23
 - 最后更新：2026-07-23
-- 当前阶段：阶段 0 生产基线与安全收口进行中；代码/数据库基线、D1 手工备份恢复基线、旧凭据撤销和 Git 历史清理已完成，自动备份与自动化测试待完成
+- 当前阶段：阶段 0 生产基线与安全收口本地实施已完成；迁移前自动备份和自动化回归测试已验证，等待 GitHub Actions 首次运行后最终收口
 - 当前原则：本文档记录方案，不代表所有功能均已开发上线
 
 ---
@@ -984,7 +984,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 🟡 Cloudflare D1 积分记录已上线
 - 🟡 Shopify、Amazon、eBay 有部分页面和预设基础
 - 🟡 当前成功后扣积分逻辑已有基础，需要增加任务级幂等保护
-- 🟡 阶段 0 已建立生产架构、D1 schema 和手工备份恢复基线，已撤销 Google、remove.bg、Pages 与 Worker 中确认停用的旧凭据并清理 Git 历史；自动备份和自动化测试尚未完成
+- 🟡 阶段 0 的生产架构、D1 schema、迁移前自动备份、凭据撤销、Git 历史清理和本地自动化测试均已完成；等待 GitHub Actions 首次运行后最终标记完成
 - 🟡 生产 D1 已有 `sub_credits`、`payg_credits`、`subscriptions`、`webhook_events` 等结构，但当前 Worker 仍主要使用单一 `credits` 余额
 - 🟡 生产数据库记录了两条历史迁移，原始 SQL 未进入 Git；已记录其名称、时间和最终结构，不伪造或重放未知 SQL
 
@@ -1022,7 +1022,8 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - ⬜ 新工作区的完整端到端测试
 - ✅ 已撤销曾出现在 Git 部署文档中的可能有效凭据：旧 Google OAuth 客户端和 remove.bg API key 已永久删除，旧 Pages/Worker 绑定已清理
 - ✅ 已清理 Git 历史中的 remove.bg 明文 key，并使用 `force-with-lease` 更新 GitHub `main`；旧 Google 和 NextAuth 凭据已在上游或运行环境撤销，不再扩大历史重写范围
-- 🟡 建立生产 D1 自动备份和迁移前恢复演练：手工全量备份、校验和本地恢复演练已完成，自动化备份尚未实施
+- ✅ 已建立迁移前 D1 自动备份：远端迁移入口会先导出生产数据、记录 Time Travel bookmark 和 SHA-256，并在本地恢复及完整性检查通过后才允许继续
+- 🟡 已增加支付、积分和 schema 自动化回归测试，本地 13 项通过；GitHub Actions 工作流已创建，等待首次远端运行验证
 
 ---
 
@@ -1032,7 +1033,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 
 ### 阶段 0：生产基线与安全收口
 
-状态：🟡 进行中。
+状态：🟡 本地实施完成，等待 GitHub Actions 首次运行验证。
 
 已完成：
 
@@ -1048,11 +1049,13 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 已清空 Pages 旧架构的 5 个生产密钥，并删除 Worker 中未被当前代码引用的 Remove.bg 与美图 3 个密钥
 - 已在 remove.bg 后台永久删除旧 API key，当前账号不再显示任何 API key
 - 已把 remove.bg 明文 key 从当前文件和 Git `main` 全部历史中替换，并通过 `force-with-lease` 更新 GitHub；本地旧引用和不可达对象已清理
+- 已增加 `npm run d1:backup` 和受保护的 `npm run d1:migrate:remote`；远端迁移在备份导出、本地恢复、完整性校验或 bookmark 记录失败时自动终止
+- 已使用新脚本完成一次生产 D1 只读全量导出和恢复验证
+- 已增加 Cloudflare Workers Vitest、备份脚本 Node 测试和 GitHub Actions；本地 13 项测试通过
 
 尚未完成：
 
-- 把已验证的 D1 手工备份流程自动化，并在每次 schema 迁移前执行
-- 为支付、积分和 schema 增加自动化测试
+- 推送后确认 GitHub Actions 首次远端运行通过
 
 阶段 0 未完成前，不部署新的积分或支付逻辑。
 
@@ -1064,6 +1067,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 统一免费额度
 - 修正所有页面和条款中的额度文案
 - 增加任务级扣费幂等
+- 验证捕获订单属于当前登录用户
 - 验证支付、充值、扣费、退款
 
 验收条件：
@@ -1219,8 +1223,9 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 当前实现先查询订单状态，再分别增加积分和更新订单状态
 - 两个并发请求可能同时读到 `pending`
 - 如果同时继续执行，理论上可能重复增加购买积分
+- 当前捕获接口只按订单 ID 查询，没有同时验证订单属于当前登录用户
 - 推荐奖励上线后，15% 和 10% 奖励也会面临相同风险
-- 调整要求：订单条件更新、D1 原子批处理、积分流水唯一幂等键、PayPal Capture ID 唯一约束必须一起实施
+- 调整要求：订单归属验证、订单条件更新、D1 原子批处理、积分流水唯一幂等键、PayPal Capture ID 唯一约束必须一起实施
 
 ### 10.9 卡密兑换不能分步骤提交
 
@@ -1279,6 +1284,14 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 处理：已将当前 bug 修复推送到 `origin/main`；历史重写后的提交为 `b844795`
 - 推送后尚未观察到 `b844795` 的新 Pages 生产部署，因此不能标记为本次重新部署
 
+### 10.17 Legacy Next 依赖阻塞安全补丁
+
+- `npm audit --omit=dev` 当前报告 3 个生产依赖链漏洞：Next.js 为 critical、Sharp 为 high、PostCSS 为 moderate
+- npm 给出的非 major 修复目标是 Next.js `15.5.21`
+- legacy `@cloudflare/next-on-pages` 将 Next.js peer dependency 上限锁在 `15.5.2`，直接升级会破坏旧 Next/Pages 构建链
+- 当前生产主路径是根目录静态页面和 `worker/index.js`，不运行该 legacy Next 服务端代码
+- 本次不以强制升级或 `npm audit fix --force` 破坏旧路径；后续应删除不再使用的 Next 部署链，或先制定迁移方案再升级
+
 ---
 
 ## 11. 决策与调整记录
@@ -1307,6 +1320,8 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 | 2026-07-23 | 在阶段 1 前增加阶段 0 生产基线与安全收口 | 仓库、生产部署和 D1 结构存在漂移，且历史文件包含明文凭据 |
 | 2026-07-23 | 历史 D1 迁移只记录事实和最终结构，不伪造原 SQL | D1 只保留迁移名称和时间，无法恢复当时的准确 SQL |
 | 2026-07-23 | 当前生产主路径统一为根目录静态页面和 `worker/index.js` | `app/`、`functions/`、`public/` 中存在旧实现，容易修改错入口 |
+| 2026-07-23 | 生产 D1 远端迁移只能通过 `npm run d1:migrate:remote` | 强制先完成导出、恢复、完整性校验和 Time Travel bookmark 记录 |
+| 2026-07-23 | Worker 基础回归使用 Cloudflare Vitest 运行时 | 测试需要覆盖真实 Worker API、D1 binding 和请求上下文限制 |
 
 ---
 
@@ -1522,3 +1537,34 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 与原计划的调整：用户确认不再考虑 remove.bg；将此前“仅删除运行环境绑定、暂不重写历史”调整为“上游永久删除并清理 Git 可达历史”
 - 遗留问题：如需连 GitHub 缓存和 Pull Request 引用也彻底清除，需要按 GitHub 官方敏感数据清理流程联系 GitHub Support；阶段 0 仍需完成 D1 自动备份和自动化测试
 - 下一步：实现迁移前 D1 自动备份脚本和支付、积分、schema 基础回归测试
+
+### 2026-07-23：阶段 0 第四部分——迁移前自动备份与回归测试
+
+- 本次目标：把已验证的生产 D1 手工备份流程变成远端迁移的强制前置步骤，并为当前支付、积分和 schema 建立可重复执行的自动化基线
+- 实际完成：
+  - 增加 `npm run d1:backup`：全量导出生产 D1，限制目录和文件权限，记录 SHA-256 与 Time Travel bookmark，在临时 SQLite 中恢复并执行完整性检查
+  - 增加 `npm run d1:migrate:remote`：只有备份文件存在且通过恢复验证后，才会列出并应用远端迁移；任何备份步骤失败都会在迁移前终止
+  - 增加 3 个 Node 测试，覆盖成功备份、备份先于迁移、无效导出阻止迁移
+  - 增加 Cloudflare Workers Vitest 集成测试，使用本地 workerd 和 D1 binding 覆盖 9 张业务表、关键计费字段、登录用户扣费、游客累计额度、fal.ai 失败不扣费、fal.ai 成功后扣 1 积分、PayPal 鉴权、非法套餐、待支付订单和顺序重复捕获
+  - 把并发捕获原子性和订单归属验证登记为 2 个阶段 1 测试 TODO，没有为了让阶段 0 测试通过而提前改动生产计费逻辑
+  - 增加 GitHub Actions，在 push 到 `main` 和 Pull Request 时运行完整测试及 Worker dry-run 打包
+- 修改文件：`scripts/backup_d1.sh`、`scripts/migrate_d1_remote.sh`、`tests/d1-backup.test.mjs`、`tests/worker.integration.test.js`、`vitest.config.mjs`、`.github/workflows/test.yml`、`package.json`、`package-lock.json`、`README.md`、`worker/migrations/README.md`、本进度文档
+- 数据库/配置调整：
+  - 没有写入或迁移生产 D1
+  - 使用新脚本生成 `/Users/yubudong/.shopbgremover-backups/shopbgremover-db-20260723T150654Z.sql` 及同名 metadata 文件，目录权限为 `700`、文件权限为 `600`
+  - 备份 SHA-256 为 `137718b8b268da83f5d78ab653a8520ed97664d497f3eabe7db320bcad75f86a`，Time Travel bookmark 为 `000001d4-00000000-000050b1-86650c79226ada01ffe3acd864a709dd`
+- 测试结果：
+  - `npm test` 通过：3 个备份保护测试和 10 个 Worker/D1/支付/积分测试通过，另有 2 个阶段 1 TODO
+  - 生产备份恢复的 `PRAGMA integrity_check` 为 `ok`，包含 10 张非 SQLite 内部表、6 个用户和 45 个订单
+  - Wrangler `4.113.0` 确认生产 D1 没有待应用迁移
+  - `wrangler deploy --dry-run` 打包成功，未部署
+  - `bash -n`、Worker 语法检查和 `git diff --check` 通过
+- 是否部署：没有部署 Worker、Pages 或数据库迁移；GitHub Actions 工作流尚未推送，因此首次远端运行待验证
+- 生产验证：只读生产导出、Time Travel bookmark 获取和本地恢复验证通过；备份内容 SHA 与同日第一次手工备份一致，说明两次导出之间数据库内容未变化
+- 踩坑：
+  - D1 测试运行时不能把带独立注释行的多行 schema 直接交给 `exec()`；测试改为去除注释并逐条 `prepare().run()`
+  - workerd 不允许跨请求上下文复用带 body stream 的 `Response`；外部 API mock 必须在被测请求调用期间创建响应
+  - `npm install` 显示 legacy Next 依赖链存在安全漏洞；当前生产不运行该路径，但后续需要拆除或迁移旧 Next/Pages 构建链
+- 与原计划的调整：将“自动备份”定义为所有远端迁移的强制、可验证前置步骤；D1 自带 Time Travel 继续提供短期恢复，本地 SQL 导出用于独立校验和更长期保留
+- 遗留问题：等待本提交推送后的 GitHub Actions 首次运行；支付并发幂等和订单归属修复属于阶段 1
+- 下一步：推送并确认 CI 后将阶段 0 标记完成，再向用户确认是否开始阶段 1

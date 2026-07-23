@@ -32,18 +32,44 @@ migration plan.
 - Wrangler migration directory: `worker/migrations/`
 
 The production database already contains real users, orders, and credit
-balances. Always take a production backup and test migrations against a copy
-before applying a new remote migration.
+balances. Remote migrations must go through the guarded command below:
+
+```bash
+npm run d1:migrate:remote
+```
+
+That command first performs a full production export, restores it into a
+temporary SQLite database, checks integrity, records the current D1 Time Travel
+bookmark and SHA-256, and only then lists and applies remote migrations. It
+aborts before migration if any backup or restore validation step fails.
+
+Backups default to `~/.shopbgremover-backups` with directory mode `700` and file
+mode `600`. Override the destination with `SHOPBGREMOVER_BACKUP_DIR` when
+needed. To create and verify a backup without applying migrations:
+
+```bash
+npm run d1:backup
+```
+
+Do not run `wrangler d1 migrations apply --remote` directly.
 
 ## Local checks
 
 ```bash
+npm install
+npm test
 node --check worker/index.js
 git diff --check
 ```
 
-There is not yet a complete automated test suite. Payment, credit, and schema
-changes must add focused tests before deployment.
+The Stage 0 suite covers backup gating, production schema, current PayPal order
+creation/capture behavior, authenticated and anonymous credit use, and the rule
+that fal.ai failures do not deduct credit. It runs on every push and pull
+request through `.github/workflows/test.yml`.
+
+The known concurrent PayPal callback risk is intentionally not fixed by this
+baseline; Stage 1 must add atomic order claiming and a concurrent regression
+test before changing billing behavior.
 
 ## Deployment safety
 
