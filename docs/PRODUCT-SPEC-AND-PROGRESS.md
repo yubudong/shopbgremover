@@ -12,7 +12,7 @@
 
 - 创建日期：2026-07-23
 - 最后更新：2026-07-23
-- 当前阶段：阶段 0 生产基线与安全收口进行中；代码/数据库基线已整理，密钥轮换与历史清理待完成
+- 当前阶段：阶段 0 生产基线与安全收口进行中；代码/数据库基线、D1 手工备份恢复基线和主要旧凭据清理已完成，remove.bg 上游密钥核销与自动化测试待完成
 - 当前原则：本文档记录方案，不代表所有功能均已开发上线
 
 ---
@@ -984,7 +984,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 🟡 Cloudflare D1 积分记录已上线
 - 🟡 Shopify、Amazon、eBay 有部分页面和预设基础
 - 🟡 当前成功后扣积分逻辑已有基础，需要增加任务级幂等保护
-- 🟡 阶段 0 已建立生产架构和 D1 schema 基线，但尚未完成密钥轮换和 Git 历史清理
+- 🟡 阶段 0 已建立生产架构、D1 schema 和手工备份恢复基线，已清理 Google、Pages 与 Worker 中确认停用的旧凭据；remove.bg 上游密钥核销和自动化测试尚未完成
 - 🟡 生产 D1 已有 `sub_credits`、`payg_credits`、`subscriptions`、`webhook_events` 等结构，但当前 Worker 仍主要使用单一 `credits` 余额
 - 🟡 生产数据库记录了两条历史迁移，原始 SQL 未进入 Git；已记录其名称、时间和最终结构，不伪造或重放未知 SQL
 
@@ -1020,9 +1020,9 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - ⬜ Shopee 预设
 - ⬜ TikTok Shop 预设
 - ⬜ 新工作区的完整端到端测试
-- ⬜ 轮换曾出现在 Git 部署文档中的所有可能有效凭据
-- ⬜ 评估并安全清理 Git 历史中的旧明文凭据
-- ⬜ 建立生产 D1 自动备份和迁移前恢复演练
+- 🟡 轮换或撤销曾出现在 Git 部署文档中的所有可能有效凭据：旧 Google OAuth 客户端已删除，旧 Pages/Worker 绑定已清理；remove.bg 上游密钥仍需登录账号核销
+- ✅ 已评估 Git 历史中的旧明文凭据；当前不强制重写 `main` 历史，优先撤销凭据并保留审计链，若 remove.bg 上游无法撤销再重新评估
+- 🟡 建立生产 D1 自动备份和迁移前恢复演练：手工全量备份、校验和本地恢复演练已完成，自动化备份尚未实施
 
 ---
 
@@ -1043,12 +1043,15 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 已记录远端 `0001_billing_model_upgrade.sql` 和 `0002_sso_codes.sql` 的应用事实及最终结构
 - 已从当前部署文档删除明文凭据
 - 已停止跟踪 `.wrangler` 本地数据库缓存和 `.vercel/output` 构建产物，本机文件仍保留
+- 已导出生产 D1 全量备份，记录 Time Travel bookmark，并完成临时 SQLite 恢复及完整性检查
+- 已删除 Git 历史中泄露但不再被生产使用的旧 Google OAuth 客户端；生产登录仍使用现行客户端
+- 已清空 Pages 旧架构的 5 个生产密钥，并删除 Worker 中未被当前代码引用的 Remove.bg 与美图 3 个密钥
+- 已评估 Git 历史重写风险，当前决定不强制重写 `main`；已撤销的历史凭据保留为审计记录
 
 尚未完成：
 
-- 轮换曾经提交到 Git 的 Google、旧 NextAuth 会话密钥和旧图片 API 等凭据
-- 决定是否使用历史重写清除 Git 历史中的明文凭据
-- 建立生产 D1 备份、恢复和迁移演练流程
+- 登录 remove.bg 账号核对并撤销 Git 历史中的旧 API key；当前 Chrome 无该账号登录态，未擅自创建或关联账号
+- 把已验证的 D1 手工备份流程自动化，并在每次 schema 迁移前执行
 - 为支付、积分和 schema 增加自动化测试
 
 阶段 0 未完成前，不部署新的积分或支付逻辑。
@@ -1466,3 +1469,30 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - 与原计划的调整：历史迁移改为保存应用事实和最终 schema，不创建可能误导的伪 SQL
 - 遗留问题：密钥轮换、Git 历史清理、D1 备份/恢复演练和自动化测试尚未完成
 - 下一步：先完成凭据轮换决策和生产备份方案，再进入阶段 1.1 支付与扣费幂等
+
+### 2026-07-23：阶段 0 第二部分——D1 备份恢复与旧凭据收口
+
+- 本次目标：在改动支付和积分逻辑前建立可验证的生产数据恢复点，撤销仓库历史中已确认泄露且仍有绑定的旧凭据
+- 实际完成：
+  - 将生产 D1 全量导出到仓库外的 `/Users/yubudong/.shopbgremover-backups/shopbgremover-db-20260723-190104.sql`，目录权限为 `700`、文件权限为 `600`
+  - 备份 SHA-256 为 `137718b8b268da83f5d78ab653a8520ed97664d497f3eabe7db320bcad75f86a`，Time Travel bookmark 为 `000001d1-00000000-000050b1-1cabdb4f615a51da1b39d974f338023d`
+  - 将备份恢复到临时 SQLite 数据库，`PRAGMA integrity_check` 返回 `ok`；恢复后有 6 个用户、45 个订单，`subscriptions` 和 `webhook_events` 均为 0 行；验证后删除临时数据库
+  - 在 Google Cloud 删除 Git 历史中泄露的旧 OAuth 客户端 `shopbgremover`；控制台当前只剩生产使用的 `bgremover` 客户端，旧客户端在 30 天内仍可从 Google Cloud 恢复
+  - 删除 Pages 生产环境的 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL`、`REMOVE_BG_API_KEY`，复查后 Pages 密钥列表为空；对应旧 Pages API 和登录路由此前已确认返回 404
+  - 删除 Worker 中当前代码未引用的 `REMOVE_BG_API_KEY`、`MEITU_API_KEY`、`MEITU_API_SECRET`；复查后只保留 FAL、现行 Google、JWT、PayPal 和 Resend 所需的 9 个密钥
+  - 评估 Git 历史重写：当前不强制重写 `main`。历史重写会破坏现有克隆和部署引用，且不能替代上游撤销；优先撤销凭据并保留审计链，若旧 remove.bg key 无法从上游撤销再重新评估
+- 修改文件：仅更新 `docs/PRODUCT-SPEC-AND-PROGRESS.md`；备份保存在仓库外，没有加入 Git
+- 数据库/配置调整：未写入或迁移生产 D1；已修改 Google Cloud OAuth 客户端、Cloudflare Pages 密钥和 Worker 密钥配置
+- 测试结果：
+  - D1 备份本地恢复和完整性检查通过
+  - Pages 密钥清单复查为空，Worker 密钥清单复查只剩 9 个现行依赖
+  - 生产首页返回 200；`/auth/login` 返回 302 且仍指向现行 `…t900…` Google 客户端；`/api/me` 返回 200 和匿名用户；空参数调用 `/api/remove-bg` 返回预期的 400 参数错误
+- 是否部署：没有部署代码；Worker 密钥删除已生成并生效为生产 Secret Change 版本，Pages 只修改了生产密钥配置
+- 生产验证：上述首页、登录、用户信息和抠图参数校验冒烟测试均通过；Pages 最新代码部署仍为 `c8e8dd2`
+- 踩坑：
+  - Chrome 中没有 remove.bg 登录态；继续会要求登录或创建/关联账号，因此没有擅自操作，上游旧 key 是否仍有效尚未核销
+  - Worker 密钥变更按版本记录；未来不能盲目回滚到旧 Worker 版本，否则可能恢复旧绑定或与当前密钥集合不一致
+  - Pages CLI 检测到根目录 `wrangler.toml` 不含 `pages_build_output_dir`，会忽略该配置；这是 Worker 与 Pages 共仓库造成的提示，本次没有据此改动部署结构
+- 与原计划的调整：对当前代码未引用的旧图片服务密钥采用删除绑定而不是轮换；remove.bg 上游撤销留待账号登录后完成
+- 遗留问题：remove.bg 上游旧 API key 核销、D1 自动化备份、支付/积分/schema 自动化测试尚未完成
+- 下一步：用户登录 remove.bg 后撤销或重置旧 API key；随后实现 D1 迁移前自动备份和基础回归测试，完成阶段 0
