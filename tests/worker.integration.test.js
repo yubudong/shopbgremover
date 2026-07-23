@@ -16,6 +16,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM ai_tasks;
+    DELETE FROM credit_ledger;
+    DELETE FROM credit_grants;
+    DELETE FROM user_free_entitlements;
+    DELETE FROM guest_ip_usage;
+    DELETE FROM guest_usage;
     DELETE FROM webhook_events;
     DELETE FROM subscriptions;
     DELETE FROM sso_codes;
@@ -41,15 +47,20 @@ async function createAuthenticatedUser({
   email = 'buyer@example.com',
   code = '123456',
   credits = 5,
+  deviceId = 'test-device-buyer',
 } = {}) {
   const expiresAt = Math.floor(Date.now() / 1000) + 600;
   await env.DB.prepare(
-    `INSERT INTO email_otps (email, code, expires_at, attempts) VALUES (?, ?, ?, 0)`
+    'INSERT INTO email_otps (email, code, expires_at, attempts) VALUES (?, ?, ?, 0)'
   ).bind(email, code, expiresAt).run();
 
   const response = await exports.default.fetch(new Request(`${API_ORIGIN}/api/auth/email/verify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-ID': deviceId,
+      'CF-Connecting-IP': '203.0.113.20',
+    },
     body: JSON.stringify({ email, code }),
   }));
 
@@ -60,9 +71,30 @@ async function createAuthenticatedUser({
   const user = await env.DB.prepare(
     'SELECT id FROM users WHERE email = ?'
   ).bind(email).first();
-  await env.DB.prepare(
-    'UPDATE user_credits SET credits = ? WHERE user_id = ?'
-  ).bind(credits, user.id).run();
+
+  if (credits !== null) {
+    await env.DB.prepare('DELETE FROM credit_ledger WHERE user_id = ?').bind(user.id).run();
+    await env.DB.prepare('DELETE FROM credit_grants WHERE user_id = ?').bind(user.id).run();
+    await env.DB.prepare(
+      'UPDATE user_credits SET credits = ?, total_used = 0 WHERE user_id = ?'
+    ).bind(credits, user.id).run();
+
+    if (credits > 0) {
+      const grantId = `test-opening:${user.id}`;
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO credit_grants
+           (id, user_id, credit_type, granted_credits, remaining_credits, idempotency_key)
+           VALUES (?, ?, 'legacy', ?, ?, ?)`
+        ).bind(grantId, user.id, credits, credits, grantId),
+        env.DB.prepare(
+          `INSERT INTO credit_ledger
+           (id, user_id, delta, balance_type, reason, grant_id, idempotency_key)
+           VALUES (?, ?, ?, 'legacy', 'test_opening', ?, ?)`
+        ).bind(grantId, user.id, credits, grantId, grantId),
+      ]);
+    }
+  }
 
   return {
     cookie: cookie.split(';', 1)[0],
@@ -77,8 +109,69 @@ function authenticatedRequest(path, cookie, init = {}) {
   return new Request(`${API_ORIGIN}${path}`, { ...init, headers });
 }
 
+function removeBackgroundRequest({
+  cookie,
+  taskId,
+  deviceId = 'guest-device-1',
+  ip = '203.0.113.10',
+  imageUrl = 'https://example.com/product.png',
+} = {}) {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'X-Device-ID': deviceId,
+    'CF-Connecting-IP': ip,
+  });
+  if (cookie) headers.set('Cookie', cookie);
+
+  return new Request(`${API_ORIGIN}/api/remove-bg`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ image_url: imageUrl, task_id: taskId }),
+  });
+}
+
+function installFalSuccessMock() {
+  const outboundFetch = vi.fn(async (input) => {
+    const url = String(input);
+    if (url === 'https://fal.run/fal-ai/birefnet') {
+      return Response.json({ image: { url: 'https://cdn.example.com/result.png' } });
+    }
+    if (url === 'https://cdn.example.com/result.png') {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        status: 200,
+        headers: { 'Content-Type': 'image/png' },
+      });
+    }
+    throw new Error(`Unexpected outbound request: ${url}`);
+  });
+  vi.stubGlobal('fetch', outboundFetch);
+  return outboundFetch;
+}
+
+function completedPayPalOrder({
+  orderId,
+  captureId = `CAPTURE-${orderId}`,
+  amount = '22.00',
+  currency = 'CNY',
+} = {}) {
+  return {
+    id: orderId,
+    status: 'COMPLETED',
+    payer: { payer_id: 'PAYER-1' },
+    purchase_units: [{
+      payments: {
+        captures: [{
+          id: captureId,
+          status: 'COMPLETED',
+          amount: { value: amount, currency_code: currency },
+        }],
+      },
+    }],
+  };
+}
+
 describe('production schema baseline', () => {
-  it('creates every production business table', async () => {
+  it('creates every Stage 1 business table', async () => {
     const result = await env.DB.prepare(
       `SELECT name FROM sqlite_master
        WHERE type = 'table'
@@ -88,77 +181,115 @@ describe('production schema baseline', () => {
     ).all();
 
     expect(result.results.map((row) => row.name)).toEqual([
+      'ai_tasks',
+      'credit_grants',
+      'credit_ledger',
       'email_otps',
       'free_usage',
+      'guest_ip_usage',
+      'guest_usage',
       'orders',
       'processing_history',
       'sso_codes',
       'subscriptions',
       'user_credits',
+      'user_free_entitlements',
       'users',
       'webhook_events',
     ]);
   });
 
-  it('keeps the billing columns observed in production', async () => {
-    const result = await env.DB.prepare('PRAGMA table_info(user_credits)').all();
-    const columns = result.results.map((row) => row.name);
+  it('contains the credit-bucket and payment idempotency columns', async () => {
+    const [credits, orders] = await Promise.all([
+      env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
+      env.DB.prepare('PRAGMA table_info(orders)').all(),
+    ]);
 
-    expect(columns).toEqual(expect.arrayContaining([
-      'credits',
-      'total_used',
-      'sub_credits',
-      'payg_credits',
-      'plan',
-      'sub_reset_at',
-      'plan_renews_at',
-      'bg_day',
-      'bg_day_count',
+    expect(credits.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'credit_type',
+      'remaining_credits',
+      'expires_at',
+      'idempotency_key',
+    ]));
+    expect(orders.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'base_credits',
+      'currency',
+      'paypal_capture_id',
+      'completed_at',
+      'refunded_at',
     ]));
   });
 });
 
-describe('credit accounting', () => {
-  it('deducts one credit for an authenticated user', async () => {
-    const { cookie, userId } = await createAuthenticatedUser({ credits: 2 });
+describe('free quota and credit accounting', () => {
+  it('issues 10 lifetime registration credits minus prior guest usage', async () => {
+    const outboundFetch = installFalSuccessMock();
 
-    const response = await exports.default.fetch(authenticatedRequest(
-      '/api/use-credit',
-      cookie,
-      { method: 'POST' }
-    ));
-
-    expect(response.status).toBe(200);
-    expect(await jsonResponse(response)).toMatchObject({ ok: true, remaining: 1 });
-
-    const credits = await env.DB.prepare(
-      'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
-    ).bind(userId).first();
-    expect(credits).toEqual(expect.objectContaining({ credits: 1, total_used: 1 }));
-  });
-
-  it('enforces the anonymous lifetime quota without exceeding it', async () => {
-    const ip = '203.0.113.10';
-
-    for (let index = 0; index < 10; index += 1) {
-      const response = await exports.default.fetch(new Request(`${API_ORIGIN}/api/use-credit`, {
-        method: 'POST',
-        headers: { 'CF-Connecting-IP': ip },
+    for (let index = 0; index < 3; index += 1) {
+      const response = await exports.default.fetch(removeBackgroundRequest({
+        taskId: `guest-task-${index}`,
+        deviceId: 'convert-me',
+        ip: '203.0.113.30',
       }));
       expect(response.status).toBe(200);
     }
 
-    const blocked = await exports.default.fetch(new Request(`${API_ORIGIN}/api/use-credit`, {
-      method: 'POST',
-      headers: { 'CF-Connecting-IP': ip },
+    const { userId } = await createAuthenticatedUser({
+      email: 'converted@example.com',
+      credits: null,
+      deviceId: 'convert-me',
+    });
+    const summary = await env.DB.prepare(
+      `SELECT uc.credits, e.guest_uses_applied, e.issued_credits
+       FROM user_credits uc
+       JOIN user_free_entitlements e ON e.user_id = uc.user_id
+       WHERE uc.user_id = ?`
+    ).bind(userId).first();
+    expect(summary).toEqual(expect.objectContaining({
+      credits: 7,
+      guest_uses_applied: 3,
+      issued_credits: 7,
+    }));
+    expect(outboundFetch).toHaveBeenCalledTimes(6);
+  });
+
+  it('enforces the anonymous lifetime quota at 3 by both device and IP', async () => {
+    const outboundFetch = installFalSuccessMock();
+
+    for (let index = 0; index < 3; index += 1) {
+      const response = await exports.default.fetch(removeBackgroundRequest({
+        taskId: `guest-quota-${index}`,
+      }));
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await exports.default.fetch(removeBackgroundRequest({
+      taskId: 'guest-quota-blocked',
     }));
     expect(blocked.status).toBe(403);
     expect(await jsonResponse(blocked)).toMatchObject({ ok: false, reason: 'free_limit' });
+    expect(outboundFetch).toHaveBeenCalledTimes(6);
 
-    const usage = await env.DB.prepare(
-      'SELECT count FROM free_usage WHERE ip = ?'
-    ).bind(ip).first();
-    expect(usage.count).toBe(10);
+    const [device, ip] = await Promise.all([
+      env.DB.prepare('SELECT count FROM guest_usage').first(),
+      env.DB.prepare('SELECT count FROM guest_ip_usage').first(),
+    ]);
+    expect(device.count).toBe(3);
+    expect(ip.count).toBe(3);
+  });
+
+  it('does not allow a direct credit-only deduction', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 2 });
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/use-credit',
+      cookie,
+      { method: 'POST' },
+    ));
+    expect(response.status).toBe(410);
+    const balance = await env.DB.prepare(
+      'SELECT credits FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first('credits');
+    expect(balance).toBe(2);
   });
 
   it('does not deduct credit when fal.ai fails', async () => {
@@ -166,14 +297,10 @@ describe('credit accounting', () => {
     const outboundFetch = vi.fn(async () => new Response('upstream unavailable', { status: 503 }));
     vi.stubGlobal('fetch', outboundFetch);
 
-    const response = await exports.default.fetch(authenticatedRequest(
-      '/api/remove-bg',
+    const response = await exports.default.fetch(removeBackgroundRequest({
       cookie,
-      {
-        method: 'POST',
-        body: JSON.stringify({ image_url: 'https://example.com/product.png' }),
-      }
-    ));
+      taskId: 'fal-failure-task',
+    }));
 
     expect(response.status).toBe(502);
     expect(outboundFetch).toHaveBeenCalledTimes(1);
@@ -181,42 +308,74 @@ describe('credit accounting', () => {
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
     ).bind(userId).first();
     expect(credits).toEqual(expect.objectContaining({ credits: 3, total_used: 0 }));
+    const ledger = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_ledger
+       WHERE task_id = 'fal-failure-task'`
+    ).first('count');
+    expect(ledger).toBe(0);
   });
 
-  it('deducts exactly one credit after fal.ai and result download succeed', async () => {
+  it('deducts once and reuses the result for the same AI task', async () => {
     const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
-    let outboundCall = 0;
-    const outboundFetch = vi.fn(async () => {
-      outboundCall += 1;
-      if (outboundCall === 1) {
-        return Response.json({
-          image: { url: 'https://cdn.example.com/result.png' },
-        });
-      }
-      return new Response(new Uint8Array([137, 80, 78, 71]), {
-        status: 200,
-        headers: { 'Content-Type': 'image/png' },
-      });
-    });
-    vi.stubGlobal('fetch', outboundFetch);
-
-    const response = await exports.default.fetch(authenticatedRequest(
-      '/api/remove-bg',
+    const outboundFetch = installFalSuccessMock();
+    const request = () => removeBackgroundRequest({
       cookie,
-      {
-        method: 'POST',
-        body: JSON.stringify({ image_url: 'https://example.com/product.png' }),
-      }
-    ));
+      taskId: 'idempotent-ai-task',
+    });
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('image/png');
-    expect(outboundFetch).toHaveBeenCalledTimes(2);
+    const first = await exports.default.fetch(request());
+    const second = await exports.default.fetch(request());
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(outboundFetch).toHaveBeenCalledTimes(3);
 
     const credits = await env.DB.prepare(
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
     ).bind(userId).first();
     expect(credits).toEqual(expect.objectContaining({ credits: 2, total_used: 1 }));
+    const ledger = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_ledger
+       WHERE task_id = 'idempotent-ai-task'`
+    ).first('count');
+    expect(ledger).toBe(1);
+  });
+
+  it('allows only one concurrent execution of the same AI task', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 2 });
+    let releaseFal;
+    const falGate = new Promise((resolve) => {
+      releaseFal = resolve;
+    });
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url === 'https://fal.run/fal-ai/birefnet') {
+        await falGate;
+        return Response.json({ image: { url: 'https://cdn.example.com/result.png' } });
+      }
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { 'Content-Type': 'image/png' },
+      });
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const firstPromise = exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId: 'concurrent-ai-task',
+    }));
+    await vi.waitFor(() => expect(outboundFetch).toHaveBeenCalledTimes(1));
+    const second = await exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId: 'concurrent-ai-task',
+    }));
+    expect(second.status).toBe(409);
+    releaseFal();
+    const first = await firstPromise;
+    expect(first.status).toBe(200);
+
+    const credits = await env.DB.prepare(
+      'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first();
+    expect(credits).toEqual(expect.objectContaining({ credits: 1, total_used: 1 }));
   });
 });
 
@@ -227,14 +386,13 @@ describe('PayPal order flow', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'payg_50' }),
-      }
+        body: JSON.stringify({ plan: 'credits_100' }),
+      },
     ));
-
     expect(response.status).toBe(401);
   });
 
-  it('rejects an unknown plan before contacting PayPal', async () => {
+  it('rejects an old or unknown plan before contacting PayPal', async () => {
     const { cookie } = await createAuthenticatedUser();
     const outboundFetch = vi.fn();
     vi.stubGlobal('fetch', outboundFetch);
@@ -244,20 +402,26 @@ describe('PayPal order flow', () => {
       cookie,
       {
         method: 'POST',
-        body: JSON.stringify({ plan: 'not-a-plan' }),
-      }
+        body: JSON.stringify({ plan: 'starter_monthly' }),
+      },
     ));
-
     expect(response.status).toBe(400);
     expect(outboundFetch).not.toHaveBeenCalled();
   });
 
-  it('records a pending order returned by PayPal', async () => {
+  it('creates a CNY one-time pack and records a pending order', async () => {
     const { cookie, userId } = await createAuthenticatedUser();
-    const outboundFetch = vi.fn(async () => Response.json({
-      id: 'PAYPAL-ORDER-1',
-      links: [{ rel: 'approve', href: 'https://paypal.example/approve' }],
-    }));
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/v2/checkout/orders')) {
+        return Response.json({
+          id: 'PAYPAL-ORDER-1',
+          links: [{ rel: 'approve', href: 'https://paypal.example/approve' }],
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
     vi.stubGlobal('fetch', outboundFetch);
 
     const response = await exports.default.fetch(authenticatedRequest(
@@ -265,66 +429,269 @@ describe('PayPal order flow', () => {
       cookie,
       {
         method: 'POST',
-        body: JSON.stringify({ plan: 'payg_50' }),
-      }
+        body: JSON.stringify({ plan: 'credits_100' }),
+      },
     ));
-
     expect(response.status).toBe(200);
-    expect(await jsonResponse(response)).toEqual({
-      orderId: 'PAYPAL-ORDER-1',
-      approveUrl: 'https://paypal.example/approve',
-    });
 
     const order = await env.DB.prepare(
-      'SELECT user_id, plan, amount, credits, status FROM orders WHERE id = ?'
+      `SELECT user_id, plan, amount, credits, base_credits, currency, status
+       FROM orders WHERE id = ?`
     ).bind('PAYPAL-ORDER-1').first();
     expect(order).toEqual(expect.objectContaining({
       user_id: userId,
-      plan: 'payg_50',
-      amount: 4.9,
-      credits: 50,
+      plan: 'credits_100',
+      amount: 22,
+      credits: 100,
+      base_credits: 100,
+      currency: 'CNY',
       status: 'pending',
     }));
+
+    const createCall = outboundFetch.mock.calls.find(([input]) =>
+      String(input).endsWith('/v2/checkout/orders'));
+    const createBody = JSON.parse(createCall[1].body);
+    expect(createBody.purchase_units[0].amount).toEqual({
+      currency_code: 'CNY',
+      value: '22.00',
+    });
   });
 
-  it('adds credits once for sequential duplicate capture callbacks', async () => {
+  it('adds paid credits once for sequential duplicate capture callbacks', async () => {
     const { cookie, userId } = await createAuthenticatedUser({ credits: 5 });
     await env.DB.prepare(
-      `INSERT INTO orders (id, user_id, plan, amount, credits, status)
-       VALUES (?, ?, ?, ?, ?, 'pending')`
-    ).bind('PAYPAL-ORDER-2', userId, 'payg_50', 4.9, 50).run();
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES (?, ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+    ).bind('PAYPAL-ORDER-2', userId).run();
 
-    const outboundFetch = vi.fn(async () => Response.json({ status: 'COMPLETED' }));
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({ orderId: 'PAYPAL-ORDER-2' }));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
     vi.stubGlobal('fetch', outboundFetch);
 
-    const first = await exports.default.fetch(authenticatedRequest(
+    const capture = () => exports.default.fetch(authenticatedRequest(
       '/api/paypal/capture-order',
       cookie,
       {
         method: 'POST',
         body: JSON.stringify({ orderId: 'PAYPAL-ORDER-2' }),
-      }
+      },
     ));
+    const first = await capture();
+    const second = await capture();
     expect(first.status).toBe(200);
-    expect(await jsonResponse(first)).toEqual({ ok: true, credits: 50 });
-
-    const second = await exports.default.fetch(authenticatedRequest(
-      '/api/paypal/capture-order',
-      cookie,
-      {
-        method: 'POST',
-        body: JSON.stringify({ orderId: 'PAYPAL-ORDER-2' }),
-      }
-    ));
-    expect(second.status).toBe(400);
-    expect(outboundFetch).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(200);
+    expect(await jsonResponse(second)).toMatchObject({ alreadyProcessed: true });
 
     const credits = await env.DB.prepare(
       'SELECT credits FROM user_credits WHERE user_id = ?'
     ).bind(userId).first('credits');
-    expect(credits).toBe(55);
+    expect(credits).toBe(105);
+    const grants = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_grants
+       WHERE order_id = 'PAYPAL-ORDER-2'`
+    ).first('count');
+    expect(grants).toBe(1);
   });
 
-  it.todo('atomically prevents duplicate credits from concurrent capture callbacks');
-  it.todo('rejects capture when the PayPal order belongs to a different user');
+  it('atomically prevents duplicate credits from concurrent capture callbacks', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 0 });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES (?, ?, 'credits_300', 60, 300, 300, 'CNY', 'pending')`
+    ).bind('PAYPAL-CONCURRENT', userId).run();
+
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({
+          orderId: 'PAYPAL-CONCURRENT',
+          captureId: 'CAPTURE-CONCURRENT',
+          amount: '60.00',
+        }));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const request = () => exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'PAYPAL-CONCURRENT' }),
+      },
+    ));
+    const responses = await Promise.all([request(), request()]);
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+
+    const [credits, grants, ledgers] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(userId).first('credits'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_grants
+         WHERE order_id = 'PAYPAL-CONCURRENT'`
+      ).first('count'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_ledger
+         WHERE order_id = 'PAYPAL-CONCURRENT' AND reason = 'paypal_purchase'`
+      ).first('count'),
+    ]);
+    expect(credits).toBe(300);
+    expect(grants).toBe(1);
+    expect(ledgers).toBe(1);
+  });
+
+  it('rejects capture when the PayPal order belongs to another user', async () => {
+    const first = await createAuthenticatedUser({
+      email: 'owner@example.com',
+      credits: 0,
+    });
+    const second = await createAuthenticatedUser({
+      email: 'attacker@example.com',
+      credits: 0,
+      deviceId: 'attacker-device',
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES ('OWNED-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+    ).bind(first.userId).run();
+    const outboundFetch = vi.fn();
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      second.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'OWNED-ORDER' }),
+      },
+    ));
+    expect(response.status).toBe(404);
+    expect(outboundFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a captured amount mismatch without granting credits', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 0 });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES ('MISMATCH-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+    ).bind(userId).run();
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      return Response.json(completedPayPalOrder({
+        orderId: 'MISMATCH-ORDER',
+        amount: '1.00',
+      }));
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'MISMATCH-ORDER' }),
+      },
+    ));
+    expect(response.status).toBe(409);
+    const credits = await env.DB.prepare(
+      'SELECT credits FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first('credits');
+    expect(credits).toBe(0);
+  });
+});
+
+describe('PayPal refund webhook', () => {
+  it('verifies and reverses a full refund exactly once', async () => {
+    const { userId } = await createAuthenticatedUser({ credits: 0 });
+    const grantId = 'purchase:REFUND-ORDER:paid';
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO orders
+         (id, user_id, plan, amount, credits, base_credits, currency, status,
+          paypal_capture_id, completed_at)
+         VALUES ('REFUND-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY',
+                 'completed', 'CAPTURE-REFUND', unixepoch())`
+      ).bind(userId),
+      env.DB.prepare(
+        `INSERT INTO credit_grants
+         (id, user_id, credit_type, granted_credits, remaining_credits,
+          order_id, idempotency_key)
+         VALUES (?, ?, 'paid', 100, 100, 'REFUND-ORDER', ?)`
+      ).bind(grantId, userId, grantId),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id, idempotency_key)
+         VALUES (?, ?, 100, 'paid', 'paypal_purchase', ?, 'REFUND-ORDER', ?)`
+      ).bind(grantId, userId, grantId, grantId),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = 100 WHERE user_id = ?'
+      ).bind(userId),
+    ]);
+
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/v1/notifications/verify-webhook-signature')) {
+        return Response.json({ verification_status: 'SUCCESS' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const event = {
+      id: 'WH-REFUND-1',
+      event_type: 'PAYMENT.CAPTURE.REFUNDED',
+      resource: {
+        id: 'CAPTURE-REFUND',
+        amount: { value: '22.00', currency_code: 'CNY' },
+      },
+    };
+    const webhookRequest = () => new Request(`${API_ORIGIN}/api/paypal/webhook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'PAYPAL-AUTH-ALGO': 'SHA256withRSA',
+        'PAYPAL-CERT-URL': 'https://api.paypal.com/cert.pem',
+        'PAYPAL-TRANSMISSION-ID': 'transmission-1',
+        'PAYPAL-TRANSMISSION-SIG': 'signature',
+        'PAYPAL-TRANSMISSION-TIME': '2026-07-23T00:00:00Z',
+      },
+      body: JSON.stringify(event),
+    });
+
+    const first = await exports.default.fetch(webhookRequest());
+    const second = await exports.default.fetch(webhookRequest());
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const [credits, grant, order, reversals] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(userId).first('credits'),
+      env.DB.prepare('SELECT remaining_credits FROM credit_grants WHERE id = ?')
+        .bind(grantId).first('remaining_credits'),
+      env.DB.prepare('SELECT status FROM orders WHERE id = ?')
+        .bind('REFUND-ORDER').first('status'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_ledger
+         WHERE reason = 'paypal_refund' AND order_id = 'REFUND-ORDER'`
+      ).first('count'),
+    ]);
+    expect(credits).toBe(0);
+    expect(grant).toBe(0);
+    expect(order).toBe('refunded');
+    expect(reversals).toBe(1);
+  });
 });

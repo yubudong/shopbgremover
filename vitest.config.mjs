@@ -23,6 +23,7 @@ export default defineConfig({
           PAYPAL_CLIENT_ID: 'test-paypal-client',
           PAYPAL_SECRET: 'test-paypal-secret',
           PAYPAL_MODE: 'sandbox',
+          PAYPAL_WEBHOOK_ID: 'test-paypal-webhook',
           RESEND_API_KEY: 'test-resend-key',
           RESEND_FROM: 'test@example.com',
         },

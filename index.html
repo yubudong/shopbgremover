@@ -807,14 +807,14 @@
 
 <!-- Low Credits Banner -->
 <div class="low-banner" id="lowBanner">
-  ⚡ You're running low on credits — renew now and get 10% off.
+  ⚡ You're running low on credits — buy a one-time pack when you need more.
   <a onclick="showUpgradeModal()">Upgrade →</a>
 </div>
 
 <!-- Navbar -->
 <nav class="navbar">
   <a class="nav-logo" href="#">
-    
+
     <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
     <span class="nav-logo-text">ShopBG<span>Remover</span></span>
   </a>
@@ -852,7 +852,7 @@
 <section class="tool-section" id="tool">
   <div class="tool-head">
     <h1>Remove product backgrounds for <em>Shopify, Amazon & eBay</em></h1>
-    <p>AI batch background removal — up to 50 images at once, ~3s each. Try free, no signup needed.</p>
+    <p>AI background removal for one image at a time as a guest. Sign in to process up to 50 images per batch and download ZIP files.</p>
   </div>
 
   <div class="workspace">
@@ -1146,10 +1146,10 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal('registerOverlay')">✕</button>
     <div class="modal-icon icon-blue">🎁</div>
-    <h3>Get 20 free HD credits</h3>
-    <p>You've used all your free credits. Sign up free and we'll give you <strong>20 high-resolution credits</strong> — no credit card needed.</p>
+    <h3>Get up to 10 lifetime free removals</h3>
+    <p>Create a free account for up to <strong>10 lifetime AI removals</strong>. Your guest usage already counts toward that total.</p>
     <div class="modal-perks">
-      <div class="modal-perk"><span class="perk-icon">✂</span> 20 HD background removals, free</div>
+      <div class="modal-perk"><span class="perk-icon">✂</span> Up to 10 lifetime AI removals</div>
       <div class="modal-perk"><span class="perk-icon">📦</span> Batch up to 50 images at once</div>
       <div class="modal-perk"><span class="perk-icon">🕑</span> 90-day history &amp; re-download</div>
     </div>
@@ -1166,15 +1166,15 @@
     <button class="modal-close" onclick="closeModal('upgradeOverlay')">✕</button>
     <div class="modal-icon icon-amber">⚡</div>
     <h3>Credits used up</h3>
-    <p>Upgrade to Starter for just <strong>$4.9/month</strong> and get 200 credits — enough for 200 HD product images every month.</p>
+    <p>Buy <strong>100 credits for ¥22</strong> when you need more. Purchased credits never expire and there is no subscription.</p>
     <div class="modal-perks">
-      <div class="modal-perk"><span class="perk-icon">🚀</span> 200 HD credits every month</div>
+      <div class="modal-perk"><span class="perk-icon">🚀</span> 100 permanent paid credits</div>
       <div class="modal-perk"><span class="perk-icon">📦</span> Batch 50 images at once</div>
       <div class="modal-perk"><span class="perk-icon">🎨</span> Custom background colors</div>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn modal-btn-amber" onclick="window.location='/checkout?plan=starter'">
-        Upgrade to Starter — $4.9/mo →
+      <button class="modal-btn modal-btn-amber" onclick="window.location='/pricing#plans'">
+        Buy 100 credits — ¥22 →
       </button>
       <button class="modal-btn modal-btn-ghost" onclick="closeModal('upgradeOverlay')">Not now</button>
     </div>
@@ -1246,13 +1246,24 @@
 <div class="upgrade-toast" id="upgradToast">
   <h4>⚡ Credits running low</h4>
   <p>Renew now and get <strong>10% off</strong> your next month.</p>
-  <button onclick="showUpgradeModal()">Upgrade now →</button>
+  <button onclick="showUpgradeModal()">Buy credits →</button>
 </div>
 
 <script>
   const API = 'https://api.shopbgremover.com';
 
-  let selectedFiles   = [];
+
+  function getOrCreateDeviceId() {
+    let id = localStorage.getItem('sbgrDeviceId');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('sbgrDeviceId', id);
+    }
+    document.cookie = `sbgr_device=${encodeURIComponent(id)}; Path=/; Domain=.shopbgremover.com; Max-Age=31536000; Secure; SameSite=Lax`;
+    return id;
+  }
+  const DEVICE_ID = getOrCreateDeviceId();
+let selectedFiles   = [];
   let processedResults = [];
   let currentUser     = null;
   let bgMode          = 'white';      // 'white' | 'transparent' | 'custom'
@@ -1317,7 +1328,7 @@
     btn.disabled = true; btn.textContent = 'Sending…';
 
     const res  = await fetch(`${API}/api/auth/email/send-otp`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email }),
     });
     const data = await res.json();
@@ -1348,7 +1359,7 @@
 
     const res  = await fetch(`${API}/api/auth/email/verify`, {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email: otpEmail, code }),
     });
     const data = await res.json();
@@ -1396,7 +1407,7 @@
     document.getElementById('otpVerifyError').style.display = 'none';
     document.getElementById('otpInput').value = '';
     const res  = await fetch(`${API}/api/auth/email/send-otp`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email: otpEmail }),
     });
     const data = await res.json();
@@ -1486,7 +1497,7 @@
   fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
 
   function handleFiles(files) {
-    selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
+    selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, currentUser ? 50 : 1);
     if (!selectedFiles.length) return;
 
     uploadArea.style.minHeight = '72px';
@@ -1528,15 +1539,6 @@
   }
 
   // ── Free-use gate (anonymous) ─────────────────────────────
-
-  function getFreeCount() {
-    return parseInt(localStorage.getItem('freeUsageTotal') || '0');
-  }
-
-  function incrementFreeCount() {
-    const count = getFreeCount() + 1;
-    localStorage.setItem('freeUsageTotal', String(count));
-  }
 
   // ── Image compression ─────────────────────────────────────
 
@@ -1627,14 +1629,10 @@
     if (!selectedFiles.length) return;
 
     // Anonymous free limit
-    if (!currentUser && getFreeCount() >= 10) {
-      showRegisterModal();
-      return;
-    }
 
     // Credit pre-check
     try {
-      const cr = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include' });
+      const cr = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include', headers: { 'X-Device-ID': DEVICE_ID } });
       if (cr.ok) {
         const cd = await cr.json();
         if (cd.reason === 'free_limit')  { showRegisterModal(); return; }
@@ -1662,8 +1660,8 @@
         const res = await fetch(`${API}/api/remove-bg`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: dataUrl }),
+          headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
+          body: JSON.stringify({ image_url: dataUrl, task_id: crypto.randomUUID() }),
         });
 
         if (res.ok) {
@@ -1671,8 +1669,6 @@
           const processedBlob = await applyBackground(rawBlob);
           const name          = getFileName(selectedFiles[i].name, processedResults.length);
           processedResults.push({ name, blob: processedBlob });
-
-          if (!currentUser) incrementFreeCount();
 
           if (card) {
             card.classList.add('flipping');
@@ -1709,7 +1705,7 @@
     if (currentUser && ok > 0) {
       fetch(`${API}/api/history`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
         body: JSON.stringify({ file_count: ok, settings: { bgMode } }),
       });
       loadUser();

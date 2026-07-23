@@ -17,7 +17,7 @@
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://www.shopbgremover.com/logo1200.png" />
-  <meta name="description" content="Affordable AI background removal for Shopify, Amazon & eBay sellers. Free tier included. Starter from $4.9/mo for 100 HD images. No commitment, cancel anytime.">
+  <meta name="description" content="One-time AI background removal credits for e-commerce sellers. 100 credits ¥22, 300 credits ¥60, or 1000 credits ¥160. Purchased credits never expire.">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -236,7 +236,7 @@ a{color:var(--accent2);text-decoration:none}
 <!-- Navbar -->
 <nav class="navbar">
   <a class="nav-logo" href="/">
-    
+
     <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
   </a>
   <div class="nav-links">
@@ -267,243 +267,88 @@ a{color:var(--accent2);text-decoration:none}
 
 <!-- Hero -->
 <section class="hero">
-  <div class="hero-badge">⚡ 5× more images than remove.bg — half the price</div>
-  <h1>Plans that <em>scale with you</em></h1>
-  <p>Start free, upgrade when you're ready. No hidden fees, cancel anytime, every plan includes batch processing.</p>
+  <div class="hero-badge">⚡ One-time credits · no subscription</div>
+  <h1>Credits that <em>never expire</em></h1>
+  <p>Start with a lifetime free allowance, then buy only the credits you need. One successful AI background removal costs one credit.</p>
 </section>
 
-<!-- Toggle -->
-<div class="toggle-section">
-  <span class="toggle-label active" id="lbl-m" onclick="setBilling(false)">Monthly</span>
-  <div class="toggle-track" id="toggle" onclick="toggleBilling()"><div class="toggle-thumb"></div></div>
-  <span class="toggle-label" id="lbl-a" onclick="setBilling(true)">Annual</span>
-  <span class="save-pill">Save 20%</span>
-</div>
-
-<!-- Plans -->
-<div class="plans">
-
-  <!-- Free -->
+<div class="plans" id="plans">
   <div class="plan">
     <div class="plan-name">Free</div>
-    <div class="plan-desc">Test it out — zero risk</div>
+    <div class="plan-desc">Try the full AI quality</div>
+    <div class="plan-original">&nbsp;</div>
+    <div class="plan-price-row"><span class="plan-dollar">¥</span><span class="plan-amount">0</span></div>
+    <div class="plan-per">&nbsp;</div>
+    <a href="/#tool" class="plan-cta cta-ghost">Start free</a>
+    <ul class="plan-features"><li><span class="ico yes">✓</span> 3 lifetime removals without signup</li>
+<li><span class="ico yes">✓</span> Up to 10 lifetime removals after signup</li>
+<li><span class="ico yes">✓</span> Guest mode supports one image at a time</li>
+<li><span class="ico yes">✓</span> Prior guest usage counts toward the 10</li></ul>
+  </div>
+
+  <div class="plan">
+
+    <div class="plan-name">100 credits</div>
+    <div class="plan-desc">Purchased credits never expire</div>
     <div class="plan-original">&nbsp;</div>
     <div class="plan-price-row">
-      <span class="plan-dollar">$</span>
-      <span class="plan-amount">0</span>
+      <span class="plan-dollar">¥</span>
+      <span class="plan-amount">22</span>
+      <span class="plan-period"> one-time</span>
     </div>
-    <div class="plan-per">&nbsp;</div>
-    <a href="/#tool" class="plan-cta cta-ghost">Get started free</a>
-    <ul class="plan-features">
-      <li><span class="ico yes">✓</span> 2 images / day without signup</li>
-      <li><span class="ico yes">✓</span> 3 HD / day with free account</li>
-      <li><span class="ico yes">✓</span> 10 bonus HD credits on signup</li>
-      <li><span class="ico yes">✓</span> White &amp; transparent backgrounds</li>
-      <li><span class="ico yes">✓</span> Batch upload up to 2 images</li>
-      <li class="off"><span class="ico no">—</span> Custom background color</li>
-      <li class="off"><span class="ico no">—</span> ZIP download</li>
-      <li class="off"><span class="ico no">—</span> Processing history</li>
-    </ul>
+    <div class="plan-per">¥0.22 / image</div>
+    <div class="paypal-wrap" id="pp-100"></div>
+    <div class="pp-login-hint" id="hint-100"></div>
+    <ul class="plan-features"><li><span class="ico yes">✓</span> Purchased credits never expire</li>
+<li><span class="ico yes">✓</span> Only successful AI removal costs 1 credit</li>
+<li><span class="ico yes">✓</span> Local edits and exports are free</li>
+<li><span class="ico yes">✓</span> Batch processing and ZIP download</li></ul>
   </div>
 
-  <!-- Starter -->
-  <div class="plan">
-    <div class="plan-name">Starter</div>
-    <div class="plan-desc">For sellers with 50–100 products / mo</div>
-    <div class="plan-original" data-monthly="&nbsp;" data-annual="$4.9/mo">&nbsp;</div>
-    <div class="plan-price-row">
-      <span class="plan-dollar">$</span>
-      <span class="plan-amount" data-monthly="4.9" data-annual="3.9">4.9</span>
-      <span class="plan-period">/ mo</span>
-    </div>
-    <div class="plan-per" data-monthly="$0.049 per image" data-annual="$0.039 per image">$0.049 per image</div>
-    <div class="paypal-wrap" id="pp-starter"></div>
-    <div class="pp-login-hint" id="hint-starter"></div>
-    <ul class="plan-features">
-      <li><span class="ico yes">✓</span> <strong>100</strong> HD credits / month</li>
-      <li><span class="ico yes">✓</span> Batch up to 20 images</li>
-      <li><span class="ico yes">✓</span> Full HD quality output</li>
-      <li><span class="ico yes">✓</span> Custom background color</li>
-      <li><span class="ico yes">✓</span> File renaming templates</li>
-      <li><span class="ico yes">✓</span> ZIP batch download</li>
-      <li><span class="ico yes">✓</span> 30-day processing history</li>
-      <li class="off"><span class="ico no">—</span> Priority processing</li>
-    </ul>
-  </div>
-
-  <!-- Pro -->
   <div class="plan featured">
-    <div class="plan-tag">Most Popular</div>
-    <div class="plan-name">Pro</div>
-    <div class="plan-desc">For growing shops, 200–300 products / mo</div>
-    <div class="plan-original" data-monthly="&nbsp;" data-annual="$9.9/mo">&nbsp;</div>
+    <div class="plan-tag">Most popular</div>
+    <div class="plan-name">300 credits</div>
+    <div class="plan-desc">Purchased credits never expire</div>
+    <div class="plan-original">&nbsp;</div>
     <div class="plan-price-row">
-      <span class="plan-dollar">$</span>
-      <span class="plan-amount" data-monthly="9.9" data-annual="7.9">9.9</span>
-      <span class="plan-period">/ mo</span>
+      <span class="plan-dollar">¥</span>
+      <span class="plan-amount">60</span>
+      <span class="plan-period"> one-time</span>
     </div>
-    <div class="plan-per" data-monthly="$0.033 per image" data-annual="$0.026 per image">$0.033 per image</div>
-    <div class="paypal-wrap" id="pp-pro"></div>
-    <div class="pp-login-hint" id="hint-pro"></div>
-    <ul class="plan-features">
-      <li><span class="ico yes">✓</span> <strong>300</strong> HD credits / month</li>
-      <li><span class="ico yes">✓</span> Batch up to 50 images</li>
-      <li><span class="ico yes">✓</span> Full HD quality output</li>
-      <li><span class="ico yes">✓</span> All background options</li>
-      <li><span class="ico yes">✓</span> Platform size presets</li>
-      <li><span class="ico yes">✓</span> ZIP batch download</li>
-      <li><span class="ico yes">✓</span> 90-day processing history</li>
-      <li><span class="ico yes">✓</span> Priority processing queue</li>
-      <li><span class="ico yes">✓</span> Credits never expire</li>
-    </ul>
+    <div class="plan-per">¥0.20 / image</div>
+    <div class="paypal-wrap" id="pp-300"></div>
+    <div class="pp-login-hint" id="hint-300"></div>
+    <ul class="plan-features"><li><span class="ico yes">✓</span> Purchased credits never expire</li>
+<li><span class="ico yes">✓</span> Only successful AI removal costs 1 credit</li>
+<li><span class="ico yes">✓</span> Local edits and exports are free</li>
+<li><span class="ico yes">✓</span> Batch processing and ZIP download</li></ul>
   </div>
 
-  <!-- Business -->
   <div class="plan">
-    <div class="plan-name">Business</div>
-    <div class="plan-desc">For high-volume sellers &amp; agencies</div>
-    <div class="plan-original" data-monthly="&nbsp;" data-annual="$24.9/mo">&nbsp;</div>
+
+    <div class="plan-name">1000 credits</div>
+    <div class="plan-desc">Purchased credits never expire</div>
+    <div class="plan-original">&nbsp;</div>
     <div class="plan-price-row">
-      <span class="plan-dollar">$</span>
-      <span class="plan-amount" data-monthly="24.9" data-annual="19.9">24.9</span>
-      <span class="plan-period">/ mo</span>
+      <span class="plan-dollar">¥</span>
+      <span class="plan-amount">160</span>
+      <span class="plan-period"> one-time</span>
     </div>
-    <div class="plan-per" data-monthly="$0.025 per image" data-annual="$0.020 per image">$0.025 per image</div>
-    <div class="paypal-wrap" id="pp-business"></div>
-    <div class="pp-login-hint" id="hint-business"></div>
-    <ul class="plan-features">
-      <li><span class="ico yes">✓</span> <strong>1,000</strong> HD credits / month</li>
-      <li><span class="ico yes">✓</span> Everything in Pro</li>
-      <li><span class="ico yes">✓</span> API access</li>
-      <li><span class="ico yes">✓</span> Credits never expire</li>
-      <li><span class="ico yes">✓</span> Priority support</li>
-    </ul>
-  </div>
-
-</div>
-
-<!-- Comparison -->
-<div class="compare">
-  <div class="compare-box">
-    <div class="compare-icon">⚡</div>
-    <div class="compare-text">
-      <strong>How we compare:</strong> Our Pro plan gives you 300 images for $9.9/mo. Other leading background removers charge $9/mo for just 40 images. You get up to 20x more images per dollar — with industry-leading AI quality.
-    </div>
-  </div>
-  <div class="compare-hook">
-    <span class="hook-emoji">👉</span>
-    <span class="hook-text">Limited time offer: Upgrade now to lock in this early-bird pricing forever. Your price will never go up.</span>
-    <a href="/pricing#plans" class="hook-btn" onclick="document.querySelector('.plans').scrollIntoView({behavior:'smooth'});return false;">Lock in my price →</a>
+    <div class="plan-per">¥0.16 / image</div>
+    <div class="paypal-wrap" id="pp-1000"></div>
+    <div class="pp-login-hint" id="hint-1000"></div>
+    <ul class="plan-features"><li><span class="ico yes">✓</span> Purchased credits never expire</li>
+<li><span class="ico yes">✓</span> Only successful AI removal costs 1 credit</li>
+<li><span class="ico yes">✓</span> Local edits and exports are free</li>
+<li><span class="ico yes">✓</span> Batch processing and ZIP download</li></ul>
   </div>
 </div>
 
-<!-- Pay-as-you-go -->
-<section class="payg">
-  <div class="section-head">
-    <h2>Pay-as-you-go</h2>
-    <p>No subscription, no commitment. Buy credits and use them anytime within 12 months.</p>
-  </div>
-  <div class="payg-grid">
-    <div class="payg-card">
-      <div class="payg-amount">$1.50</div>
-      <div class="payg-images">10 images</div>
-      <div class="payg-per">$0.150 / image</div>
-      <div class="payg-valid">Valid 12 months</div>
-      <div class="paypal-wrap" id="pp-payg-10"></div>
-    </div>
-    <div class="payg-card">
-      <div class="payg-amount">$4.90</div>
-      <div class="payg-images">50 images</div>
-      <div class="payg-per">$0.098 / image</div>
-      <div class="payg-valid">Valid 12 months</div>
-      <div class="paypal-wrap" id="pp-payg-50"></div>
-    </div>
-    <div class="payg-card">
-      <div class="payg-amount">$12.90</div>
-      <div class="payg-images">200 images</div>
-      <div class="payg-per">$0.065 / image</div>
-      <div class="payg-valid">Valid 12 months</div>
-      <div class="paypal-wrap" id="pp-payg-200"></div>
-    </div>
-    <div class="payg-card">
-      <div class="payg-amount">$24.90</div>
-      <div class="payg-images">500 images</div>
-      <div class="payg-per">$0.050 / image</div>
-      <div class="payg-valid">Valid 12 months</div>
-      <div class="paypal-wrap" id="pp-payg-500"></div>
-    </div>
-  </div>
-</section>
-
-<!-- Trust -->
-<section class="trust">
-  <div class="section-head">
-    <h2>Why sellers trust ShopBGRemover</h2>
-  </div>
-  <div class="trust-grid">
-    <div class="trust-card">
-      <div class="icon">🔒</div>
-      <h3>No risk to try</h3>
-      <p>Start with free images — no credit card, no signup. Buy a small pay-as-you-go pack to test before committing to a subscription.</p>
-    </div>
-    <div class="trust-card">
-      <div class="icon">↩️</div>
-      <h3>Cancel anytime</h3>
-      <p>No contracts, no penalties. Cancel your subscription with one click and keep using remaining credits until the billing period ends.</p>
-    </div>
-    <div class="trust-card">
-      <div class="icon">🛡️</div>
-      <h3>Secure &amp; private</h3>
-      <p>Images are processed in real-time and automatically deleted. We never store or share your photos. Payments secured by PayPal.</p>
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
 <section class="faq">
-  <div class="section-head">
-    <h2>Frequently asked questions</h2>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What image formats are supported?</div>
-    <div class="faq-a">We support JPG, JPEG, PNG, and WebP. Maximum file size is 5 MB for free users, 10 MB for registered and paid users. Output is always high-quality PNG with transparency support.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long does each image take to process?</div>
-    <div class="faq-a">Most images are processed in 3–8 seconds. Pro and Business subscribers enjoy priority processing for faster results, especially during peak hours.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try before subscribing?</div>
-    <div class="faq-a">Absolutely. You get free images without even signing up. Create a free account for 20 bonus HD credits. Or buy a small pay-as-you-go pack (10 images for $1.50) to test with your actual product photos — no subscription required.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What's the difference between monthly and annual billing?</div>
-    <div class="faq-a">Annual billing saves you 20% compared to monthly. For example, Pro is $9.9/mo monthly but only $7.9/mo on annual billing — that's $24 saved per year. You can switch between billing periods at any time.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What counts as one credit?</div>
-    <div class="faq-a">One credit = one background removal, regardless of image size or output format. Resizing to a platform preset (Shopify, Amazon, eBay) does not cost an extra credit.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do unused credits expire?</div>
-    <div class="faq-a">No. All purchased credits never expire — use them whenever you need.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I cancel or change my plan?</div>
-    <div class="faq-a">Yes, cancel or change your plan anytime with one click — no penalties. When you cancel, you keep access until the end of your current billing period. Remaining credits stay available until they expire.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is my data safe?</div>
-    <div class="faq-a">Your images are processed in real-time on Cloudflare's global edge network and deleted immediately after. We never store, analyze, or share your photos. All payments are processed through PayPal with bank-level encryption.</div>
-  </div>
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What payment methods do you accept?</div>
-    <div class="faq-a">We accept Visa, Mastercard, American Express, and PayPal through PayPal's secure payment gateway. All transactions are encrypted and PCI-compliant.</div>
-  </div>
+  <div class="section-head"><h2>Simple, transparent billing</h2></div>
+  <div class="faq-item open"><div class="faq-a">There are no monthly or annual plans. Purchased credits remain available permanently. Unused packs can be refunded within 7 days only when no credit from that pack has been used.</div></div>
 </section>
 
-<!-- Footer -->
 <footer class="footer">
   <div class="footer-logo">ShopBG Remover</div>
   <div class="footer-links">
@@ -525,128 +370,76 @@ a{color:var(--accent2);text-decoration:none}
 </footer>
 
 <!-- PayPal JS SDK — replace PAYPAL_CLIENT_ID with your actual Client ID -->
-<script src="https://www.paypal.com/sdk/js?client-id=AZSlMaqcUdHvRQdaCALfi1d4tvCgf2nJiEjPpE9dJgRdHmhrSj1J-7CKfHEq4KWgwjt4k-yM9xTI_oW6&currency=USD&intent=capture" data-sdk-integration-source="button-factory"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=AZSlMaqcUdHvRQdaCALfi1d4tvCgf2nJiEjPpE9dJgRdHmhrSj1J-7CKfHEq4KWgwjt4k-yM9xTI_oW6&currency=CNY&intent=capture" data-sdk-integration-source="button-factory"></script>
 
 <script>
 const API = 'https://api.shopbgremover.com';
-let annual = false;
 let currentUser = null;
 
-// ── Billing toggle ────────────────────────────────────────
-function toggleBilling() { setBilling(!annual); }
-
-function setBilling(isAnnual) {
-  annual = isAnnual;
-  document.getElementById('toggle').classList.toggle('on', annual);
-  document.getElementById('lbl-m').classList.toggle('active', !annual);
-  document.getElementById('lbl-a').classList.toggle('active',  annual);
-
-  document.querySelectorAll('.plan-amount[data-monthly]').forEach(el => {
-    el.textContent = annual ? el.dataset.annual : el.dataset.monthly;
-  });
-  document.querySelectorAll('.plan-per[data-monthly]').forEach(el => {
-    el.textContent = annual ? el.dataset.annual : el.dataset.monthly;
-  });
-  document.querySelectorAll('.plan-original[data-monthly]').forEach(el => {
-    el.innerHTML = annual ? el.dataset.annual : el.dataset.monthly;
-  });
-}
-
-// ── Auth ──────────────────────────────────────────────────
 async function loadUser() {
   try {
-    const res  = await fetch(`${API}/api/me`, { credentials: 'include' });
-    const data = await res.json();
+    const response = await fetch(`${API}/api/me`, { credentials: 'include' });
+    const data = await response.json();
     currentUser = data.user || null;
-  } catch(e) {}
+  } catch {}
   renderPayPalButtons();
 }
 
-// ── PayPal button factory ─────────────────────────────────
-function makeButton(containerId, planKey, hintId) {
+function makeButton(containerId, plan, hintId) {
   if (!window.paypal) return;
-
   paypal.Buttons({
-    style: {
-      layout: 'horizontal',
-      color:  'blue',
-      shape:  'rect',
-      label:  'pay',
-      height: 44,
-      tagline: false,
-    },
-
+    style: { layout: 'horizontal', color: 'blue', shape: 'rect', label: 'pay', height: 44, tagline: false },
     createOrder: async () => {
-      // Must be logged in
       if (!currentUser) {
-        window.location = `${API}/auth/login?redirect=/pricing`;
+        window.location = `${API}/auth/login`;
         return;
       }
-      const plan = planKey(); // planKey is a fn so it reads latest `annual`
-      const res  = await fetch(`${API}/api/paypal/create-order`, {
+      const response = await fetch(`${API}/api/paypal/create-order`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.orderId) {
-        alert(data.error || 'Failed to create order. Please try again.');
+      const data = await response.json();
+      if (!response.ok || !data.orderId) {
+        alert(data.error || "Unable to create the order. Please try again.");
         return;
       }
       return data.orderId;
     },
-
-    onApprove: async (ppData) => {
-      const res = await fetch(`${API}/api/paypal/capture-order`, {
+    onApprove: async (paypalData) => {
+      const response = await fetch(`${API}/api/paypal/capture-order`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: ppData.orderID }),
+        body: JSON.stringify({ orderId: paypalData.orderID }),
       });
-      const result = await res.json();
-      if (res.ok && result.credits != null) {
+      const result = await response.json();
+      if (response.ok && result.credits != null) {
         window.location = `/?payment=success&credits=${result.credits}`;
       } else {
-        alert(result.error || 'Payment captured but something went wrong. Contact support.');
+        alert(result.error || "Payment was not completed. Please contact support if PayPal charged you.");
       }
     },
-
-    onError: (err) => {
-      console.error('PayPal error', err);
-      alert('PayPal encountered an error. Please try again or contact support.');
+    onError: (error) => {
+      console.error('PayPal error', error);
+      alert("PayPal encountered an error. Please try again or contact support.");
     },
-  }).render('#' + containerId);
-
-  // Login hint for non-logged-in users
-  if (hintId) {
-    const hint = document.getElementById(hintId);
-    if (hint && !currentUser) {
-      hint.textContent = '* Sign in required to complete purchase';
-    }
-  }
+  }).render(`#${containerId}`);
+  const hint = document.getElementById(hintId);
+  if (hint && !currentUser) hint.textContent = "* Sign in required to complete purchase";
 }
 
 function renderPayPalButtons() {
   if (!window.paypal) {
-    // SDK not loaded yet — retry once
     setTimeout(renderPayPalButtons, 800);
     return;
   }
-
-  // Subscription plans
-  makeButton('pp-starter',  () => annual ? 'starter_annual'  : 'starter_monthly',  'hint-starter');
-  makeButton('pp-pro',      () => annual ? 'pro_annual'       : 'pro_monthly',      'hint-pro');
-  makeButton('pp-business', () => annual ? 'business_annual'  : 'business_monthly', 'hint-business');
-
-  // Pay-as-you-go
-  makeButton('pp-payg-10',  () => 'payg_10',  null);
-  makeButton('pp-payg-50',  () => 'payg_50',  null);
-  makeButton('pp-payg-200', () => 'payg_200', null);
-  makeButton('pp-payg-500', () => 'payg_500', null);
+  makeButton('pp-100', 'credits_100', 'hint-100');
+  makeButton('pp-300', 'credits_300', 'hint-300');
+  makeButton('pp-1000', 'credits_1000', 'hint-1000');
 }
 
-// ── Init ─────────────────────────────────────────────────
 loadUser();
 </script>
 

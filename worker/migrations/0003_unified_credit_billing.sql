@@ -1,61 +1,23 @@
--- ShopBGRemover production schema baseline.
--- Synced from the remote D1 sqlite_master on 2026-07-23.
+-- Stage 1: one-time credit packs, auditable credit buckets, task idempotency,
+-- and payment/refund metadata.
 --
--- This is the canonical schema for a fresh database. Production already has
--- real data and two historical migration records; do not reapply this file to
--- production as a migration.
+-- Existing aggregate balances have mixed historical origins. Preserve them as
+-- permanent "legacy" grants instead of guessing whether each credit was free,
+-- subscription, or pay-as-you-go.
 
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  avatar TEXT,
-  created_at INTEGER DEFAULT (unixepoch())
-);
+ALTER TABLE orders ADD COLUMN base_credits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN bonus_credits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE orders ADD COLUMN paypal_capture_id TEXT;
+ALTER TABLE orders ADD COLUMN paypal_payer_id TEXT;
+ALTER TABLE orders ADD COLUMN completed_at INTEGER;
+ALTER TABLE orders ADD COLUMN refunded_at INTEGER;
+ALTER TABLE orders ADD COLUMN refund_amount TEXT;
+ALTER TABLE orders ADD COLUMN failure_detail TEXT;
 
-CREATE TABLE IF NOT EXISTS user_credits (
-  user_id TEXT PRIMARY KEY,
-  credits INTEGER DEFAULT 0,
-  total_used INTEGER DEFAULT 0,
-  sub_credits INTEGER NOT NULL DEFAULT 0,
-  payg_credits INTEGER NOT NULL DEFAULT 0,
-  plan TEXT NOT NULL DEFAULT 'free',
-  sub_reset_at INTEGER,
-  plan_renews_at INTEGER,
-  bg_day TEXT,
-  bg_day_count INTEGER NOT NULL DEFAULT 0,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE IF NOT EXISTS processing_history (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  file_count INTEGER NOT NULL,
-  created_at INTEGER DEFAULT (unixepoch()),
-  settings_json TEXT,
-  site TEXT,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE IF NOT EXISTS orders (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  plan TEXT NOT NULL,
-  amount INTEGER NOT NULL,
-  credits INTEGER NOT NULL,
-  status TEXT DEFAULT 'pending',
-  base_credits INTEGER NOT NULL DEFAULT 0,
-  bonus_credits INTEGER NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL DEFAULT 'USD',
-  paypal_capture_id TEXT,
-  paypal_payer_id TEXT,
-  completed_at INTEGER,
-  refunded_at INTEGER,
-  refund_amount TEXT,
-  failure_detail TEXT,
-  created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
+UPDATE orders
+SET base_credits = credits
+WHERE base_credits = 0;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_capture_id
 ON orders(paypal_capture_id)
@@ -63,55 +25,6 @@ WHERE paypal_capture_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_status
 ON orders(user_id, status, created_at);
-
-CREATE TABLE IF NOT EXISTS free_usage (
-  ip TEXT PRIMARY KEY,
-  count INTEGER DEFAULT 0,
-  bg_day TEXT,
-  bg_day_count INTEGER NOT NULL DEFAULT 0,
-  bg_month TEXT,
-  bg_month_count INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS email_otps (
-  email TEXT PRIMARY KEY,
-  code TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  attempts INTEGER DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS sso_codes (
-  code TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  used INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER DEFAULT (unixepoch())
-);
-
-CREATE TABLE IF NOT EXISTS subscriptions (
-  paypal_sub_id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  plan TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active',
-  current_period_end INTEGER,
-  created_at INTEGER DEFAULT (unixepoch()),
-  updated_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Kept for historical audit only. The current product does not sell or renew
--- subscriptions.
-
-CREATE TABLE IF NOT EXISTS webhook_events (
-  event_id TEXT PRIMARY KEY,
-  type TEXT,
-  status TEXT NOT NULL DEFAULT 'received',
-  resource_id TEXT,
-  payload_hash TEXT,
-  processed_at INTEGER,
-  error TEXT,
-  received_at INTEGER DEFAULT (unixepoch())
-);
 
 CREATE TABLE IF NOT EXISTS credit_grants (
   id TEXT PRIMARY KEY,
@@ -213,3 +126,60 @@ CREATE TABLE IF NOT EXISTS user_free_entitlements (
   issued_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+ALTER TABLE webhook_events ADD COLUMN status TEXT NOT NULL DEFAULT 'received';
+ALTER TABLE webhook_events ADD COLUMN resource_id TEXT;
+ALTER TABLE webhook_events ADD COLUMN payload_hash TEXT;
+ALTER TABLE webhook_events ADD COLUMN processed_at INTEGER;
+ALTER TABLE webhook_events ADD COLUMN error TEXT;
+
+INSERT OR IGNORE INTO credit_grants (
+  id,
+  user_id,
+  credit_type,
+  granted_credits,
+  remaining_credits,
+  idempotency_key
+)
+SELECT
+  'legacy-opening:' || user_id,
+  user_id,
+  'legacy',
+  credits,
+  credits,
+  'legacy-opening:' || user_id
+FROM user_credits
+WHERE credits > 0;
+
+-- Existing accounts already received credits under the legacy model. Mark the
+-- lifetime registration entitlement as handled so deployment cannot grant a
+-- second signup bonus. New accounts are issued 10 minus their guest usage by
+-- the Worker.
+INSERT OR IGNORE INTO user_free_entitlements (
+  user_id,
+  lifetime_limit,
+  guest_uses_applied,
+  issued_credits
+)
+SELECT user_id, 10, 0, 0
+FROM user_credits;
+
+INSERT OR IGNORE INTO credit_ledger (
+  id,
+  user_id,
+  delta,
+  balance_type,
+  reason,
+  grant_id,
+  idempotency_key
+)
+SELECT
+  'legacy-opening:' || user_id,
+  user_id,
+  credits,
+  'legacy',
+  'legacy_opening_balance',
+  'legacy-opening:' || user_id,
+  'legacy-opening:' || user_id
+FROM user_credits
+WHERE credits > 0;

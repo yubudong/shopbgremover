@@ -317,7 +317,7 @@
 <section class="tool-section" id="tool">
   <div class="tool-head">
     <h1>Entferne den Hintergrund deiner Produkte für <em>Shopify, Amazon und eBay</em></h1>
-    <p>KI-Stapelverarbeitung — bis zu 50 Bilder auf einmal, ~3 s pro Bild. Kostenlos testen, keine Anmeldung.</p>
+    <p>Als Gast jeweils ein Bild mit KI freistellen. Nach der Anmeldung bis zu 50 Bilder pro Stapel verarbeiten und als ZIP herunterladen.</p>
   </div>
 
   <div class="workspace">
@@ -591,10 +591,10 @@
   <div class="modal">
     <button class="modal-close" onclick="closeModal('registerOverlay')">✕</button>
     <div class="modal-icon icon-blue">🎁</div>
-    <h3>Sichere dir 20 HD-Credits gratis</h3>
-    <p>Du hast alle kostenlosen Credits aufgebraucht. Registriere dich kostenlos und wir schenken dir <strong>20 Credits in hoher Auflösung</strong> — keine Kreditkarte nötig.</p>
+    <h3>Bis zu 10 kostenlose Entfernungen insgesamt</h3>
+    <p>Erstelle ein kostenloses Konto für bis zu <strong>10 KI-Entfernungen insgesamt</strong>. Deine Gastnutzung wird bereits angerechnet.</p>
     <div class="modal-perks">
-      <div class="modal-perk"><span class="perk-icon">✂</span> 20 HD-Hintergrundentfernungen, gratis</div>
+      <div class="modal-perk"><span class="perk-icon">✂</span> Bis zu 10 KI-Entfernungen insgesamt</div>
       <div class="modal-perk"><span class="perk-icon">📦</span> Bis zu 50 Bilder pro Stapel</div>
       <div class="modal-perk"><span class="perk-icon">🕑</span> 90 Tage Verlauf &amp; erneuter Download</div>
     </div>
@@ -610,15 +610,15 @@
     <button class="modal-close" onclick="closeModal('upgradeOverlay')">✕</button>
     <div class="modal-icon icon-amber">⚡</div>
     <h3>Credits aufgebraucht</h3>
-    <p>Wechsle zu Starter für nur <strong>$4.9/Monat</strong> und erhalte 200 Credits — genug für 200 HD-Produktbilder pro Monat.</p>
+    <p>Kaufe bei Bedarf <strong>100 Credits für ¥22</strong>. Gekaufte Credits verfallen nie und es gibt kein Abonnement.</p>
     <div class="modal-perks">
-      <div class="modal-perk"><span class="perk-icon">🚀</span> 200 HD-Credits pro Monat</div>
+      <div class="modal-perk"><span class="perk-icon">🚀</span> 100 dauerhaft gültige Credits</div>
       <div class="modal-perk"><span class="perk-icon">📦</span> 50 Bilder pro Stapel</div>
       <div class="modal-perk"><span class="perk-icon">🎨</span> Benutzerdefinierte Hintergrundfarben</div>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn modal-btn-amber" onclick="window.location='/checkout?plan=starter'">
-        Auf Starter upgraden — $4.9/Monat →
+      <button class="modal-btn modal-btn-amber" onclick="window.location='/de/pricing#plans'">
+        100 Credits kaufen — ¥22 →
       </button>
       <button class="modal-btn modal-btn-ghost" onclick="closeModal('upgradeOverlay')">Nicht jetzt</button>
     </div>
@@ -678,13 +678,24 @@
 <div class="upgrade-toast" id="upgradToast">
   <h4>⚡ Credits werden knapp</h4>
   <p>Jetzt verlängern und <strong>10 % Rabatt</strong> im nächsten Monat erhalten.</p>
-  <button onclick="showUpgradeModal()">Jetzt upgraden →</button>
+  <button onclick="showUpgradeModal()">Credits kaufen →</button>
 </div>
 
 <script>
   const API = 'https://api.shopbgremover.com';
 
-  let selectedFiles   = [];
+
+  function getOrCreateDeviceId() {
+    let id = localStorage.getItem('sbgrDeviceId');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('sbgrDeviceId', id);
+    }
+    document.cookie = `sbgr_device=${encodeURIComponent(id)}; Path=/; Domain=.shopbgremover.com; Max-Age=31536000; Secure; SameSite=Lax`;
+    return id;
+  }
+  const DEVICE_ID = getOrCreateDeviceId();
+let selectedFiles   = [];
   let processedResults = [];
   let currentUser     = null;
   let bgMode          = 'white';
@@ -744,7 +755,7 @@
     btn.disabled = true; btn.textContent = 'Senden…';
 
     const res  = await fetch(`${API}/api/auth/email/send-otp`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email }),
     });
     const data = await res.json();
@@ -775,7 +786,7 @@
 
     const res  = await fetch(`${API}/api/auth/email/verify`, {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email: otpEmail, code }),
     });
     const data = await res.json();
@@ -822,7 +833,7 @@
     document.getElementById('otpVerifyError').style.display = 'none';
     document.getElementById('otpInput').value = '';
     const res  = await fetch(`${API}/api/auth/email/send-otp`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
       body: JSON.stringify({ email: otpEmail }),
     });
     const data = await res.json();
@@ -906,7 +917,7 @@
   fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
 
   function handleFiles(files) {
-    selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 50);
+    selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, currentUser ? 50 : 1);
     if (!selectedFiles.length) return;
 
     uploadArea.style.minHeight = '72px';
@@ -945,15 +956,6 @@
 
   function setStatus(msg) {
     document.getElementById('statusText').textContent = msg;
-  }
-
-  function getFreeCount() {
-    return parseInt(localStorage.getItem('freeUsageTotal') || '0');
-  }
-
-  function incrementFreeCount() {
-    const count = getFreeCount() + 1;
-    localStorage.setItem('freeUsageTotal', String(count));
   }
 
   async function compressToDataUrl(file) {
@@ -1031,13 +1033,8 @@
   async function startProcessing() {
     if (!selectedFiles.length) return;
 
-    if (!currentUser && getFreeCount() >= 10) {
-      showRegisterModal();
-      return;
-    }
-
     try {
-      const cr = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include' });
+      const cr = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include', headers: { 'X-Device-ID': DEVICE_ID } });
       if (cr.ok) {
         const cd = await cr.json();
         if (cd.reason === 'free_limit')  { showRegisterModal(); return; }
@@ -1065,8 +1062,8 @@
         const res = await fetch(`${API}/api/remove-bg`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: dataUrl }),
+          headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
+          body: JSON.stringify({ image_url: dataUrl, task_id: crypto.randomUUID() }),
         });
 
         if (res.ok) {
@@ -1074,8 +1071,6 @@
           const processedBlob = await applyBackground(rawBlob);
           const name          = getFileName(selectedFiles[i].name, processedResults.length);
           processedResults.push({ name, blob: processedBlob });
-
-          if (!currentUser) incrementFreeCount();
 
           if (card) {
             card.classList.add('flipping');
@@ -1112,7 +1107,7 @@
     if (currentUser && ok > 0) {
       fetch(`${API}/api/history`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
         body: JSON.stringify({ file_count: ok, settings: { bgMode } }),
       });
       loadUser();

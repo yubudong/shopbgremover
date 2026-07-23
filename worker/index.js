@@ -5,7 +5,14 @@
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, FAL_API_KEY
 const REDIRECT_URI = 'https://api.shopbgremover.com/auth/callback';
 const FRONTEND_URL = 'https://www.shopbgremover.com';
-const FREE_TOTAL_LIMIT = 10;
+const GUEST_FREE_LIMIT = 3;
+const REGISTERED_FREE_LIMIT = 10;
+const FREE_CREDIT_TTL_SECONDS = 30 * 24 * 60 * 60;
+const CREDIT_PACKS = Object.freeze({
+  credits_100: { amount: '22.00', credits: 100, currency: 'CNY' },
+  credits_300: { amount: '60.00', credits: 300, currency: 'CNY' },
+  credits_1000: { amount: '160.00', credits: 1000, currency: 'CNY' },
+});
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -19,7 +26,8 @@ function cors(origin) {
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Device-ID',
+    'Access-Control-Expose-Headers': 'X-Task-ID',
     'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin',
   };
@@ -70,6 +78,334 @@ async function getUser(request, env) {
   return verifyJWT(match[1], env.JWT_SECRET);
 }
 
+function getCookie(request, name) {
+  const cookie = request.headers.get('Cookie') || '';
+  const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function getGuestIdentity(request) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const suppliedDevice = request.headers.get('X-Device-ID') || getCookie(request, 'sbgr_device');
+  const fallbackDevice = `fallback:${ip}:${request.headers.get('User-Agent') || 'unknown'}`;
+  const rawDevice = suppliedDevice || fallbackDevice;
+  const [deviceHash, ipHash] = await Promise.all([
+    sha256Hex(`device:${rawDevice}`),
+    sha256Hex(`ip:${ip}`),
+  ]);
+
+  return {
+    rawIp: ip,
+    deviceHash,
+    ipHash,
+    ownerKey: `guest:${deviceHash}`,
+  };
+}
+
+async function getGuestUsage(env, guest) {
+  const [device, ip, legacy] = await Promise.all([
+    env.DB.prepare('SELECT count FROM guest_usage WHERE device_hash = ?')
+      .bind(guest.deviceHash).first(),
+    env.DB.prepare('SELECT count FROM guest_ip_usage WHERE ip_hash = ?')
+      .bind(guest.ipHash).first(),
+    env.DB.prepare('SELECT count FROM free_usage WHERE ip = ?')
+      .bind(guest.rawIp).first(),
+  ]);
+
+  return Math.max(
+    Number(device?.count || 0),
+    Number(ip?.count || 0),
+    Math.min(Number(legacy?.count || 0), GUEST_FREE_LIMIT),
+  );
+}
+
+async function getCreditSummary(env, userId) {
+  const [aggregate, buckets] = await Promise.all([
+    env.DB.prepare('SELECT credits, total_used FROM user_credits WHERE user_id = ?')
+      .bind(userId).first(),
+    env.DB.prepare(
+      `SELECT credit_type, COALESCE(SUM(remaining_credits), 0) AS remaining
+       FROM credit_grants
+       WHERE user_id = ?
+         AND remaining_credits > 0
+         AND (expires_at IS NULL OR expires_at > unixepoch())
+       GROUP BY credit_type`
+    ).bind(userId).all(),
+  ]);
+
+  const byType = {
+    paid: 0,
+    free: 0,
+    referral: 0,
+    promotion: 0,
+    legacy: 0,
+  };
+  for (const row of buckets.results || []) {
+    byType[row.credit_type] = Number(row.remaining || 0);
+  }
+
+  const bucketTotal = Object.values(byType).reduce((sum, value) => sum + value, 0);
+  const aggregateTotal = Number(aggregate?.credits || 0);
+  return {
+    credits: Math.max(0, Math.min(aggregateTotal, bucketTotal)),
+    total_used: Number(aggregate?.total_used || 0),
+    buckets: byType,
+  };
+}
+
+async function ensureUserCreditAccount(env, userId, guest) {
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 0)'
+  ).bind(userId).run();
+
+  const entitlement = await env.DB.prepare(
+    'SELECT user_id FROM user_free_entitlements WHERE user_id = ?'
+  ).bind(userId).first();
+  if (entitlement) return;
+
+  const guestUsed = guest ? Math.min(await getGuestUsage(env, guest), GUEST_FREE_LIMIT) : 0;
+  const issuedCredits = REGISTERED_FREE_LIMIT - guestUsed;
+  const grantId = `registration-free:${userId}`;
+  const expiresAt = Math.floor(Date.now() / 1000) + FREE_CREDIT_TTL_SECONDS;
+  const statements = [
+    env.DB.prepare(
+      `INSERT INTO user_free_entitlements
+       (user_id, lifetime_limit, guest_uses_applied, issued_credits)
+       VALUES (?, ?, ?, ?)`
+    ).bind(userId, REGISTERED_FREE_LIMIT, guestUsed, issuedCredits),
+  ];
+
+  if (issuedCredits > 0) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO credit_grants
+         (id, user_id, credit_type, granted_credits, remaining_credits, expires_at, idempotency_key)
+         VALUES (?, ?, 'free', ?, ?, ?, ?)`
+      ).bind(grantId, userId, issuedCredits, issuedCredits, expiresAt, grantId),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, idempotency_key)
+         VALUES (?, ?, ?, 'free', 'registration_free', ?, ?)`
+      ).bind(grantId, userId, issuedCredits, grantId, grantId),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
+      ).bind(issuedCredits, userId),
+    );
+  }
+
+  if (guest) {
+    statements.push(
+      env.DB.prepare(
+        'UPDATE guest_usage SET linked_user_id = ?, updated_at = unixepoch() WHERE device_hash = ?'
+      ).bind(userId, guest.deviceHash),
+    );
+  }
+
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    const concurrent = await env.DB.prepare(
+      'SELECT user_id FROM user_free_entitlements WHERE user_id = ?'
+    ).bind(userId).first();
+    if (!concurrent) throw error;
+  }
+}
+
+async function reserveAiTask(env, {
+  taskId,
+  ownerKey,
+  userId,
+  guestDeviceHash,
+  inputHash,
+}) {
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO ai_tasks
+     (task_id, owner_key, user_id, guest_device_hash, input_hash, status)
+     VALUES (?, ?, ?, ?, ?, 'processing')`
+  ).bind(taskId, ownerKey, userId, guestDeviceHash, inputHash).run();
+
+  if (Number(inserted.meta?.changes || 0) === 1) {
+    return { state: 'new' };
+  }
+
+  const task = await env.DB.prepare(
+    `SELECT task_id, owner_key, input_hash, status, result_url
+     FROM ai_tasks WHERE task_id = ?`
+  ).bind(taskId).first();
+
+  if (!task || task.owner_key !== ownerKey || task.input_hash !== inputHash) {
+    return { state: 'conflict' };
+  }
+  if (task.status === 'succeeded') {
+    return { state: 'succeeded', resultUrl: task.result_url };
+  }
+  if (task.status === 'processing') {
+    return { state: 'processing' };
+  }
+
+  const retried = await env.DB.prepare(
+    `UPDATE ai_tasks
+     SET status = 'processing', error_code = NULL, updated_at = unixepoch()
+     WHERE task_id = ? AND status = 'failed'`
+  ).bind(taskId).run();
+  return Number(retried.meta?.changes || 0) === 1
+    ? { state: 'retry' }
+    : { state: 'processing' };
+}
+
+async function failAiTask(env, taskId, errorCode) {
+  await env.DB.prepare(
+    `UPDATE ai_tasks
+     SET status = 'failed', error_code = ?, updated_at = unixepoch()
+     WHERE task_id = ? AND status = 'processing'`
+  ).bind(errorCode, taskId).run();
+}
+
+async function chargeUserForTask(env, userId, taskId, resultUrl) {
+  const grant = await env.DB.prepare(
+    `SELECT id
+     FROM credit_grants
+     WHERE user_id = ?
+       AND remaining_credits > 0
+       AND (expires_at IS NULL OR expires_at > unixepoch())
+     ORDER BY
+       CASE WHEN credit_type IN ('free', 'referral', 'promotion') THEN 0 ELSE 1 END,
+       CASE WHEN expires_at IS NULL THEN 9223372036854775807 ELSE expires_at END,
+       created_at,
+       id
+     LIMIT 1`
+  ).bind(userId).first();
+  if (!grant) return null;
+
+  const ledgerId = `task-charge:${taskId}`;
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, task_id, idempotency_key)
+         VALUES (
+           ?,
+           (SELECT user_id FROM credit_grants
+            WHERE id = ? AND user_id = ? AND remaining_credits > 0
+              AND (expires_at IS NULL OR expires_at > unixepoch())),
+           -1,
+           (SELECT credit_type FROM credit_grants
+            WHERE id = ? AND user_id = ? AND remaining_credits > 0
+              AND (expires_at IS NULL OR expires_at > unixepoch())),
+           'ai_background_removal',
+           ?,
+           ?,
+           ?
+         )`
+      ).bind(
+        ledgerId,
+        grant.id,
+        userId,
+        grant.id,
+        userId,
+        grant.id,
+        taskId,
+        ledgerId,
+      ),
+      env.DB.prepare(
+        `UPDATE credit_grants
+         SET remaining_credits = remaining_credits - 1, updated_at = unixepoch()
+         WHERE id = ? AND user_id = ? AND remaining_credits > 0`
+      ).bind(grant.id, userId),
+      env.DB.prepare(
+        `UPDATE user_credits
+         SET credits = credits - 1, total_used = total_used + 1
+         WHERE user_id = ?`
+      ).bind(userId),
+      env.DB.prepare(
+        `UPDATE ai_tasks
+         SET status = 'succeeded', result_url = ?, charge_ledger_id = ?,
+             completed_at = unixepoch(), updated_at = unixepoch()
+         WHERE task_id = ? AND status = 'processing'`
+      ).bind(resultUrl, ledgerId, taskId),
+    ]);
+  } catch (error) {
+    const existing = await env.DB.prepare(
+      'SELECT id FROM credit_ledger WHERE idempotency_key = ?'
+    ).bind(ledgerId).first();
+    if (!existing) return null;
+  }
+
+  return getCreditSummary(env, userId);
+}
+
+async function chargeGuestForTask(env, guest, taskId, resultUrl) {
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO guest_usage (device_hash, last_ip_hash, count)
+         VALUES (?, ?, 1)
+         ON CONFLICT(device_hash) DO UPDATE SET
+           last_ip_hash = excluded.last_ip_hash,
+           count = guest_usage.count + 1,
+           updated_at = unixepoch()`
+      ).bind(guest.deviceHash, guest.ipHash),
+      env.DB.prepare(
+        `INSERT INTO guest_ip_usage (ip_hash, count)
+         VALUES (?, 1)
+         ON CONFLICT(ip_hash) DO UPDATE SET
+           count = guest_ip_usage.count + 1,
+           updated_at = unixepoch()`
+      ).bind(guest.ipHash),
+      env.DB.prepare(
+        `UPDATE ai_tasks
+         SET status = 'succeeded', result_url = ?,
+             completed_at = unixepoch(), updated_at = unixepoch()
+         WHERE task_id = ? AND status = 'processing'`
+      ).bind(resultUrl, taskId),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function paypalBase(env) {
+  return env.PAYPAL_MODE === 'sandbox'
+    ? 'https://api-m.sandbox.paypal.com'
+    : 'https://api-m.paypal.com';
+}
+
+async function getPayPalAccessToken(env) {
+  if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_SECRET) {
+    throw new Error('PayPal credentials not configured');
+  }
+  const response = await fetch(`${paypalBase(env)}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(`PayPal authentication failed (${response.status})`);
+  }
+  return data.access_token;
+}
+
+function findPayPalCapture(order) {
+  for (const unit of order?.purchase_units || []) {
+    for (const capture of unit?.payments?.captures || []) {
+      if (capture?.status === 'COMPLETED') return capture;
+    }
+  }
+  return null;
+}
+
 // ── Router ────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
@@ -102,6 +438,7 @@ export default {
     if (url.pathname === '/auth/callback') {
       const code = url.searchParams.get('code');
       if (!code) return Response.redirect(`${FRONTEND_URL}?error=no_code`, 302);
+      const guest = await getGuestIdentity(request);
 
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -125,10 +462,7 @@ export default {
          ON CONFLICT(id) DO UPDATE SET name=excluded.name, avatar=excluded.avatar`
       ).bind(profile.id, profile.email, profile.name, profile.picture).run();
 
-      // Init credits if new user
-      await env.DB.prepare(
-        `INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 5)`
-      ).bind(profile.id).run();
+      await ensureUserCreditAccount(env, profile.id, guest);
 
       const token = await signJWT(
         { sub: profile.id, email: profile.email, name: profile.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
@@ -214,6 +548,7 @@ export default {
     if (url.pathname === '/api/auth/email/verify' && request.method === 'POST') {
       const { email, code } = await request.json().catch(() => ({}));
       if (!email || !code) return json({ error: 'Email and code are required.' }, 400, origin);
+      const guest = await getGuestIdentity(request);
 
       const otp = await env.DB.prepare(
         `SELECT code, expires_at, attempts FROM email_otps WHERE email = ?`
@@ -247,10 +582,9 @@ export default {
         const name    = email.split('@')[0];
         await env.DB.prepare(`INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)`)
           .bind(userId, email, name).run();
-        await env.DB.prepare(`INSERT OR IGNORE INTO user_credits (user_id, credits) VALUES (?, 5)`)
-          .bind(userId).run();
         user = { id: userId, name };
       }
+      await ensureUserCreditAccount(env, user.id, guest);
 
       const token = await signJWT(
         { sub: user.id, email, name: user.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
@@ -271,94 +605,99 @@ export default {
     if (url.pathname === '/api/me') {
       const user = await getUser(request, env);
       if (!user) return json({ user: null }, 200, origin);
-      const credits = await env.DB.prepare(
-        `SELECT credits, total_used FROM user_credits WHERE user_id = ?`
-      ).bind(user.sub).first();
+      const credits = await getCreditSummary(env, user.sub);
       return json({ user: { id: user.sub, email: user.email, name: user.name }, credits }, 200, origin);
     }
 
-    // POST /api/use-credit → deduct 1 credit (or check free quota)
+    // Direct credit deductions are disabled: only a successful AI task can
+    // consume a credit.
     if (url.pathname === '/api/use-credit' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-
-      if (!user) {
-        // Free quota check (total per IP, not daily)
-        const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ?`
-        ).bind(ip).first();
-        const count = row?.count || 0;
-        if (count >= FREE_TOTAL_LIMIT) {
-          return json({ ok: false, reason: 'free_limit', message: 'Free limit reached. Sign up for 20 free credits.' }, 403, origin);
-        }
-        await env.DB.prepare(
-          `INSERT INTO free_usage (ip, count) VALUES (?, 1)
-           ON CONFLICT(ip) DO UPDATE SET count = count + 1`
-        ).bind(ip).run();
-        return json({ ok: true, remaining: FREE_TOTAL_LIMIT - count - 1 }, 200, origin);
-      }
-
-      // Paid user: deduct credit
-      const credits = await env.DB.prepare(
-        `SELECT credits FROM user_credits WHERE user_id = ?`
-      ).bind(user.sub).first();
-      if (!credits || credits.credits <= 0) {
-        return json({ ok: false, reason: 'no_credits', message: 'No credits remaining.' }, 403, origin);
-      }
-      await env.DB.prepare(
-        `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
-      ).bind(user.sub).run();
-      return json({ ok: true, remaining: credits.credits - 1 }, 200, origin);
+      return json({
+        error: 'Direct credit deductions are disabled. Use /api/remove-bg with a task_id.',
+      }, 410, origin);
     }
 
     // GET /api/check-credit → 只检查额度，不扣除
     if (url.pathname === '/api/check-credit') {
       const user = await getUser(request, env);
-      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (!user) {
-        const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ?`
-        ).bind(ip).first();
-        if ((row?.count || 0) >= FREE_TOTAL_LIMIT) {
-          return json({ ok: false, reason: 'free_limit' }, 200, origin);
-        }
-        return json({ ok: true }, 200, origin);
+        const guest = await getGuestIdentity(request);
+        const used = await getGuestUsage(env, guest);
+        return json({
+          ok: used < GUEST_FREE_LIMIT,
+          ...(used >= GUEST_FREE_LIMIT ? { reason: 'free_limit' } : {}),
+          remaining: Math.max(0, GUEST_FREE_LIMIT - used),
+          limit: GUEST_FREE_LIMIT,
+        }, 200, origin);
       }
-      const credits = await env.DB.prepare(
-        `SELECT credits FROM user_credits WHERE user_id = ?`
-      ).bind(user.sub).first();
-      if (!credits || credits.credits <= 0) {
+      const credits = await getCreditSummary(env, user.sub);
+      if (credits.credits <= 0) {
         return json({ ok: false, reason: 'no_credits' }, 200, origin);
       }
-      return json({ ok: true, remaining: credits.credits }, 200, origin);
+      return json({ ok: true, remaining: credits.credits, buckets: credits.buckets }, 200, origin);
     }
 
     // POST /api/remove-bg → fal.ai BiRefNet 抠图（成功后才扣积分）
     if (url.pathname === '/api/remove-bg' && request.method === 'POST') {
       const user = await getUser(request, env);
-      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-
-      // 1. 检查额度（不扣除）
-      if (!user) {
-        const row = await env.DB.prepare(
-          `SELECT count FROM free_usage WHERE ip = ?`
-        ).bind(ip).first();
-        if ((row?.count || 0) >= FREE_TOTAL_LIMIT) {
-          return json({ ok: false, reason: 'free_limit', message: 'Free limit reached. Sign up for 20 free credits.' }, 403, origin);
-        }
-      } else {
-        const credits = await env.DB.prepare(
-          `SELECT credits FROM user_credits WHERE user_id = ?`
-        ).bind(user.sub).first();
-        if (!credits || credits.credits <= 0) {
-          return json({ ok: false, reason: 'no_credits', message: 'No credits remaining.' }, 403, origin);
-        }
-      }
+      const guest = user ? null : await getGuestIdentity(request);
+      let activeTaskId = null;
 
       try {
         const body = await request.json();
         const image_url = body?.image_url;
         if (!image_url) return json({ error: '缺少 image_url' }, 400, origin);
+        const taskId = typeof body?.task_id === 'string' && body.task_id.length >= 8 && body.task_id.length <= 128
+          ? body.task_id
+          : crypto.randomUUID();
+        activeTaskId = taskId;
+        const ownerKey = user ? `user:${user.sub}` : guest.ownerKey;
+        const inputHash = await sha256Hex(image_url);
+        const reservation = await reserveAiTask(env, {
+          taskId,
+          ownerKey,
+          userId: user?.sub || null,
+          guestDeviceHash: guest?.deviceHash || null,
+          inputHash,
+        });
+
+        if (reservation.state === 'conflict') {
+          return json({ error: 'task_id belongs to another task', reason: 'task_conflict' }, 409, origin);
+        }
+        if (reservation.state === 'processing') {
+          return json({ error: 'Task is already processing', reason: 'task_processing', task_id: taskId }, 409, origin);
+        }
+        if (reservation.state === 'succeeded') {
+          const existingImage = await fetch(reservation.resultUrl);
+          if (!existingImage.ok) {
+            return json({ error: 'Previous task result is no longer available', reason: 'result_expired' }, 410, origin);
+          }
+          return new Response(existingImage.body, {
+            headers: {
+              'Content-Type': existingImage.headers.get('Content-Type') || 'image/png',
+              'X-Task-ID': taskId,
+              ...cors(origin),
+            },
+          });
+        }
+
+        if (!user) {
+          const used = await getGuestUsage(env, guest);
+          if (used >= GUEST_FREE_LIMIT) {
+            await failAiTask(env, taskId, 'free_limit');
+            return json({
+              ok: false,
+              reason: 'free_limit',
+              message: 'Free limit reached. Create an account for up to 10 lifetime free removals.',
+            }, 403, origin);
+          }
+        } else {
+          const credits = await getCreditSummary(env, user.sub);
+          if (credits.credits <= 0) {
+            await failAiTask(env, taskId, 'no_credits');
+            return json({ ok: false, reason: 'no_credits', message: 'No credits remaining.' }, 403, origin);
+          }
+        }
 
         // 直接调用 fal.ai，前端已压缩好
         const falRes = await fetch('https://fal.run/fal-ai/birefnet', {
@@ -377,39 +716,43 @@ export default {
 
         if (!falRes.ok) {
           const txt = await falRes.text();
+          await failAiTask(env, taskId, 'fal_failed');
           return json({ error: 'fal.ai 调用失败', detail: txt }, 502, origin);
         }
 
         const falData = await falRes.json();
         const resultUrl = falData?.image?.url;
         if (!resultUrl) {
+          await failAiTask(env, taskId, 'missing_result');
           return json({ error: '未获取到结果图片', detail: falData }, 500, origin);
         }
 
         // 4. 下载结果图片
         const imgRes = await fetch(resultUrl);
         if (!imgRes.ok) {
+          await failAiTask(env, taskId, 'result_download_failed');
           return json({ error: '下载结果图片失败', status: imgRes.status }, 500, origin);
         }
 
-        // 5. 成功后才扣积分
-        if (!user) {
-          await env.DB.prepare(
-            `INSERT INTO free_usage (ip, count) VALUES (?, 1)
-             ON CONFLICT(ip) DO UPDATE SET count = count + 1`
-          ).bind(ip).run();
-        } else {
-          await env.DB.prepare(
-            `UPDATE user_credits SET credits = credits - 1, total_used = total_used + 1 WHERE user_id = ?`
-          ).bind(user.sub).run();
+        // 成功获取结果后，通过 D1 事务批次只扣一次。
+        if (user) {
+          const charged = await chargeUserForTask(env, user.sub, taskId, resultUrl);
+          if (!charged) {
+            await failAiTask(env, taskId, 'credit_race');
+            return json({ error: 'Credit balance changed. Please retry.', reason: 'no_credits' }, 409, origin);
+          }
+        } else if (!await chargeGuestForTask(env, guest, taskId, resultUrl)) {
+          await failAiTask(env, taskId, 'free_limit_race');
+          return json({ error: 'Free limit reached.', reason: 'free_limit' }, 409, origin);
         }
 
         // 6. 返回图片
         return new Response(imgRes.body, {
-          headers: { 'Content-Type': 'image/png', ...cors(origin) },
+          headers: { 'Content-Type': 'image/png', 'X-Task-ID': taskId, ...cors(origin) },
         });
 
       } catch (e) {
+        if (activeTaskId) await failAiTask(env, activeTaskId, 'internal_error');
         return json({ error: '处理失败', message: e.message }, 500, origin);
       }
     }
@@ -444,44 +787,25 @@ export default {
         const user = await getUser(request, env);
         if (!user) return json({ error: 'Unauthorized' }, 401, origin);
         
-        const { plan } = await request.json();
-        const PLANS = {
-          // Monthly subscriptions
-          starter_monthly:  { amount: '4.90',   credits: 100  },
-          pro_monthly:      { amount: '9.90',   credits: 300  },
-          business_monthly: { amount: '24.90',  credits: 1000 },
-          // Annual subscriptions (billed as one-time yearly payment)
-          starter_annual:   { amount: '46.80',  credits: 1200 },
-          pro_annual:       { amount: '94.80',  credits: 3600 },
-          business_annual:  { amount: '238.80', credits: 12000 },
-          // Pay-as-you-go
-          payg_10:          { amount: '1.50',   credits: 10   },
-          payg_50:          { amount: '4.90',   credits: 50   },
-          payg_200:         { amount: '12.90',  credits: 200  },
-          payg_500:         { amount: '24.90',  credits: 500  },
-        };
-        
-        if (!PLANS[plan]) return json({ error: 'Invalid plan' }, 400, origin);
-        
-        if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_SECRET) {
-          return json({ error: 'PayPal credentials not configured' }, 500, origin);
-        }
+        const { plan } = await request.json().catch(() => ({}));
+        const pack = CREDIT_PACKS[plan];
+        if (!pack) return json({ error: 'Invalid credit pack' }, 400, origin);
 
-        const ppBase = env.PAYPAL_MODE === 'sandbox'
-          ? 'https://api-m.sandbox.paypal.com'
-          : 'https://api-m.paypal.com';
-        const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
-        const orderRes = await fetch(`${ppBase}/v2/checkout/orders`, {
+        const accessToken = await getPayPalAccessToken(env);
+        const requestId = crypto.randomUUID();
+        const orderRes = await fetch(`${paypalBase(env)}/v2/checkout/orders`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Basic ${auth}`,
+            'Authorization': `Bearer ${accessToken}`,
+            'PayPal-Request-Id': requestId,
           },
           body: JSON.stringify({
             intent: 'CAPTURE',
             purchase_units: [{
-              amount: { currency_code: 'USD', value: PLANS[plan].amount },
-              description: `ShopBG Remover - ${plan}`,
+              reference_id: requestId,
+              amount: { currency_code: pack.currency, value: pack.amount },
+              description: `ShopBG Remover - ${pack.credits} credits`,
             }],
           }),
         });
@@ -495,17 +819,28 @@ export default {
         }
         
         if (!order.id) {
-          return json({ error: 'PayPal order creation failed', paypalError: order }, 500, origin);
+          return json({ error: 'PayPal order creation failed', detail: order }, 502, origin);
         }
         
         // Save order to DB
         await env.DB.prepare(
-          `INSERT INTO orders (id, user_id, plan, amount, credits, status) VALUES (?, ?, ?, ?, ?, 'pending')`
-        ).bind(order.id, user.sub, plan, PLANS[plan].amount, PLANS[plan].credits).run();
+          `INSERT INTO orders
+           (id, user_id, plan, amount, credits, base_credits, bonus_credits, currency, status)
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'pending')`
+        ).bind(
+          order.id,
+          user.sub,
+          plan,
+          pack.amount,
+          pack.credits,
+          pack.credits,
+          pack.currency,
+        ).run();
         
         return json({ orderId: order.id, approveUrl: order.links.find(l => l.rel === 'approve')?.href }, 200, origin);
       } catch(e) {
-        return json({ error: 'Internal server error', message: e.message, stack: e.stack }, 500, origin);
+        console.error(JSON.stringify({ message: 'PayPal order creation failed', error: e.message }));
+        return json({ error: 'Unable to create PayPal order' }, 502, origin);
       }
     }
 
@@ -514,41 +849,303 @@ export default {
       const user = await getUser(request, env);
       if (!user) return json({ error: 'Unauthorized' }, 401, origin);
 
-      const { orderId } = await request.json();
-      const ppBase = env.PAYPAL_MODE === 'sandbox'
-        ? 'https://api-m.sandbox.paypal.com'
-        : 'https://api-m.paypal.com';
-      const auth = btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`);
+      const { orderId } = await request.json().catch(() => ({}));
+      if (!orderId) return json({ error: 'orderId is required' }, 400, origin);
 
-      // Get order from DB first (to check for duplicate processing)
-      const order = await env.DB.prepare(`SELECT plan, credits, status FROM orders WHERE id = ?`).bind(orderId).first();
+      // Order ownership is part of the lookup; another user cannot claim it.
+      const order = await env.DB.prepare(
+        `SELECT id, user_id, plan, amount, credits, base_credits, currency,
+                status, paypal_capture_id
+         FROM orders
+         WHERE id = ? AND user_id = ?`
+      ).bind(orderId, user.sub).first();
       if (!order) return json({ error: 'Order not found' }, 404, origin);
-      if (order.status === 'completed') return json({ error: 'Order already processed' }, 400, origin);
+      if (order.status === 'completed') {
+        return json({ ok: true, credits: order.base_credits, alreadyProcessed: true }, 200, origin);
+      }
+      if (order.status !== 'pending') {
+        return json({ error: 'Order cannot be captured in its current state' }, 409, origin);
+      }
 
-      const captureRes = await fetch(`${ppBase}/v2/checkout/orders/${orderId}/capture`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${auth}` },
-      });
+      try {
+        const accessToken = await getPayPalAccessToken(env);
+        const captureRes = await fetch(`${paypalBase(env)}/v2/checkout/orders/${orderId}/capture`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'PayPal-Request-Id': `capture-${orderId}`,
+          },
+        });
+        let paypalOrder = await captureRes.json().catch(() => ({}));
+        let capture = findPayPalCapture(paypalOrder);
 
-      const capture = await captureRes.json();
+        if (!capture) {
+          const detailsRes = await fetch(`${paypalBase(env)}/v2/checkout/orders/${orderId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+          });
+          paypalOrder = await detailsRes.json().catch(() => ({}));
+          capture = findPayPalCapture(paypalOrder);
+        }
 
-      // Handle already-captured orders (card payments captured instantly)
-      const isCompleted = capture.status === 'COMPLETED' ||
-        (capture.name === 'UNPROCESSABLE_ENTITY' &&
-         capture.details?.[0]?.issue === 'ORDER_ALREADY_CAPTURED');
+        if (!capture || capture.status !== 'COMPLETED') {
+          return json({ error: 'Payment not completed', detail: paypalOrder }, 400, origin);
+        }
 
-      if (!isCompleted) return json({ error: 'Payment not completed', detail: capture }, 400, origin);
+        const capturedAmount = Number(capture.amount?.value);
+        const expectedAmount = Number(order.amount);
+        if (capture.amount?.currency_code !== order.currency || capturedAmount !== expectedAmount) {
+          await env.DB.prepare(
+            `UPDATE orders SET status = 'payment_review', failure_detail = ?
+             WHERE id = ? AND user_id = ? AND status = 'pending'`
+          ).bind(
+            JSON.stringify({
+              expected: { currency: order.currency, amount: expectedAmount },
+              captured: capture.amount || null,
+            }),
+            orderId,
+            user.sub,
+          ).run();
+          return json({ error: 'Captured amount does not match the order' }, 409, origin);
+        }
 
-      const credits = order.credits;
-      await env.DB.prepare(
-        `UPDATE user_credits SET credits = credits + ? WHERE user_id = ?`
-      ).bind(credits, user.sub).run();
+        const grantId = `purchase:${orderId}:paid`;
+        const payerId = paypalOrder?.payer?.payer_id || null;
+        try {
+          await env.DB.batch([
+            env.DB.prepare(
+              `UPDATE orders
+               SET status = 'completed', paypal_capture_id = ?, paypal_payer_id = ?,
+                   completed_at = unixepoch(), failure_detail = NULL
+               WHERE id = ? AND user_id = ? AND status = 'pending'`
+            ).bind(capture.id, payerId, orderId, user.sub),
+            env.DB.prepare(
+              `INSERT INTO credit_grants
+               (id, user_id, credit_type, granted_credits, remaining_credits,
+                order_id, idempotency_key)
+               VALUES (?, ?, 'paid', ?, ?, ?, ?)`
+            ).bind(grantId, user.sub, order.base_credits, order.base_credits, orderId, grantId),
+            env.DB.prepare(
+              `INSERT INTO credit_ledger
+               (id, user_id, delta, balance_type, reason, grant_id, order_id, idempotency_key)
+               VALUES (?, ?, ?, 'paid', 'paypal_purchase', ?, ?, ?)`
+            ).bind(grantId, user.sub, order.base_credits, grantId, orderId, grantId),
+            env.DB.prepare(
+              'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
+            ).bind(order.base_credits, user.sub),
+          ]);
+        } catch (error) {
+          const completed = await env.DB.prepare(
+            `SELECT status, paypal_capture_id FROM orders
+             WHERE id = ? AND user_id = ?`
+          ).bind(orderId, user.sub).first();
+          if (completed?.status !== 'completed' || completed.paypal_capture_id !== capture.id) {
+            throw error;
+          }
+        }
 
-      await env.DB.prepare(
-        `UPDATE orders SET status = 'completed' WHERE id = ?`
-      ).bind(orderId).run();
+        return json({ ok: true, credits: order.base_credits }, 200, origin);
+      } catch (error) {
+        console.error(JSON.stringify({
+          message: 'PayPal capture failed',
+          orderId,
+          userId: user.sub,
+          error: error.message,
+        }));
+        return json({ error: 'Unable to capture PayPal payment' }, 502, origin);
+      }
+    }
 
-      return json({ ok: true, credits }, 200, origin);
+    // POST /api/paypal/webhook → verified PayPal refund/reversal processing.
+    if (url.pathname === '/api/paypal/webhook' && request.method === 'POST') {
+      if (!env.PAYPAL_WEBHOOK_ID) {
+        return json({ error: 'PayPal webhook is not configured' }, 503, origin);
+      }
+
+      const rawBody = await request.text();
+      let event;
+      try {
+        event = JSON.parse(rawBody);
+      } catch {
+        return json({ error: 'Invalid webhook JSON' }, 400, origin);
+      }
+      if (!event?.id || !event?.event_type) {
+        return json({ error: 'Invalid webhook event' }, 400, origin);
+      }
+
+      try {
+        const accessToken = await getPayPalAccessToken(env);
+        const verificationRes = await fetch(
+          `${paypalBase(env)}/v1/notifications/verify-webhook-signature`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              auth_algo: request.headers.get('PAYPAL-AUTH-ALGO'),
+              cert_url: request.headers.get('PAYPAL-CERT-URL'),
+              transmission_id: request.headers.get('PAYPAL-TRANSMISSION-ID'),
+              transmission_sig: request.headers.get('PAYPAL-TRANSMISSION-SIG'),
+              transmission_time: request.headers.get('PAYPAL-TRANSMISSION-TIME'),
+              webhook_id: env.PAYPAL_WEBHOOK_ID,
+              webhook_event: event,
+            }),
+          },
+        );
+        const verification = await verificationRes.json().catch(() => ({}));
+        if (!verificationRes.ok || verification.verification_status !== 'SUCCESS') {
+          return json({ error: 'Invalid PayPal webhook signature' }, 401, origin);
+        }
+
+        const payloadHash = await sha256Hex(rawBody);
+        await env.DB.prepare(
+          `INSERT OR IGNORE INTO webhook_events
+           (event_id, type, status, resource_id, payload_hash)
+           VALUES (?, ?, 'received', ?, ?)`
+        ).bind(event.id, event.event_type, event.resource?.id || null, payloadHash).run();
+
+        const eventRow = await env.DB.prepare(
+          'SELECT status, payload_hash FROM webhook_events WHERE event_id = ?'
+        ).bind(event.id).first();
+        if (eventRow?.payload_hash !== payloadHash) {
+          return json({ error: 'Webhook event ID payload mismatch' }, 409, origin);
+        }
+        if (eventRow?.status === 'processed' || eventRow?.status === 'ignored') {
+          return json({ ok: true, duplicate: true }, 200, origin);
+        }
+
+        const refundEvents = new Set([
+          'PAYMENT.CAPTURE.REFUNDED',
+          'PAYMENT.CAPTURE.REVERSED',
+        ]);
+        if (!refundEvents.has(event.event_type)) {
+          await env.DB.prepare(
+            `UPDATE webhook_events
+             SET status = 'ignored', processed_at = unixepoch()
+             WHERE event_id = ?`
+          ).bind(event.id).run();
+          return json({ ok: true, ignored: true }, 200, origin);
+        }
+
+        const captureId = event.resource?.id;
+        const order = await env.DB.prepare(
+          `SELECT id, user_id, amount, currency, status
+           FROM orders WHERE paypal_capture_id = ?`
+        ).bind(captureId).first();
+        if (!order) {
+          await env.DB.prepare(
+            `UPDATE webhook_events SET status = 'orphaned', error = ?
+             WHERE event_id = ?`
+          ).bind('No order found for PayPal capture', event.id).run();
+          return json({ ok: true, orphaned: true }, 200, origin);
+        }
+        if (order.status === 'refunded') {
+          await env.DB.prepare(
+            `UPDATE webhook_events
+             SET status = 'processed', processed_at = unixepoch()
+             WHERE event_id = ?`
+          ).bind(event.id).run();
+          return json({ ok: true, duplicate: true }, 200, origin);
+        }
+
+        const refundedAmount = Number(event.resource?.amount?.value);
+        if (
+          !Number.isFinite(refundedAmount)
+          || event.resource?.amount?.currency_code !== order.currency
+          || refundedAmount < Number(order.amount)
+        ) {
+          await env.DB.batch([
+            env.DB.prepare(
+              `UPDATE orders
+               SET status = 'refund_review', refund_amount = ?, failure_detail = ?
+               WHERE id = ?`
+            ).bind(
+              event.resource?.amount?.value || null,
+              'Partial or currency-mismatched refund requires manual review',
+              order.id,
+            ),
+            env.DB.prepare(
+              `UPDATE webhook_events
+               SET status = 'review', error = ?, processed_at = unixepoch()
+               WHERE event_id = ?`
+            ).bind('Partial or currency-mismatched refund', event.id),
+          ]);
+          return json({ ok: true, review: true }, 200, origin);
+        }
+
+        const grant = await env.DB.prepare(
+          `SELECT id, granted_credits
+           FROM credit_grants
+           WHERE order_id = ? AND credit_type = 'paid'`
+        ).bind(order.id).first();
+        if (!grant) {
+          throw new Error('Paid credit grant not found for refunded order');
+        }
+
+        const purchaseLedger = await env.DB.prepare(
+          `SELECT id FROM credit_ledger
+           WHERE order_id = ? AND reason = 'paypal_purchase'`
+        ).bind(order.id).first();
+        const reversalId = `paypal-refund:${captureId}`;
+        try {
+          await env.DB.batch([
+            env.DB.prepare(
+              `UPDATE credit_grants
+               SET remaining_credits = 0, updated_at = unixepoch()
+               WHERE id = ?`
+            ).bind(grant.id),
+            env.DB.prepare(
+              `INSERT INTO credit_ledger
+               (id, user_id, delta, balance_type, reason, grant_id, order_id,
+                idempotency_key, reversal_of)
+               VALUES (?, ?, ?, 'paid', 'paypal_refund', ?, ?, ?, ?)`
+            ).bind(
+              reversalId,
+              order.user_id,
+              -Number(grant.granted_credits),
+              grant.id,
+              order.id,
+              reversalId,
+              purchaseLedger?.id || null,
+            ),
+            env.DB.prepare(
+              'UPDATE user_credits SET credits = credits - ? WHERE user_id = ?'
+            ).bind(grant.granted_credits, order.user_id),
+            env.DB.prepare(
+              `UPDATE orders
+               SET status = 'refunded', refunded_at = unixepoch(), refund_amount = ?,
+                   failure_detail = NULL
+               WHERE id = ?`
+            ).bind(event.resource.amount.value, order.id),
+            env.DB.prepare(
+              `UPDATE webhook_events
+               SET status = 'processed', processed_at = unixepoch(), error = NULL
+               WHERE event_id = ?`
+            ).bind(event.id),
+          ]);
+        } catch (error) {
+          const reversed = await env.DB.prepare(
+            'SELECT id FROM credit_ledger WHERE idempotency_key = ?'
+          ).bind(reversalId).first();
+          if (!reversed) throw error;
+        }
+
+        return json({ ok: true, refunded: true }, 200, origin);
+      } catch (error) {
+        await env.DB.prepare(
+          `UPDATE webhook_events
+           SET status = 'error', error = ?
+           WHERE event_id = ?`
+        ).bind(error.message, event.id).run().catch(() => undefined);
+        console.error(JSON.stringify({
+          message: 'PayPal webhook processing failed',
+          eventId: event.id,
+          error: error.message,
+        }));
+        return json({ error: 'Webhook processing failed' }, 500, origin);
+      }
     }
 
     return json({ error: 'Not found' }, 404, origin);
