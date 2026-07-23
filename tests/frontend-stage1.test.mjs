@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 
 const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/'];
 const indexFiles = locales.map((locale) => `${locale}index.html`);
 const pricingFiles = locales.map((locale) => `${locale}pricing.html`);
 const termsFiles = locales.map((locale) => `${locale}terms.html`);
+const root = path.resolve(import.meta.dirname, '..');
+const execFileAsync = promisify(execFile);
 
 async function read(file) {
   return readFile(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -112,4 +117,30 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
       assert.doesNotThrow(() => new Function(script), file);
     }
   }
+});
+
+test('Pages build contains only the canonical static site', async () => {
+  await execFileAsync(process.execPath, [
+    path.join(root, 'scripts', 'build_static_pages.mjs'),
+  ]);
+
+  const output = path.join(root, '.pages-dist');
+  const required = [
+    'index.html',
+    'pricing.html',
+    'de/index.html',
+    'es/index.html',
+    'fr/index.html',
+    'pt-br/index.html',
+    'Logo256.png',
+    'photo/cosmetic.jpg',
+  ];
+
+  for (const file of required) {
+    await readFile(path.join(output, file));
+  }
+
+  await assert.rejects(readFile(path.join(output, 'worker', 'index.js')));
+  await assert.rejects(readFile(path.join(output, 'test-paypal.html')));
+  await assert.rejects(readFile(path.join(output, 'public', 'index.html')));
 });

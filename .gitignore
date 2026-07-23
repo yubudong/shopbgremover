@@ -6,3 +6,4 @@ dist/
 .env.*.local
 .wrangler/
 .vercel/output/
+.pages-dist/
