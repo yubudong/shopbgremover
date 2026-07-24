@@ -1155,7 +1155,14 @@ export default {
       const user = await getUser(request, env);
       if (!user) return privateJson({ error: 'Unauthorized' }, 401, origin);
 
-      const [code, paidOrder, counts] = await Promise.all([
+      const [
+        code,
+        paidOrder,
+        counts,
+        rewardTotals,
+        rewardHistory,
+        invitees,
+      ] = await Promise.all([
         ensureReferralCode(env, user.sub),
         env.DB.prepare(
           `SELECT id FROM orders
@@ -1170,8 +1177,64 @@ export default {
            FROM referrals
            WHERE referrer_user_id = ?`
         ).bind(user.sub).first(),
+        env.DB.prepare(
+          `SELECT
+             COALESCE(SUM(granted_credits), 0) AS total_granted,
+             COALESCE(SUM(
+               CASE
+                 WHEN remaining_credits > 0
+                   AND (expires_at IS NULL OR expires_at > unixepoch())
+                 THEN remaining_credits ELSE 0
+               END
+             ), 0) AS available_credits,
+             COALESCE(SUM(
+               CASE
+                 WHEN remaining_credits > 0 AND expires_at <= unixepoch()
+                 THEN remaining_credits ELSE 0
+               END
+             ), 0) AS expired_credits,
+             MIN(
+               CASE
+                 WHEN remaining_credits > 0 AND expires_at > unixepoch()
+                 THEN expires_at ELSE NULL
+               END
+             ) AS next_expiry_at,
+             (
+               SELECT COALESCE(SUM(-delta), 0)
+               FROM credit_ledger
+               WHERE user_id = ? AND balance_type = 'referral' AND delta < 0
+                 AND reason IN ('paypal_refund_referral', 'voucher_dispute_referral')
+             ) AS reversed_credits
+           FROM credit_grants
+           WHERE user_id = ? AND credit_type = 'referral'`
+        ).bind(user.sub, user.sub).first(),
+        env.DB.prepare(
+          `SELECT l.id, l.delta, l.reason, l.order_id, l.created_at,
+                  l.reversal_of, g.remaining_credits, g.expires_at,
+                  CASE WHEN EXISTS (
+                    SELECT 1 FROM credit_ledger reversal
+                    WHERE reversal.reversal_of = l.id
+                  ) THEN 1 ELSE 0 END AS has_reversal,
+                  related.email AS related_email
+           FROM credit_ledger l
+           LEFT JOIN credit_grants g ON g.id = l.grant_id
+           LEFT JOIN users related ON related.id = l.related_user_id
+           WHERE l.user_id = ? AND l.balance_type = 'referral'
+           ORDER BY l.created_at DESC, l.id DESC
+           LIMIT 50`
+        ).bind(user.sub).all(),
+        env.DB.prepare(
+          `SELECT r.status, r.risk_status, r.bound_at, r.first_paid_at,
+                  invited.email AS invited_email
+           FROM referrals r
+           JOIN users invited ON invited.id = r.referred_user_id
+           WHERE r.referrer_user_id = ?
+           ORDER BY r.bound_at DESC, r.id DESC
+           LIMIT 50`
+        ).bind(user.sub).all(),
       ]);
 
+      const now = Math.floor(Date.now() / 1000);
       return privateJson({
         code: code.code,
         status: code.status,
@@ -1180,6 +1243,46 @@ export default {
         registered_count: Number(counts?.registered_count || 0),
         paid_count: Number(counts?.paid_count || 0),
         review_count: Number(counts?.review_count || 0),
+        pending_reward_credits: 0,
+        available_reward_credits: Number(rewardTotals?.available_credits || 0),
+        total_reward_credits: Number(rewardTotals?.total_granted || 0),
+        reversed_reward_credits: Number(rewardTotals?.reversed_credits || 0),
+        expired_reward_credits: Number(rewardTotals?.expired_credits || 0),
+        next_reward_expiry_at: rewardTotals?.next_expiry_at == null
+          ? null
+          : Number(rewardTotals.next_expiry_at),
+        reward_release_policy: 'immediate',
+        reward_history: (rewardHistory.results || []).map((entry) => {
+          let entryStatus = 'used';
+          if (Number(entry.delta) < 0) entryStatus = 'reversal';
+          else if (Number(entry.has_reversal) === 1) entryStatus = 'reversed';
+          else if (entry.expires_at != null && Number(entry.expires_at) <= now) {
+            entryStatus = 'expired';
+          } else if (Number(entry.remaining_credits || 0) > 0) {
+            entryStatus = 'available';
+          }
+          return {
+            id: entry.id,
+            delta: Number(entry.delta),
+            reason: entry.reason,
+            order_id: entry.order_id,
+            created_at: Number(entry.created_at),
+            expires_at: entry.expires_at == null ? null : Number(entry.expires_at),
+            remaining_credits: Number(entry.remaining_credits || 0),
+            related_email: maskEmail(entry.related_email),
+            status: entryStatus,
+            reversal_of: entry.reversal_of,
+          };
+        }),
+        invitees: (invitees.results || []).map((invitee) => ({
+          email: maskEmail(invitee.invited_email),
+          status: invitee.status,
+          risk_status: invitee.risk_status,
+          bound_at: Number(invitee.bound_at),
+          first_paid_at: invitee.first_paid_at == null
+            ? null
+            : Number(invitee.first_paid_at),
+        })),
       }, 200, origin);
     }
 

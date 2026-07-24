@@ -1149,6 +1149,130 @@ describe('PayPal order flow', () => {
 });
 
 describe('referral purchase rewards', () => {
+  it('returns available rewards, expiry, masked invitees, and reversal history', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'REWARD-DETAILS' });
+    const orderId = 'REWARD-DETAILS-ORDER';
+    const grantId = `first-referral:${orderId}:referrer`;
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO orders
+         (id, user_id, plan, amount, credits, base_credits, currency, status,
+          completed_at, payment_method, is_first_qualified_purchase,
+          referrer_user_id_snapshot)
+         VALUES (?, ?, 'voucher_300', 60, 300, 300, 'CNY', 'completed',
+                 unixepoch(), 'voucher', 1, ?)`
+      ).bind(orderId, invitee.userId, referrer.userId),
+      env.DB.prepare(
+        `UPDATE referrals
+         SET status = 'qualified', first_paid_order_id = ?, first_paid_at = unixepoch()
+         WHERE referred_user_id = ?`
+      ).bind(orderId, invitee.userId),
+      env.DB.prepare(
+        `INSERT INTO credit_grants
+         (id, user_id, credit_type, granted_credits, remaining_credits,
+          order_id, related_user_id, expires_at, idempotency_key)
+         VALUES (?, ?, 'referral', 45, 45, ?, ?, unixepoch() + ?, ?)`
+      ).bind(
+        grantId,
+        referrer.userId,
+        orderId,
+        invitee.userId,
+        90 * 24 * 60 * 60,
+        grantId,
+      ),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id,
+          related_user_id, idempotency_key)
+         VALUES (?, ?, 45, 'referral', 'referral_first_purchase', ?, ?, ?, ?)`
+      ).bind(grantId, referrer.userId, grantId, orderId, invitee.userId, grantId),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = credits + 45 WHERE user_id = ?'
+      ).bind(referrer.userId),
+    ]);
+
+    const available = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    )));
+    expect(available).toMatchObject({
+      pending_reward_credits: 0,
+      available_reward_credits: 45,
+      total_reward_credits: 45,
+      reversed_reward_credits: 0,
+      expired_reward_credits: 0,
+      reward_release_policy: 'immediate',
+      registered_count: 1,
+      paid_count: 1,
+    });
+    expect(available.next_reward_expiry_at).toBeGreaterThan(
+      Math.floor(Date.now() / 1000) + 89 * 24 * 60 * 60,
+    );
+    expect(available.reward_history).toHaveLength(1);
+    expect(available.reward_history[0]).toMatchObject({
+      delta: 45,
+      reason: 'referral_first_purchase',
+      status: 'available',
+      remaining_credits: 45,
+    });
+    expect(available.reward_history[0].related_email).not.toBe(
+      'REWARD-DETAILS-invitee@example.com',
+    );
+    expect(available.invitees).toHaveLength(1);
+    expect(available.invitees[0]).toMatchObject({
+      status: 'qualified',
+      risk_status: 'normal',
+    });
+    expect(available.invitees[0].email).not.toBe(
+      'REWARD-DETAILS-invitee@example.com',
+    );
+
+    const reversalId = 'REWARD-DETAILS-REVERSAL';
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE credit_grants SET remaining_credits = 0 WHERE id = ?'
+      ).bind(grantId),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id,
+          related_user_id, idempotency_key, reversal_of)
+         VALUES (?, ?, -45, 'referral', 'voucher_dispute_referral', ?, ?, ?, ?, ?)`
+      ).bind(
+        reversalId,
+        referrer.userId,
+        grantId,
+        orderId,
+        invitee.userId,
+        reversalId,
+        grantId,
+      ),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = credits - 45 WHERE user_id = ?'
+      ).bind(referrer.userId),
+    ]);
+
+    const reversed = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    )));
+    expect(reversed).toMatchObject({
+      pending_reward_credits: 0,
+      available_reward_credits: 0,
+      total_reward_credits: 45,
+      reversed_reward_credits: 45,
+      reward_release_policy: 'immediate',
+    });
+    expect(reversed.next_reward_expiry_at).toBeNull();
+    expect(reversed.reward_history.find((entry) => entry.id === grantId)).toMatchObject({
+      status: 'reversed',
+    });
+    expect(reversed.reward_history.find((entry) => entry.id === reversalId)).toMatchObject({
+      delta: -45,
+      status: 'reversal',
+      reversal_of: grantId,
+    });
+  });
+
   it('grants a 30-credit invitee bonus and 15% first-purchase referral reward once', async () => {
     const { referrer, invitee } = await createReferredPair({ label: 'FIRST-REWARD' });
     await env.DB.prepare(

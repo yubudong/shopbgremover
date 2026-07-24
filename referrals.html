@@ -12,7 +12,7 @@
     body{margin:0;min-height:100vh;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07111f;color:#e5edf7}
     a{color:inherit}.top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #223047;background:#0b1728}
     .brand{font-size:19px;font-weight:800;text-decoration:none}.back{font-size:14px;color:#a7b6ca;text-decoration:none}
-    main{width:min(720px,calc(100% - 32px));margin:64px auto}.eyebrow{color:#60a5fa;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    main{width:min(980px,calc(100% - 32px));margin:64px auto}.eyebrow{color:#60a5fa;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
     h1{font-size:clamp(32px,7vw,48px);line-height:1.08;margin:12px 0 14px}.lead{color:#a7b6ca;line-height:1.7;margin:0 0 28px}
     .card{background:#101d30;border:1px solid #2a3a52;border-radius:18px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
     .label{font-size:13px;color:#91a4bc;margin-bottom:8px}.code{font:800 30px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}
@@ -20,8 +20,11 @@
     button,.signin{border:0;border-radius:10px;background:#2563eb;color:#fff;padding:12px 16px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center}
     .signin{display:block;margin-top:14px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:24px}.stat{background:#0a1626;border-radius:12px;padding:16px}.num{font-size:26px;font-weight:850}.name{font-size:12px;color:#91a4bc;margin-top:4px}
     .status{margin-top:18px;padding:12px 14px;border-radius:10px;background:#10233a;color:#bfdbfe;font-size:13px;line-height:1.6}.error{background:#3b1720;color:#fecdd3}
+    .reward-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}.section{margin-top:30px;padding-top:24px;border-top:1px solid #2a3a52}.section h2{font-size:18px;margin:0 0 6px}.section-note{color:#91a4bc;font-size:12px;line-height:1.6;margin:0 0 14px}
+    .table-wrap{overflow:auto;border:1px solid #263750;border-radius:12px}table{width:100%;border-collapse:collapse;min-width:680px;font-size:12px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #213149;vertical-align:top}th{color:#91a4bc;background:#0a1626;font-size:11px}tr:last-child td{border-bottom:0}
+    .pill{display:inline-block;border-radius:999px;background:#162a43;color:#bfdbfe;padding:3px 7px;font-weight:800}.positive{color:#86efac}.negative{color:#fda4af}.empty{color:#91a4bc;padding:14px 0;font-size:13px}
     .rules{margin:22px 0 0;padding-left:20px;color:#91a4bc;font-size:13px;line-height:1.8}
-    @media(max-width:560px){.stats{grid-template-columns:1fr}.linkrow{flex-direction:column}}
+    @media(max-width:720px){.reward-stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.stats,.reward-stats{grid-template-columns:1fr}.linkrow{flex-direction:column}}
   </style>
 </head>
 <body>
@@ -48,6 +51,39 @@
           <div class="stat"><div class="num" id="paidCount">0</div><div class="name">已完成充值</div></div>
           <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">风险审核中</div></div>
         </div>
+        <div class="section">
+          <h2>奖励积分 · Reward credits</h2>
+          <p class="section-note" id="rewardPolicy"></p>
+          <div class="reward-stats">
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">当前可用</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">待生效</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">累计发放</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">累计冲正</div></div>
+          </div>
+          <div class="status" id="expiryStatus"></div>
+        </div>
+        <div class="section">
+          <h2>奖励流水 · Reward history</h2>
+          <p class="section-note">显示最近 50 条推荐奖励发放、使用和冲正记录。</p>
+          <div class="table-wrap" id="rewardTableWrap">
+            <table>
+              <thead><tr><th>时间</th><th>变化</th><th>原因</th><th>被推荐账号</th><th>有效期</th><th>状态</th></tr></thead>
+              <tbody id="rewardRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="rewardEmpty" hidden>暂无推荐奖励流水。</div>
+        </div>
+        <div class="section">
+          <h2>邀请明细 · Invited users</h2>
+          <p class="section-note">账号只显示脱敏邮箱；风险审核不会仅凭相同 IP 自动封禁。</p>
+          <div class="table-wrap" id="inviteeTableWrap">
+            <table>
+              <thead><tr><th>账号</th><th>绑定时间</th><th>首充时间</th><th>关系状态</th><th>风险状态</th></tr></thead>
+              <tbody id="inviteeRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="inviteeEmpty" hidden>暂无邀请记录。</div>
+        </div>
       </div>
       <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>登录后查看 · Sign in</a>
       <div class="status error" id="error" hidden></div>
@@ -66,6 +102,76 @@
     const signIn = document.getElementById('signIn');
     const error = document.getElementById('error');
 
+    function formatTime(value) {
+      return value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
+    }
+    function rewardReason(reason) {
+      const labels = {
+        referral_first_purchase: '首充 15% 奖励',
+        referral_repeat_purchase: '后续充值 10% 奖励',
+        ai_background_removal: 'AI 去背景消耗',
+        paypal_refund_referral: 'PayPal 退款冲正',
+        voucher_dispute_referral: '卡密争议冲正',
+      };
+      return labels[reason] || reason;
+    }
+    function rewardStatus(status) {
+      const labels = {
+        available: '可用',
+        used: '已使用',
+        expired: '已过期',
+        reversed: '已冲正',
+        reversal: '冲正流水',
+      };
+      return labels[status] || status;
+    }
+    function appendCell(row, text, className = '') {
+      const cell = document.createElement('td');
+      cell.textContent = text;
+      if (className) cell.className = className;
+      row.append(cell);
+      return cell;
+    }
+    function renderRewardHistory(entries) {
+      const rows = document.getElementById('rewardRows');
+      rows.replaceChildren();
+      document.getElementById('rewardTableWrap').hidden = entries.length === 0;
+      document.getElementById('rewardEmpty').hidden = entries.length !== 0;
+      for (const entry of entries) {
+        const row = document.createElement('tr');
+        appendCell(row, formatTime(entry.created_at));
+        appendCell(
+          row,
+          `${entry.delta > 0 ? '+' : ''}${entry.delta}`,
+          entry.delta > 0 ? 'positive' : 'negative',
+        );
+        appendCell(row, rewardReason(entry.reason));
+        appendCell(row, entry.related_email || '—');
+        appendCell(row, formatTime(entry.expires_at));
+        const statusCell = appendCell(row, '');
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.textContent = rewardStatus(entry.status);
+        statusCell.append(pill);
+        rows.append(row);
+      }
+    }
+    function renderInvitees(invitees) {
+      const rows = document.getElementById('inviteeRows');
+      rows.replaceChildren();
+      document.getElementById('inviteeTableWrap').hidden = invitees.length === 0;
+      document.getElementById('inviteeEmpty').hidden = invitees.length !== 0;
+      for (const invitee of invitees) {
+        const row = document.createElement('tr');
+        appendCell(row, invitee.email || '—');
+        appendCell(row, formatTime(invitee.bound_at));
+        appendCell(row, formatTime(invitee.first_paid_at));
+        appendCell(row, invitee.status);
+        appendCell(row, invitee.risk_status);
+        rows.append(row);
+      }
+    }
+
     async function loadReferralCenter() {
       try {
         const response = await fetch(`${API}/api/referrals/me`, { credentials: 'include' });
@@ -81,6 +187,18 @@
         document.getElementById('registeredCount').textContent = data.registered_count;
         document.getElementById('paidCount').textContent = data.paid_count;
         document.getElementById('reviewCount').textContent = data.review_count;
+        document.getElementById('availableRewards').textContent = data.available_reward_credits;
+        document.getElementById('pendingRewards').textContent = data.pending_reward_credits;
+        document.getElementById('totalRewards').textContent = data.total_reward_credits;
+        document.getElementById('reversedRewards').textContent = data.reversed_reward_credits;
+        document.getElementById('rewardPolicy').textContent = data.reward_release_policy === 'immediate'
+          ? '当前规则：付款成功并通过风控后立即可用，因此待生效奖励为 0。'
+          : '奖励存在观察期，观察期结束后转为可用。';
+        document.getElementById('expiryStatus').textContent = data.next_reward_expiry_at
+          ? `最近一批可用奖励将在 ${formatTime(data.next_reward_expiry_at)} 到期；已过期未使用：${data.expired_reward_credits}。`
+          : `当前没有待到期的可用奖励；已过期未使用：${data.expired_reward_credits}。`;
+        renderRewardHistory(data.reward_history || []);
+        renderInvitees(data.invitees || []);
         document.getElementById('eligibility').textContent = data.reward_eligible
           ? '推荐奖励资格已生效 · Reward eligibility active'
           : '完成首次真实充值后，推荐奖励资格才会生效。';

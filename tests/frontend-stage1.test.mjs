@@ -173,6 +173,12 @@ test('voucher redemption and referral center use server-backed referral APIs', a
   assert.match(redeem, /不能再补填推荐人/);
   assert.match(referrals, /\/api\/referrals\/me/);
   assert.match(referrals, /credentials:\s*'include'/);
+  assert.match(referrals, /available_reward_credits/);
+  assert.match(referrals, /pending_reward_credits/);
+  assert.match(referrals, /reward_history/);
+  assert.match(referrals, /renderInvitees\(data\.invitees/);
+  assert.match(referrals, /付款成功并通过风控后立即可用/);
+  assert.doesNotMatch(referrals, /\.innerHTML\s*=/);
   assert.doesNotMatch(referrals, /localStorage.*referral/i);
 });
 
