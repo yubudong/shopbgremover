@@ -61,6 +61,32 @@ test('all localized workspaces send device and task idempotency identifiers', as
   }
 });
 
+test('all localized workspaces integrate the browser-only local cleanup editor', async () => {
+  const cleaner = await read('local-cleaner.js');
+  const worker = await read('local-cleaner-worker.js');
+  const core = await read('local-inpaint-core.mjs');
+
+  assert.match(cleaner, /new Worker\('\/local-cleaner-worker\.js', \{ type: 'module' \}\)/);
+  assert.match(cleaner, /decorateCard\(card, file, index/);
+  assert.match(cleaner, /getSourceFile\(file\)/);
+  assert.match(cleaner, /Only edit images you own or are authorized to modify/);
+  assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
+  assert.doesNotMatch(worker, /\bfetch\s*\(/);
+  assert.doesNotMatch(core, /\bfetch\s*\(/);
+  assert.doesNotMatch(`${cleaner}\n${worker}\n${core}`, /\/api\/inpaint|https?:\/\//);
+
+  for (const file of indexFiles) {
+    const html = await read(file);
+    assert.match(html, /href="\/local-cleaner\.css"/, file);
+    assert.match(html, /src="\/local-cleaner\.js"/, file);
+    assert.match(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
+    assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
+    assert.match(html, /ShopBGLocalCleaner\?\.getSourceFile\(selectedFiles\[i\]\)/, file);
+    assert.match(html, /resetProcessActionAfterLocalEdit\(\)/, file);
+    assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
+  }
+});
+
 test('ZIP download is local-only and never invokes the AI endpoint', async () => {
   for (const file of indexFiles) {
     const html = await read(file);
@@ -143,6 +169,10 @@ test('Pages build contains only the canonical static site', async () => {
     'referrals.html',
     'referrals-localized.css',
     'referrals-localized.js',
+    'local-cleaner.css',
+    'local-cleaner.js',
+    'local-cleaner-worker.js',
+    'local-inpaint-core.mjs',
     'admin-vouchers.html',
     'admin-referrals.html',
     'de/index.html',

@@ -806,6 +806,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
+<link rel="stylesheet" href="/local-cleaner.css">
 </head>
 <body>
 
@@ -1522,6 +1523,7 @@ let selectedFiles   = [];
   fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
 
   function handleFiles(files) {
+    window.ShopBGLocalCleaner?.clearAll();
     selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, currentUser ? 50 : 1);
     if (!selectedFiles.length) return;
 
@@ -1544,6 +1546,14 @@ let selectedFiles   = [];
       badge.textContent = '⏳';
       card.appendChild(img);
       card.appendChild(badge);
+      window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
+        onApply: ({ previewUrl }) => {
+          if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+          img.src = previewUrl;
+          badge.textContent = '✏️';
+          resetProcessActionAfterLocalEdit();
+        },
+      });
       grid.appendChild(card);
     });
 
@@ -1561,6 +1571,18 @@ let selectedFiles   = [];
 
   function setStatus(msg) {
     document.getElementById('statusText').textContent = msg;
+  }
+
+  function resetProcessActionAfterLocalEdit() {
+    processedResults = [];
+    document.getElementById('progressTrack').style.display = 'none';
+    document.getElementById('progressBar').style.width = '0%';
+    const btn = document.getElementById('processBtn');
+    btn.textContent = `Quitar fondo (${selectedFiles.length} ${selectedFiles.length > 1 ? 'imágenes' : 'imagen'})`;
+    btn.disabled = false;
+    btn.className = 'action-btn action-btn-primary';
+    btn.onclick = startProcessing;
+    setStatus('Limpieza local guardada. Lista para quitar el fondo con IA.');
   }
 
   // ── Free-use gate (anonymous) ─────────────────────────────
@@ -1681,7 +1703,8 @@ let selectedFiles   = [];
       document.getElementById('progressBar').style.width = `${(i / selectedFiles.length) * 100}%`;
 
       try {
-        const dataUrl = await compressToDataUrl(selectedFiles[i]);
+        const sourceFile = window.ShopBGLocalCleaner?.getSourceFile(selectedFiles[i]) || selectedFiles[i];
+        const dataUrl = await compressToDataUrl(sourceFile);
         const res = await fetch(`${API}/api/remove-bg`, {
           method: 'POST',
           credentials: 'include',
@@ -1797,5 +1820,6 @@ let selectedFiles   = [];
   // ── Init ──────────────────────────────────────────────────
   loadUser();
 </script>
+<script src="/local-cleaner.js"></script>
 </body>
 </html>
