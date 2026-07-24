@@ -19,6 +19,7 @@
     .lead{color:#a7b6ca;line-height:1.7;margin:0 0 28px}
     .card{background:#101d30;border:1px solid #2a3a52;border-radius:18px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
     label{display:block;font-size:14px;font-weight:700;margin-bottom:9px}
+    .field+.field{margin-top:18px}.hint{margin:7px 0 0;color:#7f93ad;font-size:12px;line-height:1.55}
     input{width:100%;border:1px solid #3a4c66;border-radius:11px;background:#081321;color:#fff;padding:15px 16px;font:600 17px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;outline:none}
     input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.14)}
     button,.signin{width:100%;margin-top:14px;border:0;border-radius:11px;background:#2563eb;color:#fff;padding:14px 18px;font-size:15px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center;display:block}
@@ -42,8 +43,15 @@
     <section class="card">
       <p class="account" id="accountText">正在检查登录状态…</p>
       <form id="redeemForm" hidden>
-        <label for="voucherCode">卡密 / Voucher code</label>
-        <input id="voucherCode" name="code" maxlength="27" autocomplete="off" spellcheck="false" placeholder="SBG-XXXX-XXXX-XXXX-XXXX" required>
+        <div class="field">
+          <label for="voucherCode">卡密 / Voucher code</label>
+          <input id="voucherCode" name="code" maxlength="27" autocomplete="off" spellcheck="false" placeholder="SBG-XXXX-XXXX-XXXX-XXXX" required>
+        </div>
+        <div class="field">
+          <label for="referralCode">推荐码 / Referral code（如有 · optional）</label>
+          <input id="referralCode" name="referral_code" maxlength="8" autocomplete="off" spellcheck="false" placeholder="K7M4P9Q2">
+          <p class="hint">仅可在首次充值时绑定；绑定后不能修改。300/1000 积分首充满足条件可额外获得 30 积分。</p>
+        </div>
         <button id="redeemButton" type="submit">立即兑换 · Redeem</button>
       </form>
       <a class="signin" id="signInButton" href="https://api.shopbgremover.com/auth/login" hidden>登录后兑换 · Sign in</a>
@@ -52,8 +60,10 @@
         <li>一张卡密只能成功兑换一次。</li>
         <li>兑换成功后，积分进入当前登录账号。</li>
         <li>请勿把完整卡密转发给其他人。</li>
-        <li>推荐码功能将在推荐系统阶段上线，本页目前不会绑定推荐关系。</li>
+        <li>推荐码只能在首次充值时填写，绑定后不能修改。</li>
+        <li>不填写推荐码继续兑换后，不能再补填推荐人。</li>
       </ul>
+      <p class="foot"><a href="/referrals">查看我的推荐码与邀请数据 · Referral center</a></p>
       <p class="foot">需要帮助？请保留闲鱼订单号，并联系 yubudong2023@gmail.com。客服只会核对卡密前缀和末四位，不会要求你公开发送完整卡密。</p>
     </section>
   </main>
@@ -101,6 +111,13 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       message.className = 'message';
+      const referralCode = document.getElementById('referralCode').value.trim();
+      if (
+        !referralCode
+        && !window.confirm('本次未填写推荐码。充值成功后将不能再补填推荐人，也不会获得被推荐用户首充奖励。是否继续？')
+      ) {
+        return;
+      }
       button.disabled = true;
       button.textContent = '正在兑换…';
       try {
@@ -111,7 +128,10 @@
             'Content-Type': 'application/json',
             'X-Device-ID': deviceId,
           },
-          body: JSON.stringify({ code: document.getElementById('voucherCode').value }),
+          body: JSON.stringify({
+            code: document.getElementById('voucherCode').value,
+            ...(referralCode ? { referral_code: referralCode } : {}),
+          }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || '兑换失败，请稍后重试。');
@@ -124,6 +144,7 @@
           'success',
         );
         document.getElementById('voucherCode').value = '';
+        document.getElementById('referralCode').value = '';
       } catch (error) {
         showMessage(error.message, 'error');
       } finally {

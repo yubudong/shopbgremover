@@ -104,6 +104,7 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     ...pricingFiles,
     ...termsFiles,
     'redeem.html',
+    'referrals.html',
     'admin-vouchers.html',
     'test-paypal.html',
     'shopify-background-remover.html',
@@ -134,6 +135,7 @@ test('Pages build contains only the canonical static site', async () => {
     'index.html',
     'pricing.html',
     'redeem.html',
+    'referrals.html',
     'admin-vouchers.html',
     'de/index.html',
     'es/index.html',
@@ -161,6 +163,17 @@ test('pricing links to the server-backed Xianyu voucher redemption page', async 
   assert.match(redeem, /\/api\/vouchers\/redeem/);
   assert.match(redeem, /'X-Device-ID': deviceId/);
   assert.doesNotMatch(redeem, /localStorage.*voucher|voucher.*localStorage/i);
+});
+
+test('voucher redemption and referral center use server-backed referral APIs', async () => {
+  const redeem = await read('redeem.html');
+  const referrals = await read('referrals.html');
+  assert.match(redeem, /id="referralCode"/);
+  assert.match(redeem, /referral_code:\s*referralCode/);
+  assert.match(redeem, /不能再补填推荐人/);
+  assert.match(referrals, /\/api\/referrals\/me/);
+  assert.match(referrals, /credentials:\s*'include'/);
+  assert.doesNotMatch(referrals, /localStorage.*referral/i);
 });
 
 test('localized homepages capture referral links through the signed server endpoint', async () => {

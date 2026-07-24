@@ -15,6 +15,7 @@ const rootFiles = [
   'pricing.html',
   'privacy.html',
   'redeem.html',
+  'referrals.html',
   'robots.txt',
   'shopify-background-remover.html',
   'sitemap.xml',

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>推荐中心 · ShopBG Remover</title>
+  <meta name="description" content="查看 ShopBG Remover 推荐码、推荐链接和邀请数据。">
+  <link rel="icon" href="/favicon.svg">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07111f;color:#e5edf7}
+    a{color:inherit}.top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #223047;background:#0b1728}
+    .brand{font-size:19px;font-weight:800;text-decoration:none}.back{font-size:14px;color:#a7b6ca;text-decoration:none}
+    main{width:min(720px,calc(100% - 32px));margin:64px auto}.eyebrow{color:#60a5fa;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    h1{font-size:clamp(32px,7vw,48px);line-height:1.08;margin:12px 0 14px}.lead{color:#a7b6ca;line-height:1.7;margin:0 0 28px}
+    .card{background:#101d30;border:1px solid #2a3a52;border-radius:18px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+    .label{font-size:13px;color:#91a4bc;margin-bottom:8px}.code{font:800 30px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}
+    .linkrow{display:flex;gap:10px;margin-top:20px}.linkrow input{flex:1;min-width:0;border:1px solid #3a4c66;border-radius:10px;background:#081321;color:#dbeafe;padding:12px}
+    button,.signin{border:0;border-radius:10px;background:#2563eb;color:#fff;padding:12px 16px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center}
+    .signin{display:block;margin-top:14px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:24px}.stat{background:#0a1626;border-radius:12px;padding:16px}.num{font-size:26px;font-weight:850}.name{font-size:12px;color:#91a4bc;margin-top:4px}
+    .status{margin-top:18px;padding:12px 14px;border-radius:10px;background:#10233a;color:#bfdbfe;font-size:13px;line-height:1.6}.error{background:#3b1720;color:#fecdd3}
+    .rules{margin:22px 0 0;padding-left:20px;color:#91a4bc;font-size:13px;line-height:1.8}
+    @media(max-width:560px){.stats{grid-template-columns:1fr}.linkrow{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">ShopBG Remover</a>
+    <a class="back" href="/pricing">积分价格 · Pricing</a>
+  </header>
+  <main>
+    <div class="eyebrow">Referral center</div>
+    <h1>推荐中心</h1>
+    <p class="lead">分享你的专属链接。推荐人完成过真实充值后，符合条件的被推荐用户首充可为双方带来积分奖励。</p>
+    <section class="card">
+      <div id="loading">正在加载推荐数据…</div>
+      <div id="content" hidden>
+        <div class="label">我的推荐码 · My referral code</div>
+        <div class="code" id="code"></div>
+        <div class="linkrow">
+          <input id="link" readonly aria-label="Referral link">
+          <button id="copyButton" type="button">复制链接</button>
+        </div>
+        <div class="status" id="eligibility"></div>
+        <div class="stats">
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">已邀请注册</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">已完成充值</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">风险审核中</div></div>
+        </div>
+      </div>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>登录后查看 · Sign in</a>
+      <div class="status error" id="error" hidden></div>
+      <ul class="rules">
+        <li>首笔有效充值奖励为基础积分的 15%，后续充值为 10%。</li>
+        <li>被推荐用户首次充值 300 或 1000 基础积分，额外获得 30 积分。</li>
+        <li>推荐奖励积分有效期为 90 天，不可提现或转让。</li>
+        <li>退款、拒付、同一付款账户或异常邀请不会产生有效奖励。</li>
+      </ul>
+    </section>
+  </main>
+  <script>
+    const API = 'https://api.shopbgremover.com';
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    const signIn = document.getElementById('signIn');
+    const error = document.getElementById('error');
+
+    async function loadReferralCenter() {
+      try {
+        const response = await fetch(`${API}/api/referrals/me`, { credentials: 'include' });
+        if (response.status === 401) {
+          loading.hidden = true;
+          signIn.hidden = false;
+          return;
+        }
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load referral data.');
+        document.getElementById('code').textContent = data.code;
+        document.getElementById('link').value = data.link;
+        document.getElementById('registeredCount').textContent = data.registered_count;
+        document.getElementById('paidCount').textContent = data.paid_count;
+        document.getElementById('reviewCount').textContent = data.review_count;
+        document.getElementById('eligibility').textContent = data.reward_eligible
+          ? '推荐奖励资格已生效 · Reward eligibility active'
+          : '完成首次真实充值后，推荐奖励资格才会生效。';
+        loading.hidden = true;
+        content.hidden = false;
+      } catch (cause) {
+        loading.hidden = true;
+        error.textContent = cause.message;
+        error.hidden = false;
+      }
+    }
+
+    document.getElementById('copyButton').addEventListener('click', async () => {
+      const button = document.getElementById('copyButton');
+      await navigator.clipboard.writeText(document.getElementById('link').value);
+      button.textContent = '已复制';
+      setTimeout(() => { button.textContent = '复制链接'; }, 1500);
+    });
+
+    loadReferralCenter();
+  </script>
+</body>
+</html>

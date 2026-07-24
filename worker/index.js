@@ -608,6 +608,7 @@ async function calculateOrderBenefits(env, {
   userId,
   baseCredits,
   payerId = null,
+  relationshipOverride,
 }) {
   const [priorPurchase, relationship] = await Promise.all([
     env.DB.prepare(
@@ -616,12 +617,14 @@ async function calculateOrderBenefits(env, {
        ORDER BY completed_at, created_at, id
        LIMIT 1`
     ).bind(userId, orderId).first(),
-    env.DB.prepare(
-      `SELECT id, referrer_user_id, referred_user_id, status, risk_status,
-              first_paid_order_id
-       FROM referrals
-       WHERE referred_user_id = ?`
-    ).bind(userId).first(),
+    relationshipOverride === undefined
+      ? env.DB.prepare(
+        `SELECT id, referrer_user_id, referred_user_id, referral_code,
+                status, risk_status, first_paid_order_id
+         FROM referrals
+         WHERE referred_user_id = ?`
+      ).bind(userId).first()
+      : Promise.resolve(relationshipOverride),
   ]);
   const isFirstPurchase = !priorPurchase;
   if (!relationship || relationship.status === 'rejected' || relationship.risk_status === 'rejected') {
@@ -661,6 +664,70 @@ async function calculateOrderBenefits(env, {
       : 0,
     referrerUserId: relationship.referrer_user_id,
     rejectRelationship: Boolean(payerConflict),
+  };
+}
+
+async function resolveVoucherReferral(env, {
+  userId,
+  referralCode,
+  guest,
+}) {
+  const existing = await env.DB.prepare(
+    `SELECT id, referrer_user_id, referred_user_id, referral_code,
+            status, risk_status, first_paid_order_id
+     FROM referrals WHERE referred_user_id = ?`
+  ).bind(userId).first();
+  if (!referralCode) return { relationship: existing || null, insert: null };
+
+  if (existing) {
+    if (existing.referral_code !== referralCode) {
+      return { error: 'A different referrer is already bound to this account.' };
+    }
+    return { relationship: existing, insert: null };
+  }
+
+  const priorPurchase = await env.DB.prepare(
+    `SELECT id FROM orders
+     WHERE user_id = ? AND status = 'completed' AND base_credits > 0
+     LIMIT 1`
+  ).bind(userId).first();
+  if (priorPurchase) {
+    return { error: 'A referrer cannot be added after the first top-up.' };
+  }
+
+  const referrer = await env.DB.prepare(
+    `SELECT rc.code, rc.user_id
+     FROM referral_codes rc
+     WHERE rc.code = ? AND rc.status = 'active'`
+  ).bind(referralCode).first();
+  if (!referrer || referrer.user_id === userId) {
+    return { error: 'Referral code is invalid or not eligible.' };
+  }
+  const referrerPurchase = await env.DB.prepare(
+    `SELECT id FROM orders
+     WHERE user_id = ? AND status = 'completed' AND base_credits > 0
+     LIMIT 1`
+  ).bind(referrer.user_id).first();
+  if (!referrerPurchase) {
+    return { error: 'Referral code is invalid or not eligible.' };
+  }
+
+  const relationship = {
+    id: crypto.randomUUID(),
+    referrer_user_id: referrer.user_id,
+    referred_user_id: userId,
+    referral_code: referrer.code,
+    status: 'bound',
+    risk_status: 'normal',
+    first_paid_order_id: null,
+  };
+  return {
+    relationship,
+    insert: {
+      ...relationship,
+      ipHash: guest.ipHash,
+      deviceHash: guest.deviceHash,
+    },
   };
 }
 
@@ -1552,10 +1619,11 @@ export default {
       }
 
       const body = await request.json().catch(() => ({}));
-      if (body.referral_code) {
-        return privateJson({
-          error: 'Referral codes are not available in voucher redemption yet.',
-        }, 409, origin);
+      const requestedReferralCode = body.referral_code
+        ? normalizeReferralCode(body.referral_code)
+        : null;
+      if (body.referral_code && !requestedReferralCode) {
+        return privateJson({ error: 'Referral code is invalid or not eligible.' }, 400, origin);
       }
       const normalized = normalizeVoucherCode(body.code);
       const genericError = {
@@ -1612,11 +1680,37 @@ export default {
       const grantId = `voucher:${card.id}:paid`;
       let redemptionCommitted = false;
       for (let attempt = 0; attempt < 2 && !redemptionCommitted; attempt += 1) {
+        const voucherReferral = await resolveVoucherReferral(env, {
+          userId: user.sub,
+          referralCode: requestedReferralCode,
+          guest,
+        });
+        if (voucherReferral.error) {
+          return privateJson({ error: voucherReferral.error }, 409, origin);
+        }
         const benefits = await calculateOrderBenefits(env, {
           orderId,
           userId: user.sub,
           baseCredits: Number(card.base_credits),
+          relationshipOverride: voucherReferral.relationship,
         });
+        const referralStatements = voucherReferral.insert
+          ? [
+            env.DB.prepare(
+              `INSERT INTO referrals
+               (id, referrer_user_id, referred_user_id, referral_code, source,
+                created_ip_hash, created_device_hash)
+               VALUES (?, ?, ?, ?, 'voucher', ?, ?)`
+            ).bind(
+              voucherReferral.insert.id,
+              voucherReferral.insert.referrer_user_id,
+              voucherReferral.insert.referred_user_id,
+              voucherReferral.insert.referral_code,
+              voucherReferral.insert.ipHash,
+              voucherReferral.insert.deviceHash,
+            ),
+          ]
+          : [];
         try {
           await env.DB.batch([
             env.DB.prepare(
@@ -1632,6 +1726,7 @@ export default {
                  AND vc.status IN ('generated', 'reserved', 'delivered')
                  AND (vb.expires_at IS NULL OR vb.expires_at > unixepoch())`
             ).bind(orderId, user.sub, `voucher_${card.base_credits}`, card.id),
+            ...referralStatements,
             env.DB.prepare(
               `UPDATE voucher_cards
                SET status = 'redeemed', redeemed_by = ?, redeemed_at = unixepoch(),

@@ -1453,6 +1453,117 @@ describe('referral purchase rewards', () => {
       referrer_user_id_snapshot: referrer.userId,
     });
   });
+
+  it('atomically binds a qualified referral code during the first voucher redemption', async () => {
+    const referrer = await createAuthenticatedUser({
+      email: 'voucher-code-referrer@example.com',
+      credits: 0,
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status,
+        completed_at, payment_method)
+       VALUES ('VOUCHER-CODE-REFERRER-ORDER', ?, 'voucher_100', 22, 100, 100,
+               'CNY', 'completed', unixepoch(), 'voucher')`
+    ).bind(referrer.userId).run();
+    const referral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    )));
+    const invitee = await createAuthenticatedUser({
+      email: 'voucher-code-invitee@example.com',
+      credits: 0,
+      deviceId: 'voucher-code-invitee-device',
+    });
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 300 });
+    const voucher = generated.body.vouchers[0];
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      invitee.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'voucher-code-invitee-device',
+          'CF-Connecting-IP': '203.0.113.102',
+        },
+        body: JSON.stringify({
+          code: voucher.code,
+          referral_code: referral.code,
+        }),
+      },
+    ));
+    expect(response.status).toBe(200);
+
+    const [relationship, inviteeBalance, referrerBalance] = await Promise.all([
+      env.DB.prepare(
+        `SELECT referrer_user_id, referral_code, source, status, first_paid_order_id
+         FROM referrals WHERE referred_user_id = ?`
+      ).bind(invitee.userId).first(),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+    ]);
+    expect(relationship).toEqual({
+      referrer_user_id: referrer.userId,
+      referral_code: referral.code,
+      source: 'voucher',
+      status: 'qualified',
+      first_paid_order_id: `voucher:${voucher.id}`,
+    });
+    expect(inviteeBalance).toBe(330);
+    expect(referrerBalance).toBe(45);
+  });
+
+  it('leaves a voucher untouched when its referral code is invalid', async () => {
+    const invitee = await createAuthenticatedUser({
+      email: 'invalid-voucher-referral@example.com',
+      credits: 0,
+    });
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 300 });
+    const voucher = generated.body.vouchers[0];
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      invitee.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'invalid-voucher-referral-device',
+          'CF-Connecting-IP': '203.0.113.103',
+        },
+        body: JSON.stringify({
+          code: voucher.code,
+          referral_code: 'ABCDEFGH',
+        }),
+      },
+    ));
+    expect(response.status).toBe(409);
+
+    const [card, orders, relationships, balance] = await Promise.all([
+      env.DB.prepare('SELECT status, redeemed_by FROM voucher_cards WHERE id = ?')
+        .bind(voucher.id).first(),
+      env.DB.prepare('SELECT COUNT(*) AS count FROM orders WHERE voucher_card_id = ?')
+        .bind(voucher.id).first('count'),
+      env.DB.prepare('SELECT COUNT(*) AS count FROM referrals WHERE referred_user_id = ?')
+        .bind(invitee.userId).first('count'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+    ]);
+    expect(card).toEqual({ status: 'generated', redeemed_by: null });
+    expect(orders).toBe(0);
+    expect(relationships).toBe(0);
+    expect(balance).toBe(0);
+  });
 });
 
 describe('PayPal refund webhook', () => {
