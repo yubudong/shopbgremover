@@ -9,9 +9,9 @@ const GUEST_FREE_LIMIT = 3;
 const REGISTERED_FREE_LIMIT = 10;
 const FREE_CREDIT_TTL_SECONDS = 30 * 24 * 60 * 60;
 const CREDIT_PACKS = Object.freeze({
-  credits_100: { amount: '22.00', credits: 100, currency: 'CNY' },
-  credits_300: { amount: '60.00', credits: 300, currency: 'CNY' },
-  credits_1000: { amount: '160.00', credits: 1000, currency: 'CNY' },
+  credits_100: { amount: '3.49', credits: 100, currency: 'USD' },
+  credits_300: { amount: '8.99', credits: 300, currency: 'USD' },
+  credits_1000: { amount: '23.99', credits: 1000, currency: 'USD' },
 });
 
 // ── CORS headers ──────────────────────────────────────────────
@@ -404,6 +404,16 @@ function findPayPalCapture(order) {
     }
   }
   return null;
+}
+
+function moneyToMinorUnits(value) {
+  const match = String(value ?? '').match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!match) return null;
+  const whole = Number(match[1]);
+  const fraction = Number((match[2] || '').padEnd(2, '0'));
+  if (!Number.isSafeInteger(whole) || !Number.isSafeInteger(fraction)) return null;
+  const minorUnits = whole * 100 + fraction;
+  return Number.isSafeInteger(minorUnits) ? minorUnits : null;
 }
 
 // ── Router ────────────────────────────────────────────────────
@@ -892,15 +902,20 @@ export default {
           return json({ error: 'Payment not completed', detail: paypalOrder }, 400, origin);
         }
 
-        const capturedAmount = Number(capture.amount?.value);
-        const expectedAmount = Number(order.amount);
-        if (capture.amount?.currency_code !== order.currency || capturedAmount !== expectedAmount) {
+        const capturedAmount = moneyToMinorUnits(capture.amount?.value);
+        const expectedAmount = moneyToMinorUnits(order.amount);
+        if (
+          capturedAmount === null
+          || expectedAmount === null
+          || capture.amount?.currency_code !== order.currency
+          || capturedAmount !== expectedAmount
+        ) {
           await env.DB.prepare(
             `UPDATE orders SET status = 'payment_review', failure_detail = ?
              WHERE id = ? AND user_id = ? AND status = 'pending'`
           ).bind(
             JSON.stringify({
-              expected: { currency: order.currency, amount: expectedAmount },
+              expected: { currency: order.currency, amount: String(order.amount) },
               captured: capture.amount || null,
             }),
             orderId,
@@ -1050,11 +1065,13 @@ export default {
           return json({ ok: true, duplicate: true }, 200, origin);
         }
 
-        const refundedAmount = Number(event.resource?.amount?.value);
+        const refundedAmount = moneyToMinorUnits(event.resource?.amount?.value);
+        const orderedAmount = moneyToMinorUnits(order.amount);
         if (
-          !Number.isFinite(refundedAmount)
+          refundedAmount === null
+          || orderedAmount === null
           || event.resource?.amount?.currency_code !== order.currency
-          || refundedAmount < Number(order.amount)
+          || refundedAmount < orderedAmount
         ) {
           await env.DB.batch([
             env.DB.prepare(

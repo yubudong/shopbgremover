@@ -68,17 +68,17 @@ test('ZIP download is local-only and never invokes the AI endpoint', async () =>
   }
 });
 
-test('localized pricing exposes only the three confirmed CNY packs', async () => {
+test('localized pricing exposes only the three confirmed USD packs', async () => {
   for (const file of pricingFiles) {
     const html = await read(file);
     assert.ok(html.includes(`client-id=${paypalClientId}`), file);
-    assert.match(html, /currency=CNY/, file);
+    assert.match(html, /currency=USD/, file);
     assert.match(html, /credits_100/, file);
     assert.match(html, /credits_300/, file);
     assert.match(html, /credits_1000/, file);
-    assert.match(html, />22</, file);
-    assert.match(html, />60</, file);
-    assert.match(html, />160</, file);
+    assert.match(html, />3\.49</, file);
+    assert.match(html, />8\.99</, file);
+    assert.match(html, />23\.99</, file);
     assert.doesNotMatch(
       html,
       /starter_(?:monthly|annual)|pro_(?:monthly|annual)|business_(?:monthly|annual)|payg_(?:10|50|200|500)/,
@@ -87,13 +87,13 @@ test('localized pricing exposes only the three confirmed CNY packs', async () =>
   }
 });
 
-test('localized terms state lifetime quotas and CNY one-time packs', async () => {
+test('localized terms state lifetime quotas and USD one-time packs', async () => {
   for (const file of termsFiles) {
     const html = await read(file);
-    assert.match(html, /CNY/, file);
+    assert.match(html, /USD/, file);
     assert.match(html, /1000/, file);
-    assert.match(html, /160/, file);
-    assert.doesNotMatch(html, /prices are in USD|Preise sind in USD|precios están en USD|Prix indiqués en USD|Preços em USD/, file);
+    assert.match(html, /23[,.]99/, file);
+    assert.doesNotMatch(html, /CNY|¥22|¥60|¥160/, file);
     assert.doesNotMatch(html, /3 images per day|3 Bilder pro Tag|3 imágenes por día|3 images par jour|3 imagens por dia/, file);
   }
 });

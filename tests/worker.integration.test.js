@@ -151,8 +151,8 @@ function installFalSuccessMock() {
 function completedPayPalOrder({
   orderId,
   captureId = `CAPTURE-${orderId}`,
-  amount = '22.00',
-  currency = 'CNY',
+  amount = '3.49',
+  currency = 'USD',
 } = {}) {
   return {
     id: orderId,
@@ -409,7 +409,7 @@ describe('PayPal order flow', () => {
     expect(outboundFetch).not.toHaveBeenCalled();
   });
 
-  it('creates a CNY one-time pack and records a pending order', async () => {
+  it('creates a USD one-time pack and records a pending order', async () => {
     const { cookie, userId } = await createAuthenticatedUser();
     const outboundFetch = vi.fn(async (input) => {
       const url = String(input);
@@ -441,10 +441,10 @@ describe('PayPal order flow', () => {
     expect(order).toEqual(expect.objectContaining({
       user_id: userId,
       plan: 'credits_100',
-      amount: 22,
+      amount: 3.49,
       credits: 100,
       base_credits: 100,
-      currency: 'CNY',
+      currency: 'USD',
       status: 'pending',
     }));
 
@@ -452,8 +452,8 @@ describe('PayPal order flow', () => {
       String(input).endsWith('/v2/checkout/orders'));
     const createBody = JSON.parse(createCall[1].body);
     expect(createBody.purchase_units[0].amount).toEqual({
-      currency_code: 'CNY',
-      value: '22.00',
+      currency_code: 'USD',
+      value: '3.49',
     });
   });
 
@@ -462,7 +462,7 @@ describe('PayPal order flow', () => {
     await env.DB.prepare(
       `INSERT INTO orders
        (id, user_id, plan, amount, credits, base_credits, currency, status)
-       VALUES (?, ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+       VALUES (?, ?, 'credits_100', 3.49, 100, 100, 'USD', 'pending')`
     ).bind('PAYPAL-ORDER-2', userId).run();
 
     const outboundFetch = vi.fn(async (input) => {
@@ -505,7 +505,7 @@ describe('PayPal order flow', () => {
     await env.DB.prepare(
       `INSERT INTO orders
        (id, user_id, plan, amount, credits, base_credits, currency, status)
-       VALUES (?, ?, 'credits_300', 60, 300, 300, 'CNY', 'pending')`
+       VALUES (?, ?, 'credits_300', 8.99, 300, 300, 'USD', 'pending')`
     ).bind('PAYPAL-CONCURRENT', userId).run();
 
     const outboundFetch = vi.fn(async (input) => {
@@ -515,7 +515,7 @@ describe('PayPal order flow', () => {
         return Response.json(completedPayPalOrder({
           orderId: 'PAYPAL-CONCURRENT',
           captureId: 'CAPTURE-CONCURRENT',
-          amount: '60.00',
+          amount: '8.99',
         }));
       }
       throw new Error(`Unexpected URL: ${url}`);
@@ -563,7 +563,7 @@ describe('PayPal order flow', () => {
     await env.DB.prepare(
       `INSERT INTO orders
        (id, user_id, plan, amount, credits, base_credits, currency, status)
-       VALUES ('OWNED-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+       VALUES ('OWNED-ORDER', ?, 'credits_100', 3.49, 100, 100, 'USD', 'pending')`
     ).bind(first.userId).run();
     const outboundFetch = vi.fn();
     vi.stubGlobal('fetch', outboundFetch);
@@ -585,7 +585,7 @@ describe('PayPal order flow', () => {
     await env.DB.prepare(
       `INSERT INTO orders
        (id, user_id, plan, amount, credits, base_credits, currency, status)
-       VALUES ('MISMATCH-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY', 'pending')`
+       VALUES ('MISMATCH-ORDER', ?, 'credits_100', 3.49, 100, 100, 'USD', 'pending')`
     ).bind(userId).run();
     const outboundFetch = vi.fn(async (input) => {
       const url = String(input);
@@ -622,7 +622,7 @@ describe('PayPal refund webhook', () => {
         `INSERT INTO orders
          (id, user_id, plan, amount, credits, base_credits, currency, status,
           paypal_capture_id, completed_at)
-         VALUES ('REFUND-ORDER', ?, 'credits_100', 22, 100, 100, 'CNY',
+         VALUES ('REFUND-ORDER', ?, 'credits_100', 3.49, 100, 100, 'USD',
                  'completed', 'CAPTURE-REFUND', unixepoch())`
       ).bind(userId),
       env.DB.prepare(
@@ -656,7 +656,7 @@ describe('PayPal refund webhook', () => {
       event_type: 'PAYMENT.CAPTURE.REFUNDED',
       resource: {
         id: 'CAPTURE-REFUND',
-        amount: { value: '22.00', currency_code: 'CNY' },
+        amount: { value: '3.49', currency_code: 'USD' },
       },
     };
     const webhookRequest = () => new Request(`${API_ORIGIN}/api/paypal/webhook`, {
