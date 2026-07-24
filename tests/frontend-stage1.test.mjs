@@ -9,6 +9,9 @@ const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/'];
 const indexFiles = locales.map((locale) => `${locale}index.html`);
 const pricingFiles = locales.map((locale) => `${locale}pricing.html`);
 const termsFiles = locales.map((locale) => `${locale}terms.html`);
+const localizedReferralFiles = ['de/', 'es/', 'fr/', 'pt-br/'].map(
+  (locale) => `${locale}referrals.html`,
+);
 const paypalClientId =
   'BAA4Ojux0LcQewVNqMfn8B0s2TQzAn7gr9MEsZ-oRCY7hDN1vulONcWILFXQK3lEHftqQBISBEXfDDUuWg';
 const root = path.resolve(import.meta.dirname, '..');
@@ -105,6 +108,7 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     ...termsFiles,
     'redeem.html',
     'referrals.html',
+    ...localizedReferralFiles,
     'admin-vouchers.html',
     'admin-referrals.html',
     'test-paypal.html',
@@ -137,12 +141,18 @@ test('Pages build contains only the canonical static site', async () => {
     'pricing.html',
     'redeem.html',
     'referrals.html',
+    'referrals-localized.css',
+    'referrals-localized.js',
     'admin-vouchers.html',
     'admin-referrals.html',
     'de/index.html',
+    'de/referrals.html',
     'es/index.html',
+    'es/referrals.html',
     'fr/index.html',
+    'fr/referrals.html',
     'pt-br/index.html',
+    'pt-br/referrals.html',
     'Logo256.png',
     'photo/cosmetic.jpg',
   ];
@@ -184,6 +194,42 @@ test('voucher redemption and referral center use server-backed referral APIs', a
   assert.match(referrals, /7 天观察期/);
   assert.doesNotMatch(referrals, /\.innerHTML\s*=/);
   assert.doesNotMatch(referrals, /localStorage.*referral/i);
+});
+
+test('localized referral centers fully translate static and dynamic states', async () => {
+  const expectations = [
+    ['de/referrals.html', 'de', 'Empfehlungszentrum', '7-tägige Beobachtungsfrist', 'de-DE'],
+    ['es/referrals.html', 'es', 'Centro de referidos', 'período de observación de 7 días', 'es-ES'],
+    ['fr/referrals.html', 'fr', 'Centre de parrainage', 'période d’observation de 7 jours', 'fr-FR'],
+    ['pt-br/referrals.html', 'pt-BR', 'Central de indicações', 'período de observação de 7 dias', 'pt-BR'],
+  ];
+  const sharedScript = await read('referrals-localized.js');
+
+  assert.match(sharedScript, /\/api\/referrals\/me/);
+  assert.match(sharedScript, /credentials:\s*'include'/);
+  assert.match(sharedScript, /'X-Device-ID': deviceId/);
+  assert.match(sharedScript, /referral_first_purchase/);
+  assert.match(sharedScript, /referral_repeat_purchase/);
+  assert.match(sharedScript, /relationshipStatuses/);
+  assert.match(sharedScript, /riskStatuses/);
+  assert.doesNotMatch(sharedScript, /\.innerHTML\s*=/);
+  assert.doesNotMatch(sharedScript, /[\u3400-\u9fff]/);
+
+  for (const [file, language, heading, observationCopy, locale] of expectations) {
+    const html = await read(file);
+    assert.match(html, new RegExp(`<html lang="${language}">`), file);
+    assert.match(html, new RegExp(`<h1>${heading}</h1>`), file);
+    assert.match(html, /href="\/referrals-localized\.css"/, file);
+    assert.match(html, /src="\/referrals-localized\.js"/, file);
+    assert.match(html, /hreflang="en"/, file);
+    assert.match(html, /hreflang="de"/, file);
+    assert.match(html, /hreflang="es"/, file);
+    assert.match(html, /hreflang="fr"/, file);
+    assert.match(html, /hreflang="pt-BR"/, file);
+    assert.doesNotMatch(html, /[\u3400-\u9fff]/, file);
+    assert.ok(sharedScript.includes(observationCopy), file);
+    assert.ok(sharedScript.includes(`locale: '${locale}'`), file);
+  }
 });
 
 test('referral review admin uses masked risk queue and explicit decisions', async () => {

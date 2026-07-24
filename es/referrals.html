@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Centro de referidos · ShopBG Remover</title>
+  <meta name="description" content="Gestiona tu código, enlace y recompensas por referidos de ShopBG Remover.">
+  <link rel="canonical" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/referrals">
+  <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/referrals-localized.css">
+  <script src="/referrals-localized.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/es/">ShopBG Remover</a>
+    <nav class="nav" aria-label="Navegación de la página">
+      <a class="back" href="/es/pricing">Precios</a>
+      <div class="languages" aria-label="Idioma">
+        <a href="/referrals" hreflang="en" lang="en">EN</a>
+        <a href="/de/referrals" hreflang="de" lang="de">DE</a>
+        <a href="/es/referrals" hreflang="es" lang="es" aria-current="page">ES</a>
+        <a href="/fr/referrals" hreflang="fr" lang="fr">FR</a>
+        <a href="/pt-br/referrals" hreflang="pt-BR" lang="pt-BR">PT</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <div class="eyebrow">Programa de referidos</div>
+    <h1>Centro de referidos</h1>
+    <p class="lead">Comparte tu enlace personal. Cuando hayas realizado al menos una compra real de créditos, ambos podréis recibir créditos extra por compras válidas.</p>
+    <section class="card">
+      <div id="loading">Cargando datos de referidos…</div>
+      <div id="content" hidden>
+        <div class="label">Mi código de referido</div>
+        <div class="code" id="code"></div>
+        <div class="linkrow">
+          <input id="link" readonly aria-label="Enlace de referido">
+          <button id="copyButton" type="button">Copiar enlace</button>
+        </div>
+        <div class="status" id="eligibility"></div>
+        <div class="stats">
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">Referidos registrados</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">Referidos con compra</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">En revisión de riesgo</div></div>
+        </div>
+        <div class="section">
+          <h2>Créditos de recompensa</h2>
+          <p class="section-note" id="rewardPolicy"></p>
+          <div class="reward-stats">
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">Disponibles</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">Pendientes</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">Total concedido</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">Total revertido</div></div>
+          </div>
+          <div class="status" id="expiryStatus"></div>
+        </div>
+        <div class="section">
+          <h2>Historial de recompensas</h2>
+          <p class="section-note">Muestra los últimos 50 movimientos de concesión, uso y reversión de recompensas.</p>
+          <div class="table-wrap" id="rewardTableWrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Cambio</th><th>Motivo</th><th>Cuenta referida</th><th>Vencimiento</th><th>Estado</th></tr></thead>
+              <tbody id="rewardRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="rewardEmpty" hidden>Aún no hay movimientos de recompensas.</div>
+        </div>
+        <div class="section">
+          <h2>Usuarios invitados</h2>
+          <p class="section-note">Las cuentas se muestran con el correo oculto. Compartir una dirección IP no provoca por sí solo un bloqueo.</p>
+          <div class="table-wrap" id="inviteeTableWrap">
+            <table>
+              <thead><tr><th>Cuenta</th><th>Vinculación</th><th>Primera compra</th><th>Estado de relación</th><th>Estado de riesgo</th></tr></thead>
+              <tbody id="inviteeRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="inviteeEmpty" hidden>Aún no hay invitaciones.</div>
+        </div>
+      </div>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>Iniciar sesión para ver</a>
+      <div class="status error" id="error" hidden></div>
+      <ul class="rules">
+        <li>La primera compra válida recompensa con el 15 % de los créditos base; las compras posteriores, con el 10 %.</li>
+        <li>En su primera compra de 300 o 1000 créditos base, la persona invitada recibe 30 créditos adicionales.</li>
+        <li>Las recompensas por referidos vencen a los 90 días y no pueden retirarse ni transferirse.</li>
+        <li>Los reembolsos, contracargos, una misma cuenta de pago o invitaciones anómalas no generan una recompensa válida.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

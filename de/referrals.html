@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Empfehlungszentrum · ShopBG Remover</title>
+  <meta name="description" content="Verwalte deinen ShopBG Remover Empfehlungscode, deinen Link und deine Prämien.">
+  <link rel="canonical" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/referrals">
+  <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/referrals-localized.css">
+  <script src="/referrals-localized.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/de/">ShopBG Remover</a>
+    <nav class="nav" aria-label="Seitennavigation">
+      <a class="back" href="/de/pricing">Preise</a>
+      <div class="languages" aria-label="Sprache">
+        <a href="/referrals" hreflang="en" lang="en">EN</a>
+        <a href="/de/referrals" hreflang="de" lang="de" aria-current="page">DE</a>
+        <a href="/es/referrals" hreflang="es" lang="es">ES</a>
+        <a href="/fr/referrals" hreflang="fr" lang="fr">FR</a>
+        <a href="/pt-br/referrals" hreflang="pt-BR" lang="pt-BR">PT</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <div class="eyebrow">Empfehlungsprogramm</div>
+    <h1>Empfehlungszentrum</h1>
+    <p class="lead">Teile deinen persönlichen Link. Sobald du mindestens einmal Guthaben gekauft hast, könnt ihr beide bei qualifizierten Käufen Bonusguthaben erhalten.</p>
+    <section class="card">
+      <div id="loading">Empfehlungsdaten werden geladen…</div>
+      <div id="content" hidden>
+        <div class="label">Mein Empfehlungscode</div>
+        <div class="code" id="code"></div>
+        <div class="linkrow">
+          <input id="link" readonly aria-label="Empfehlungslink">
+          <button id="copyButton" type="button">Link kopieren</button>
+        </div>
+        <div class="status" id="eligibility"></div>
+        <div class="stats">
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">Registrierte Empfehlungen</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">Empfehlungen mit Kauf</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">In Risikoprüfung</div></div>
+        </div>
+        <div class="section">
+          <h2>Prämienguthaben</h2>
+          <p class="section-note" id="rewardPolicy"></p>
+          <div class="reward-stats">
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">Verfügbar</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">Ausstehend</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">Insgesamt vergeben</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">Insgesamt storniert</div></div>
+          </div>
+          <div class="status" id="expiryStatus"></div>
+        </div>
+        <div class="section">
+          <h2>Prämienverlauf</h2>
+          <p class="section-note">Zeigt die letzten 50 Vergaben, Verwendungen und Stornierungen von Empfehlungsprämien.</p>
+          <div class="table-wrap" id="rewardTableWrap">
+            <table>
+              <thead><tr><th>Zeit</th><th>Änderung</th><th>Grund</th><th>Empfohlenes Konto</th><th>Gültig bis</th><th>Status</th></tr></thead>
+              <tbody id="rewardRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="rewardEmpty" hidden>Noch keine Prämienbuchungen.</div>
+        </div>
+        <div class="section">
+          <h2>Eingeladene Nutzer</h2>
+          <p class="section-note">Konten werden mit maskierter E-Mail angezeigt. Eine gemeinsame IP-Adresse führt allein nicht zu einer Sperre.</p>
+          <div class="table-wrap" id="inviteeTableWrap">
+            <table>
+              <thead><tr><th>Konto</th><th>Verknüpft</th><th>Erster Kauf</th><th>Beziehungsstatus</th><th>Risikostatus</th></tr></thead>
+              <tbody id="inviteeRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="inviteeEmpty" hidden>Noch keine Einladungen.</div>
+        </div>
+      </div>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>Anmelden und anzeigen</a>
+      <div class="status error" id="error" hidden></div>
+      <ul class="rules">
+        <li>Der erste qualifizierte Kauf vergibt 15 % der Basis-Credits; spätere Käufe vergüten 10 %.</li>
+        <li>Beim ersten Kauf von 300 oder 1000 Basis-Credits erhält die eingeladene Person zusätzlich 30 Credits.</li>
+        <li>Empfehlungsprämien sind 90 Tage gültig und können weder ausgezahlt noch übertragen werden.</li>
+        <li>Rückerstattungen, Rückbuchungen, dasselbe Zahlungskonto oder auffällige Einladungen ergeben keine gültige Prämie.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

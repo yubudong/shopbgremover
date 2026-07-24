@@ -16,6 +16,8 @@ const rootFiles = [
   'pricing.html',
   'privacy.html',
   'redeem.html',
+  'referrals-localized.css',
+  'referrals-localized.js',
   'referrals.html',
   'robots.txt',
   'shopify-background-remover.html',

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Centre de parrainage · ShopBG Remover</title>
+  <meta name="description" content="Gérez votre code, votre lien et vos récompenses de parrainage ShopBG Remover.">
+  <link rel="canonical" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/referrals">
+  <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/referrals-localized.css">
+  <script src="/referrals-localized.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/fr/">ShopBG Remover</a>
+    <nav class="nav" aria-label="Navigation de la page">
+      <a class="back" href="/fr/pricing">Tarifs</a>
+      <div class="languages" aria-label="Langue">
+        <a href="/referrals" hreflang="en" lang="en">EN</a>
+        <a href="/de/referrals" hreflang="de" lang="de">DE</a>
+        <a href="/es/referrals" hreflang="es" lang="es">ES</a>
+        <a href="/fr/referrals" hreflang="fr" lang="fr" aria-current="page">FR</a>
+        <a href="/pt-br/referrals" hreflang="pt-BR" lang="pt-BR">PT</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <div class="eyebrow">Programme de parrainage</div>
+    <h1>Centre de parrainage</h1>
+    <p class="lead">Partagez votre lien personnel. Après votre premier achat réel de crédits, vous pourrez tous les deux recevoir des crédits bonus pour les achats éligibles.</p>
+    <section class="card">
+      <div id="loading">Chargement des données de parrainage…</div>
+      <div id="content" hidden>
+        <div class="label">Mon code de parrainage</div>
+        <div class="code" id="code"></div>
+        <div class="linkrow">
+          <input id="link" readonly aria-label="Lien de parrainage">
+          <button id="copyButton" type="button">Copier le lien</button>
+        </div>
+        <div class="status" id="eligibility"></div>
+        <div class="stats">
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">Filleuls inscrits</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">Filleuls ayant acheté</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">En vérification de risque</div></div>
+        </div>
+        <div class="section">
+          <h2>Crédits de récompense</h2>
+          <p class="section-note" id="rewardPolicy"></p>
+          <div class="reward-stats">
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">Disponibles</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">En attente</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">Total accordé</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">Total annulé</div></div>
+          </div>
+          <div class="status" id="expiryStatus"></div>
+        </div>
+        <div class="section">
+          <h2>Historique des récompenses</h2>
+          <p class="section-note">Affiche les 50 dernières attributions, utilisations et annulations de récompenses.</p>
+          <div class="table-wrap" id="rewardTableWrap">
+            <table>
+              <thead><tr><th>Date</th><th>Variation</th><th>Motif</th><th>Compte parrainé</th><th>Expiration</th><th>Statut</th></tr></thead>
+              <tbody id="rewardRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="rewardEmpty" hidden>Aucun mouvement de récompense pour le moment.</div>
+        </div>
+        <div class="section">
+          <h2>Utilisateurs invités</h2>
+          <p class="section-note">Les adresses e-mail sont masquées. Une adresse IP partagée ne provoque pas à elle seule un blocage.</p>
+          <div class="table-wrap" id="inviteeTableWrap">
+            <table>
+              <thead><tr><th>Compte</th><th>Liaison</th><th>Premier achat</th><th>Statut de la relation</th><th>Statut de risque</th></tr></thead>
+              <tbody id="inviteeRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="inviteeEmpty" hidden>Aucune invitation pour le moment.</div>
+        </div>
+      </div>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>Se connecter pour afficher</a>
+      <div class="status error" id="error" hidden></div>
+      <ul class="rules">
+        <li>Le premier achat éligible rapporte 15 % des crédits de base ; les achats suivants rapportent 10 %.</li>
+        <li>Lors de son premier achat de 300 ou 1000 crédits de base, la personne invitée reçoit 30 crédits supplémentaires.</li>
+        <li>Les récompenses de parrainage expirent après 90 jours et ne peuvent être ni retirées ni transférées.</li>
+        <li>Les remboursements, rejets de débit, un même compte de paiement ou les invitations anormales ne génèrent aucune récompense valide.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
