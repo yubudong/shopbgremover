@@ -22,7 +22,7 @@ Tracked migrations applied afterward:
 | 4 | `0004_voucher_cards.sql` | 2026-07-24 |
 | 5 | `0005_referral_foundation.sql` | 2026-07-24 |
 | 6 | `0006_referral_reward_idempotency.sql` | 2026-07-24 |
-| 7 | `0007_voucher_dispute_reversal.sql` | pending |
+| 7 | `0007_voucher_dispute_reversal.sql` | 2026-07-24 |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes
