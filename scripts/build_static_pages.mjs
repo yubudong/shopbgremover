@@ -7,12 +7,14 @@ const output = path.join(root, '.pages-dist');
 
 const rootFiles = [
   '404.html',
+  'admin-vouchers.html',
   'amazon-ebay-product-images.html',
   'contact.html',
   'favicon.svg',
   'index.html',
   'pricing.html',
   'privacy.html',
+  'redeem.html',
   'robots.txt',
   'shopify-background-remover.html',
   'sitemap.xml',

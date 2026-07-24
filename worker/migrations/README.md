@@ -2,8 +2,8 @@
 
 Production database: `shopbgremover-db`
 
-The production `d1_migrations` table contains two migrations that were applied
-before migration SQL was added to Git:
+The production `d1_migrations` table contains two historical migrations that
+were applied before migration SQL was added to Git:
 
 | ID | Name | Applied at (UTC) |
 |---:|---|---|
@@ -14,11 +14,18 @@ Their original SQL files are not present in Git and cannot be recovered from
 the D1 migration table. Do not fabricate or replay approximations against
 production.
 
-The resulting production structure was captured in `../schema.sql` on
-2026-07-23. For a fresh database, initialize from that schema baseline. Future
-production changes must:
+Tracked migrations applied afterward:
 
-1. start with migration number `0003`;
+| ID | Name | Applied |
+|---:|---|---|
+| 3 | `0003_unified_credit_billing.sql` | 2026-07-23 |
+| 4 | `0004_voucher_cards.sql` | 2026-07-24 |
+
+The resulting production structure is maintained in `../schema.sql`. For a
+fresh database, initialize from that schema baseline. Future production changes
+must:
+
+1. start with migration number `0005`;
 2. be tested against a copy of production data;
 3. include rollback or forward-repair notes;
 4. be applied with `npm run d1:migrate:remote`, which aborts unless a fresh
@@ -28,5 +35,3 @@ production changes must:
 Use `npm run d1:backup` when a verified backup is needed without applying
 migrations. The backup SQL and metadata are stored outside the repository in
 `~/.shopbgremover-backups` by default.
-
-No migration in this directory has been applied by the current Stage 0 work.

@@ -23,6 +23,7 @@ migrations_dir = "worker/migrations"
 [vars]
 FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
+ADMIN_EMAILS = "yubudong2023@gmail.com"
 
 [[routes]]
 pattern = "api.shopbgremover.com/*"

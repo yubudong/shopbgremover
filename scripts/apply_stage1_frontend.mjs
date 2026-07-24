@@ -26,6 +26,7 @@ const pricingLocales = {
     ],
     faqTitle: 'Simple, transparent billing',
     faq: 'There are no monthly or annual plans. Purchased credits remain available permanently. Unused packs can be refunded within 7 days only when no credit from that pack has been used.',
+    voucherCta: 'Bought a voucher on Xianyu? Redeem it here.',
     loginHint: 'Sign in required to complete purchase',
     createError: 'Unable to create the order. Please try again.',
     captureError: 'Payment was not completed. Please contact support if PayPal charged you.',
@@ -57,6 +58,7 @@ const pricingLocales = {
     ],
     faqTitle: 'Einfache, transparente Abrechnung',
     faq: 'Es gibt keine Monats- oder Jahrespläne. Gekaufte Credits bleiben dauerhaft verfügbar. Ungenutzte Pakete können innerhalb von 7 Tagen erstattet werden, wenn noch kein Credit aus dem Paket verwendet wurde.',
+    voucherCta: 'Gutschein über Xianyu gekauft? Hier einlösen.',
     loginHint: 'Zum Kauf ist eine Anmeldung erforderlich',
     createError: 'Bestellung konnte nicht erstellt werden. Bitte versuche es erneut.',
     captureError: 'Die Zahlung wurde nicht abgeschlossen. Kontaktiere den Support, falls PayPal dich belastet hat.',
@@ -88,6 +90,7 @@ const pricingLocales = {
     ],
     faqTitle: 'Facturación simple y transparente',
     faq: 'No hay planes mensuales ni anuales. Los créditos comprados permanecen disponibles para siempre. Los paquetes sin usar pueden reembolsarse dentro de 7 días solo si no se utilizó ningún crédito del paquete.',
+    voucherCta: '¿Compraste un cupón en Xianyu? Canjéalo aquí.',
     loginHint: 'Debes iniciar sesión para completar la compra',
     createError: 'No se pudo crear el pedido. Inténtalo de nuevo.',
     captureError: 'El pago no se completó. Contacta con soporte si PayPal hizo el cargo.',
@@ -119,6 +122,7 @@ const pricingLocales = {
     ],
     faqTitle: 'Une facturation simple et transparente',
     faq: 'Il n’existe aucun forfait mensuel ou annuel. Les crédits achetés restent disponibles définitivement. Un pack inutilisé peut être remboursé sous 7 jours uniquement si aucun de ses crédits n’a été utilisé.',
+    voucherCta: 'Vous avez acheté un bon sur Xianyu ? Utilisez-le ici.',
     loginHint: 'Connexion requise pour finaliser l’achat',
     createError: 'Impossible de créer la commande. Veuillez réessayer.',
     captureError: 'Le paiement n’a pas abouti. Contactez le support si PayPal vous a débité.',
@@ -150,6 +154,7 @@ const pricingLocales = {
     ],
     faqTitle: 'Cobrança simples e transparente',
     faq: 'Não existem planos mensais ou anuais. Os créditos comprados ficam disponíveis para sempre. Pacotes não usados podem ser reembolsados em até 7 dias somente se nenhum crédito do pacote tiver sido usado.',
+    voucherCta: 'Comprou um voucher no Xianyu? Resgate aqui.',
     loginHint: 'É necessário entrar para concluir a compra',
     createError: 'Não foi possível criar o pedido. Tente novamente.',
     captureError: 'O pagamento não foi concluído. Contate o suporte se o PayPal fez a cobrança.',
@@ -207,6 +212,7 @@ function renderPricing(locale) {
 <section class="faq">
   <div class="section-head"><h2>${locale.faqTitle}</h2></div>
   <div class="faq-item open"><div class="faq-a">${locale.faq}</div></div>
+  <div class="faq-item open"><div class="faq-a"><a href="/redeem.html">${locale.voucherCta}</a></div></div>
 </section>
 
 `;
@@ -307,31 +313,31 @@ const termSections = {
   <ul><li><strong>Free allowance:</strong> Anonymous visitors may complete 3 AI removals in total, one image at a time. Registered users receive up to 10 lifetime free removals in total, including prior guest usage. Registered free credits expire after 30 days.</li><li><strong>Purchased credits:</strong> Available only as one-time packs of 100 credits for $3.49, 300 for $8.99, or 1000 for $23.99. Purchased credits never expire.</li><li><strong>Charging:</strong> One credit is charged only after an AI background removal succeeds. Local editing, background changes, downloads, repeated exports, and ZIP creation do not cost credits.</li></ul>
 
   <h2>5. Payments &amp; refunds</h2>
-  <p>Payments are processed by PayPal in USD. There are no monthly or annual subscriptions. By completing a purchase, you authorize the one-time charge shown at checkout.</p><p><strong>Refund policy:</strong> We offer refunds for an unused credit pack within 7 days only when no credit from that pack has been used. Contact <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. We do not offer partial refunds for partially used packs. Refunds, reversals, or chargebacks remove the credits issued by the affected purchase.</p>
+  <p>Payments are processed by PayPal in USD. Voucher cards sold through Xianyu are paid in CNY. There are no monthly or annual subscriptions. By completing a purchase, you authorize the one-time charge shown at checkout.</p><p><strong>Refund policy:</strong> We offer refunds for an unused PayPal credit pack within 7 days only when no credit from that pack has been used. A redeemed voucher card is non-refundable. An unused voucher may be refunded by the seller only after the card is voided. Contact <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. We do not offer partial refunds for partially used packs. Refunds, reversals, or chargebacks remove the credits issued by the affected purchase.</p>
 `,
   'de/terms.html': `<h2>4. Credits &amp; Abrechnung</h2>
   <ul><li><strong>Kostenloses Kontingent:</strong> Gäste können insgesamt 3 KI-Entfernungen durchführen, jeweils ein Bild. Registrierte Nutzer erhalten insgesamt bis zu 10 kostenlose Entfernungen; die Gastnutzung wird angerechnet. Kostenlose Credits für registrierte Nutzer verfallen nach 30 Tagen.</li><li><strong>Gekaufte Credits:</strong> Nur als Einmalkauf: 100 Credits für $3,49, 300 für $8,99 oder 1000 für $23,99. Gekaufte Credits verfallen nie.</li><li><strong>Abrechnung:</strong> Ein Credit wird nur nach erfolgreicher KI-Hintergrundentfernung berechnet. Lokale Bearbeitung, Hintergrundwechsel, Downloads, erneute Exporte und ZIP-Erstellung sind kostenlos.</li></ul>
 
   <h2>5. Zahlungen &amp; Erstattungen</h2>
-  <p>Zahlungen werden von PayPal in USD verarbeitet. Es gibt keine Monats- oder Jahresabonnements. Mit dem Kauf autorisierst du die einmalige, beim Checkout angezeigte Belastung.</p><p><strong>Erstattungsrichtlinie:</strong> Ein ungenutztes Credit-Paket kann innerhalb von 7 Tagen erstattet werden, wenn noch kein Credit daraus verwendet wurde. Kontaktiere <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Teilweise genutzte Pakete werden nicht teilweise erstattet. Erstattungen, Rückbuchungen oder Chargebacks entfernen die Credits des betroffenen Kaufs.</p>
+  <p>Zahlungen werden von PayPal in USD verarbeitet. Über Xianyu verkaufte Gutscheinkarten werden in CNY bezahlt. Es gibt keine Monats- oder Jahresabonnements. Mit dem Kauf autorisierst du die einmalige, beim Checkout angezeigte Belastung.</p><p><strong>Erstattungsrichtlinie:</strong> Ein ungenutztes PayPal-Credit-Paket kann innerhalb von 7 Tagen erstattet werden, wenn noch kein Credit daraus verwendet wurde. Eine eingelöste Gutscheinkarte ist nicht erstattungsfähig. Ein ungenutzter Gutschein kann vom Verkäufer nur erstattet werden, nachdem die Karte ungültig gemacht wurde. Kontaktiere <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Teilweise genutzte Pakete werden nicht teilweise erstattet. Erstattungen, Rückbuchungen oder Chargebacks entfernen die Credits des betroffenen Kaufs.</p>
 `,
   'es/terms.html': `<h2>4. Créditos y facturación</h2>
   <ul><li><strong>Cuota gratis:</strong> Los visitantes pueden completar 3 eliminaciones con IA en total, una imagen a la vez. Los usuarios registrados reciben hasta 10 eliminaciones gratis de por vida en total, incluido el uso previo como invitado. Los créditos gratis registrados caducan después de 30 días.</li><li><strong>Créditos comprados:</strong> Solo en paquetes de compra única: 100 créditos por $3,49, 300 por $8,99 o 1000 por $23,99. Los créditos comprados no caducan.</li><li><strong>Cobro:</strong> Solo se descuenta un crédito cuando la eliminación de fondo con IA termina correctamente. La edición local, cambios de fondo, descargas, nuevas exportaciones y creación de ZIP son gratis.</li></ul>
 
   <h2>5. Pagos y reembolsos</h2>
-  <p>PayPal procesa los pagos en USD. No existen suscripciones mensuales ni anuales. Al comprar, autorizas el cargo único mostrado al pagar.</p><p><strong>Política de reembolso:</strong> Reembolsamos un paquete sin usar dentro de 7 días solo si no se utilizó ningún crédito del paquete. Contacta con <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. No ofrecemos reembolsos parciales de paquetes parcialmente usados. Los reembolsos, reversiones o contracargos retiran los créditos emitidos por la compra afectada.</p>
+  <p>PayPal procesa los pagos en USD. Las tarjetas de cupón vendidas por Xianyu se pagan en CNY. No existen suscripciones mensuales ni anuales. Al comprar, autorizas el cargo único mostrado al pagar.</p><p><strong>Política de reembolso:</strong> Reembolsamos un paquete de PayPal sin usar dentro de 7 días solo si no se utilizó ningún crédito del paquete. Un cupón canjeado no es reembolsable. El vendedor solo puede reembolsar un cupón sin usar después de anularlo. Contacta con <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. No ofrecemos reembolsos parciales de paquetes parcialmente usados. Los reembolsos, reversiones o contracargos retiran los créditos emitidos por la compra afectada.</p>
 `,
   'fr/terms.html': `<h2>4. Crédits et facturation</h2>
   <ul><li><strong>Quota gratuit :</strong> Les visiteurs peuvent effectuer 3 suppressions IA au total, une image à la fois. Les utilisateurs inscrits reçoivent jusqu’à 10 suppressions gratuites à vie au total, utilisation en invité comprise. Les crédits gratuits inscrits expirent après 30 jours.</li><li><strong>Crédits achetés :</strong> Uniquement en achat unique : 100 crédits à $3,49, 300 à $8,99 ou 1000 à $23,99. Les crédits achetés n’expirent jamais.</li><li><strong>Débit :</strong> Un crédit est débité uniquement après une suppression d’arrière-plan IA réussie. Retouches locales, changements de fond, téléchargements, nouveaux exports et création ZIP sont gratuits.</li></ul>
 
   <h2>5. Paiements et remboursements</h2>
-  <p>PayPal traite les paiements en USD. Il n’existe aucun abonnement mensuel ou annuel. En achetant, vous autorisez le débit unique affiché au paiement.</p><p><strong>Politique de remboursement :</strong> Un pack inutilisé peut être remboursé sous 7 jours uniquement si aucun de ses crédits n’a été utilisé. Contactez <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Aucun remboursement partiel n’est proposé pour un pack partiellement utilisé. Un remboursement, une annulation ou une rétrofacturation retire les crédits issus de l’achat concerné.</p>
+  <p>PayPal traite les paiements en USD. Les cartes prépayées vendues via Xianyu sont payées en CNY. Il n’existe aucun abonnement mensuel ou annuel. En achetant, vous autorisez le débit unique affiché au paiement.</p><p><strong>Politique de remboursement :</strong> Un pack PayPal inutilisé peut être remboursé sous 7 jours uniquement si aucun de ses crédits n’a été utilisé. Une carte déjà utilisée n’est pas remboursable. Le vendeur ne peut rembourser une carte inutilisée qu’après l’avoir annulée. Contactez <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Aucun remboursement partiel n’est proposé pour un pack partiellement utilisé. Un remboursement, une annulation ou une rétrofacturation retire les crédits issus de l’achat concerné.</p>
 `,
   'pt-br/terms.html': `<h2>4. Créditos e cobrança</h2>
   <ul><li><strong>Cota grátis:</strong> Visitantes podem concluir 3 remoções com IA no total, uma imagem por vez. Usuários cadastrados recebem até 10 remoções grátis vitalícias no total, incluindo o uso anterior como visitante. Créditos grátis cadastrados expiram após 30 dias.</li><li><strong>Créditos comprados:</strong> Somente em compra única: 100 créditos por $3,49, 300 por $8,99 ou 1000 por $23,99. Créditos comprados nunca expiram.</li><li><strong>Cobrança:</strong> Um crédito só é debitado após uma remoção de fundo com IA bem-sucedida. Edição local, troca de fundo, downloads, novas exportações e criação de ZIP são grátis.</li></ul>
 
   <h2>5. Pagamentos e reembolsos</h2>
-  <p>Os pagamentos são processados pelo PayPal em USD. Não existem assinaturas mensais ou anuais. Ao comprar, você autoriza a cobrança única mostrada no checkout.</p><p><strong>Política de reembolso:</strong> Reembolsamos um pacote não usado em até 7 dias somente se nenhum crédito do pacote tiver sido utilizado. Contate <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Não oferecemos reembolso parcial de pacotes parcialmente usados. Reembolsos, reversões ou contestações removem os créditos emitidos pela compra afetada.</p>
+  <p>Os pagamentos são processados pelo PayPal em USD. Os cartões vendidos pelo Xianyu são pagos em CNY. Não existem assinaturas mensais ou anuais. Ao comprar, você autoriza a cobrança única mostrada no checkout.</p><p><strong>Política de reembolso:</strong> Reembolsamos um pacote PayPal não usado em até 7 dias somente se nenhum crédito do pacote tiver sido utilizado. Um cartão já resgatado não é reembolsável. O vendedor só pode reembolsar um cartão não usado depois de anulá-lo. Contate <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Não oferecemos reembolso parcial de pacotes parcialmente usados. Reembolsos, reversões ou contestações removem os créditos emitidos pela compra afetada.</p>
 `,
 };
 

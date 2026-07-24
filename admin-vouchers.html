@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>卡密管理 · ShopBG Remover</title>
+  <link rel="icon" href="/favicon.svg">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f6fa;color:#172033;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{height:64px;background:#111c2f;color:#fff;padding:0 28px;display:flex;align-items:center;justify-content:space-between}
+    header a{color:#aebbd0;text-decoration:none;font-size:13px}.brand{font-weight:800;font-size:18px}
+    main{width:min(1180px,calc(100% - 32px));margin:32px auto 70px}
+    h1{margin:0 0 8px;font-size:30px}.sub{color:#64748b;margin:0 0 26px}
+    .grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+    .panel{background:#fff;border:1px solid #dfe5ee;border-radius:14px;padding:20px;box-shadow:0 8px 26px rgba(24,39,75,.05)}
+    h2{font-size:18px;margin:0 0 18px}.field{margin-bottom:14px}label{display:block;font-size:12px;font-weight:800;color:#526078;margin-bottom:6px}
+    input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:10px 11px;background:#fff;font:14px inherit}textarea{min-height:72px;resize:vertical}
+    button{border:0;border-radius:8px;background:#2563eb;color:#fff;padding:10px 13px;font-weight:800;cursor:pointer}button.secondary{background:#e8eef8;color:#20304a}button.danger{background:#fee2e2;color:#991b1b}
+    button:disabled{opacity:.5;cursor:not-allowed}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+    .notice{display:none;padding:11px 12px;border-radius:8px;margin:12px 0;font-size:13px;line-height:1.5}.notice.show{display:block}.notice.ok{background:#dcfce7;color:#166534}.notice.err{background:#fee2e2;color:#991b1b}
+    .codes{margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px}.code-item{font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#f3f6fb;padding:9px;border-radius:7px;margin-bottom:7px;word-break:break-all}
+    .toolbar{display:flex;gap:8px;margin-bottom:14px}.toolbar input{flex:1}.toolbar select{width:150px}
+    .table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px;min-width:830px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e8edf4;vertical-align:top}th{color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .status{display:inline-block;padding:3px 7px;border-radius:999px;background:#edf2f7;font-weight:800}.actions{display:flex;gap:5px}.actions button{padding:6px 8px;font-size:11px}
+    .hidden{display:none!important}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}.toolbar{flex-wrap:wrap}.toolbar select{width:100%}}
+  </style>
+</head>
+<body>
+  <header><span class="brand">ShopBG Remover · 卡密管理</span><a href="/">返回网站</a></header>
+  <main>
+    <h1>闲鱼卡密</h1>
+    <p class="sub" id="authStatus">正在验证管理员身份…</p>
+    <div class="notice" id="globalNotice"></div>
+    <div class="grid hidden" id="adminApp">
+      <section class="panel">
+        <h2>生成卡密</h2>
+        <form id="generateForm" autocomplete="off">
+          <div class="row">
+            <div class="field"><label for="credits">积分面额</label><select id="credits"><option value="100">100 积分 · ¥22</option><option value="300">300 积分 · ¥60</option><option value="1000">1000 积分 · ¥160</option></select></div>
+            <div class="field"><label for="quantity">数量（1–100）</label><input id="quantity" type="number" min="1" max="100" value="1"></div>
+          </div>
+          <div class="field"><label for="orderRef">闲鱼订单号（单张时填写）</label><input id="orderRef" maxlength="100"></div>
+          <div class="field"><label for="batchName">批次名称（可选）</label><input id="batchName" maxlength="100"></div>
+          <div class="field"><label for="salesNote">订单备注（可选）</label><textarea id="salesNote" maxlength="500"></textarea></div>
+          <button id="generateButton" type="submit">生成并显示一次</button>
+        </form>
+        <div class="notice" id="generateNotice"></div>
+        <div class="codes hidden" id="generatedArea">
+          <div class="row"><button class="secondary" id="copyCodes" type="button">复制全部</button><button class="secondary" id="downloadCodes" type="button">下载一次 CSV</button></div>
+          <div id="generatedCodes"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>卡密记录</h2>
+        <div class="toolbar">
+          <input id="search" placeholder="闲鱼订单号、前缀或末四位">
+          <select id="statusFilter"><option value="">全部状态</option><option>generated</option><option>reserved</option><option>delivered</option><option>redeemed</option><option>void</option><option>expired</option></select>
+          <button id="refreshButton" type="button">查询</button>
+          <button class="secondary" id="auditButton" type="button">导出日志</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>卡密</th><th>积分/面值</th><th>状态</th><th>闲鱼订单</th><th>创建/兑换</th><th>兑换账号</th><th>操作</th></tr></thead><tbody id="voucherRows"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const API = 'https://api.shopbgremover.com';
+    let latestCodes = [];
+    const adminApp = document.getElementById('adminApp');
+    const authStatus = document.getElementById('authStatus');
+
+    function showNotice(element, text, type) {
+      element.textContent = text;
+      element.className = `notice show ${type}`;
+    }
+    function formatTime(value) {
+      return value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
+    }
+    async function api(path, init = {}) {
+      const response = await fetch(`${API}${path}`, {
+        credentials: 'include',
+        ...init,
+        headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      return data;
+    }
+    function downloadText(filename, text, type = 'text/plain;charset=utf-8') {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([text], { type }));
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+    async function loadAdmin() {
+      try {
+        const me = await api('/api/me');
+        if (!me.user) throw new Error('请先登录管理员账号。');
+        await loadVouchers();
+        authStatus.textContent = `管理员：${me.user.email}`;
+        adminApp.classList.remove('hidden');
+      } catch (error) {
+        authStatus.textContent = error.message;
+        const notice = document.getElementById('globalNotice');
+        showNotice(notice, '当前账号没有卡密管理权限。请使用管理员账号登录。', 'err');
+      }
+    }
+    document.getElementById('generateForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = document.getElementById('generateButton');
+      const notice = document.getElementById('generateNotice');
+      button.disabled = true;
+      latestCodes = [];
+      document.getElementById('generatedArea').classList.add('hidden');
+      try {
+        const result = await api('/api/admin/vouchers/generate', {
+          method: 'POST',
+          body: JSON.stringify({
+            credits: Number(document.getElementById('credits').value),
+            quantity: Number(document.getElementById('quantity').value),
+            sales_order_ref: document.getElementById('orderRef').value,
+            sales_note: document.getElementById('salesNote').value,
+            name: document.getElementById('batchName').value,
+          }),
+        });
+        latestCodes = result.vouchers;
+        const container = document.getElementById('generatedCodes');
+        container.replaceChildren();
+        for (const voucher of latestCodes) {
+          const item = document.createElement('div');
+          item.className = 'code-item';
+          item.textContent = `${voucher.code} · ${voucher.credits} 积分${voucher.sales_order_ref ? ` · ${voucher.sales_order_ref}` : ''}`;
+          container.append(item);
+        }
+        document.getElementById('generatedArea').classList.remove('hidden');
+        showNotice(notice, '生成成功。完整卡密不会再次从服务器返回，请立即复制或下载并安全保存。', 'ok');
+        await loadVouchers();
+      } catch (error) {
+        showNotice(notice, error.message, 'err');
+      } finally {
+        button.disabled = false;
+      }
+    });
+    document.getElementById('copyCodes').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(latestCodes.map((voucher) => voucher.code).join('\n'));
+    });
+    document.getElementById('downloadCodes').addEventListener('click', () => {
+      const rows = ['code,credits,face_value,currency,sales_order_ref'];
+      for (const voucher of latestCodes) {
+        const values = [voucher.code, voucher.credits, voucher.face_value, voucher.currency, voucher.sales_order_ref || ''];
+        rows.push(values.map((value) => {
+          let text = String(value);
+          if (/^[=+\-@]/.test(text)) text = `'${text}`;
+          return `"${text.replaceAll('"', '""')}"`;
+        }).join(','));
+      }
+      downloadText(`shopbgremover-vouchers-${Date.now()}.csv`, rows.join('\n'), 'text/csv;charset=utf-8');
+      latestCodes = [];
+      document.getElementById('generatedCodes').replaceChildren();
+      document.getElementById('generatedArea').classList.add('hidden');
+    });
+    async function loadVouchers() {
+      const query = encodeURIComponent(document.getElementById('search').value.trim());
+      const status = encodeURIComponent(document.getElementById('statusFilter').value);
+      const result = await api(`/api/admin/vouchers?q=${query}&status=${status}`);
+      const body = document.getElementById('voucherRows');
+      body.replaceChildren();
+      for (const voucher of result.vouchers) {
+        const row = document.createElement('tr');
+        const identifier = document.createElement('td');
+        identifier.textContent = `${voucher.code_prefix}…${voucher.code_last4}`;
+        const value = document.createElement('td');
+        value.textContent = `${voucher.base_credits} / ${voucher.currency} ${(voucher.face_value_minor / 100).toFixed(2)}`;
+        const status = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'status';
+        badge.textContent = voucher.status;
+        status.append(badge);
+        const order = document.createElement('td');
+        order.textContent = voucher.sales_order_ref || '—';
+        const times = document.createElement('td');
+        times.textContent = voucher.redeemed_at ? `兑换 ${formatTime(voucher.redeemed_at)}` : `创建 ${formatTime(voucher.created_at)}`;
+        const user = document.createElement('td');
+        user.textContent = voucher.redeemed_email || '—';
+        const actions = document.createElement('td');
+        actions.className = 'actions';
+        if (['generated', 'reserved'].includes(voucher.status)) actions.append(actionButton(voucher.id, 'deliver', '已发货', false));
+        if (['generated', 'reserved', 'delivered'].includes(voucher.status)) actions.append(actionButton(voucher.id, 'void', '作废', true));
+        row.append(identifier, value, status, order, times, user, actions);
+        body.append(row);
+      }
+    }
+    function actionButton(id, action, label, danger) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      if (danger) button.className = 'danger';
+      button.addEventListener('click', async () => {
+        if (danger && !confirm('确认作废这张未兑换卡密？')) return;
+        button.disabled = true;
+        try {
+          await api(`/api/admin/vouchers/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+          await loadVouchers();
+        } catch (error) {
+          alert(error.message);
+          button.disabled = false;
+        }
+      });
+      return button;
+    }
+    document.getElementById('refreshButton').addEventListener('click', loadVouchers);
+    document.getElementById('auditButton').addEventListener('click', async () => {
+      try {
+        const result = await api('/api/admin/vouchers/audit');
+        downloadText(`shopbgremover-voucher-audit-${Date.now()}.json`, JSON.stringify(result.audit, null, 2), 'application/json');
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+    loadAdmin();
+  </script>
+</body>
+</html>

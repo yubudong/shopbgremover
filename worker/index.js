@@ -13,6 +13,14 @@ const CREDIT_PACKS = Object.freeze({
   credits_300: { amount: '8.99', credits: 300, currency: 'USD' },
   credits_1000: { amount: '23.99', credits: 1000, currency: 'USD' },
 });
+const VOUCHER_PACKS = Object.freeze({
+  100: { faceValueMinor: 2200, currency: 'CNY' },
+  300: { faceValueMinor: 6000, currency: 'CNY' },
+  1000: { faceValueMinor: 16000, currency: 'CNY' },
+});
+const VOUCHER_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const VOUCHER_ACCOUNT_FAILURE_LIMIT = 5;
+const VOUCHER_IP_FAILURE_LIMIT = 20;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -38,6 +46,12 @@ function json(data, status = 200, origin) {
     status,
     headers: { 'Content-Type': 'application/json', ...cors(origin) },
   });
+}
+
+function privateJson(data, status = 200, origin) {
+  const response = json(data, status, origin);
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
 }
 
 // ── JWT (simple HMAC-SHA256) ──────────────────────────────────
@@ -89,6 +103,105 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function getAdminEmails(env) {
+  return new Set(
+    String(env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+async function getAdmin(request, env) {
+  const user = await getUser(request, env);
+  if (!user?.email) return null;
+  return getAdminEmails(env).has(user.email.toLowerCase()) ? user : null;
+}
+
+function maskEmail(email) {
+  const [local, domain] = String(email || '').split('@');
+  if (!local || !domain) return null;
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${'*'.repeat(Math.max(2, local.length - visible.length))}@${domain}`;
+}
+
+function normalizeVoucherCode(value) {
+  const compact = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^SBG[A-HJ-NP-Z2-9]{16}$/.test(compact)) return null;
+  const body = compact.slice(3);
+  return {
+    canonical: compact,
+    display: `SBG-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}-${body.slice(12, 16)}`,
+  };
+}
+
+function generateVoucherCode() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const body = Array.from(bytes, (byte) => VOUCHER_ALPHABET[byte & 31]).join('');
+  return `SBG-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}-${body.slice(12, 16)}`;
+}
+
+async function hashVoucherCode(code, env) {
+  if (!env.VOUCHER_HASH_SECRET) {
+    throw new Error('Voucher hash secret is not configured');
+  }
+  const normalized = normalizeVoucherCode(code);
+  if (!normalized) return null;
+  return sha256Hex(`${env.VOUCHER_HASH_SECRET}:${normalized.canonical}`);
+}
+
+async function recordVoucherAttempt(env, {
+  userId,
+  guest,
+  codeFingerprint,
+  success,
+}) {
+  await env.DB.prepare(
+    `INSERT INTO voucher_attempts
+     (id, user_id, ip_hash, device_hash, code_fingerprint, success)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    userId,
+    guest.ipHash,
+    guest.deviceHash,
+    codeFingerprint,
+    success ? 1 : 0,
+  ).run();
+}
+
+async function voucherAttemptIsLimited(env, userId, ipHash) {
+  const [accountFailures, ipFailures] = await Promise.all([
+    env.DB.prepare(
+      `SELECT COUNT(*) AS count
+       FROM voucher_attempts
+       WHERE user_id = ? AND success = 0
+         AND created_at > unixepoch() - 3600`
+    ).bind(userId).first('count'),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS count
+       FROM voucher_attempts
+       WHERE ip_hash = ? AND success = 0
+         AND created_at > unixepoch() - 3600`
+    ).bind(ipHash).first('count'),
+  ]);
+  return Number(accountFailures || 0) >= VOUCHER_ACCOUNT_FAILURE_LIMIT
+    || Number(ipFailures || 0) >= VOUCHER_IP_FAILURE_LIMIT;
+}
+
+async function expireVoucherCards(env) {
+  await env.DB.prepare(
+    `UPDATE voucher_cards
+     SET status = 'expired'
+     WHERE status IN ('generated', 'reserved', 'delivered')
+       AND batch_id IN (
+         SELECT id FROM voucher_batches
+         WHERE expires_at IS NOT NULL AND expires_at <= unixepoch()
+       )`
+  ).run();
 }
 
 async function getGuestIdentity(request) {
@@ -789,6 +902,439 @@ export default {
         `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
       ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
       return json({ ok: true, id }, 200, origin);
+    }
+
+    // POST /api/admin/vouchers/generate → generate plaintext once, persist hashes only.
+    if (url.pathname === '/api/admin/vouchers/generate' && request.method === 'POST') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      if (!env.VOUCHER_HASH_SECRET) {
+        return privateJson({ error: 'Voucher service is not configured' }, 503, origin);
+      }
+      await expireVoucherCards(env);
+
+      const body = await request.json().catch(() => ({}));
+      const credits = Number(body.credits);
+      const pack = VOUCHER_PACKS[credits];
+      const quantity = Number(body.quantity || 1);
+      const salesOrderRef = String(body.sales_order_ref || '').trim();
+      const salesNote = String(body.sales_note || '').trim();
+      const requestedName = String(body.name || '').trim();
+      const expiresAt = body.expires_at == null ? null : Number(body.expires_at);
+
+      if (!pack || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+        return privateJson({ error: 'Invalid voucher package or quantity' }, 400, origin);
+      }
+      if (salesOrderRef.length > 100 || salesNote.length > 500 || requestedName.length > 100) {
+        return privateJson({ error: 'Voucher metadata is too long' }, 400, origin);
+      }
+      if (quantity > 1 && salesOrderRef) {
+        return privateJson({
+          error: 'A Xianyu order reference can only be attached to one voucher',
+        }, 400, origin);
+      }
+      if (
+        expiresAt !== null
+        && (!Number.isInteger(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000))
+      ) {
+        return privateJson({ error: 'Expiration must be a future Unix timestamp' }, 400, origin);
+      }
+      if (salesOrderRef) {
+        const existing = await env.DB.prepare(
+          `SELECT id FROM voucher_cards
+           WHERE sales_channel = 'xianyu' AND sales_order_ref = ?
+             AND status IN ('generated', 'reserved', 'delivered', 'redeemed')
+           LIMIT 1`
+        ).bind(salesOrderRef).first();
+        if (existing) {
+          return privateJson({ error: 'This Xianyu order already has a voucher' }, 409, origin);
+        }
+      }
+
+      const batchId = crypto.randomUUID();
+      const batchName = requestedName
+        || (salesOrderRef ? `Xianyu ${salesOrderRef}` : `Voucher batch ${batchId.slice(0, 8)}`);
+      const cardStatus = salesOrderRef ? 'reserved' : 'generated';
+      const generated = await Promise.all(
+        Array.from({ length: quantity }, async () => {
+          const code = generateVoucherCode();
+          const normalized = normalizeVoucherCode(code);
+          return {
+            id: crypto.randomUUID(),
+            code,
+            codeHash: await hashVoucherCode(code, env),
+            prefix: normalized.display.slice(0, 8),
+            last4: normalized.display.slice(-4),
+          };
+        }),
+      );
+      const statements = [
+        env.DB.prepare(
+          `INSERT INTO voucher_batches
+           (id, name, base_credits, face_value_minor, currency, quantity,
+            sales_channel, status, expires_at, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, 'xianyu', 'active', ?, ?)`
+        ).bind(
+          batchId,
+          batchName,
+          credits,
+          pack.faceValueMinor,
+          pack.currency,
+          quantity,
+          expiresAt,
+          admin.sub,
+        ),
+      ];
+      for (const card of generated) {
+        statements.push(
+          env.DB.prepare(
+            `INSERT INTO voucher_cards
+             (id, batch_id, code_hash, code_prefix, code_last4, base_credits,
+              face_value_minor, currency, status, sales_channel, sales_order_ref,
+              sales_note, reserved_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'xianyu', ?, ?, ?)`
+          ).bind(
+            card.id,
+            batchId,
+            card.codeHash,
+            card.prefix,
+            card.last4,
+            credits,
+            pack.faceValueMinor,
+            pack.currency,
+            cardStatus,
+            salesOrderRef || null,
+            salesNote || null,
+            salesOrderRef ? Math.floor(Date.now() / 1000) : null,
+          ),
+        );
+      }
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO voucher_admin_audit
+           (id, admin_user_id, action, batch_id, detail_json)
+           VALUES (?, ?, 'generate', ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          admin.sub,
+          batchId,
+          JSON.stringify({
+            quantity,
+            credits,
+            sales_order_ref: salesOrderRef || null,
+          }),
+        ),
+      );
+
+      try {
+        await env.DB.batch(statements);
+      } catch (error) {
+        console.error(JSON.stringify({
+          message: 'Voucher generation failed',
+          batchId,
+          adminUserId: admin.sub,
+          error: error.message,
+        }));
+        return privateJson({ error: 'Unable to generate vouchers' }, 500, origin);
+      }
+
+      return privateJson({
+        ok: true,
+        batch_id: batchId,
+        status: cardStatus,
+        vouchers: generated.map((card) => ({
+          id: card.id,
+          code: card.code,
+          credits,
+          face_value: (pack.faceValueMinor / 100).toFixed(2),
+          currency: pack.currency,
+          sales_order_ref: salesOrderRef || null,
+        })),
+        warning: 'Plaintext voucher codes are shown only in this response.',
+      }, 201, origin);
+    }
+
+    // GET /api/admin/vouchers/audit → exportable administrator action history.
+    if (url.pathname === '/api/admin/vouchers/audit' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const rows = await env.DB.prepare(
+        `SELECT a.id, a.action, a.batch_id, a.card_id, a.detail_json, a.created_at,
+                u.email AS admin_email
+         FROM voucher_admin_audit a
+         JOIN users u ON u.id = a.admin_user_id
+         ORDER BY a.created_at DESC, a.id DESC
+         LIMIT 500`
+      ).all();
+      return privateJson({ audit: rows.results || [] }, 200, origin);
+    }
+
+    // GET /api/admin/vouchers → search by Xianyu order, prefix, last four, or status.
+    if (url.pathname === '/api/admin/vouchers' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      await expireVoucherCards(env);
+      const query = String(url.searchParams.get('q') || '').trim();
+      const status = String(url.searchParams.get('status') || '').trim();
+      const allowedStatuses = new Set([
+        'generated', 'reserved', 'delivered', 'redeemed', 'void', 'expired',
+      ]);
+      if (status && !allowedStatuses.has(status)) {
+        return privateJson({ error: 'Invalid status' }, 400, origin);
+      }
+
+      const conditions = [];
+      const bindings = [];
+      if (query) {
+        conditions.push(
+          `(vc.sales_order_ref LIKE ? OR vc.code_prefix LIKE ? OR vc.code_last4 LIKE ?)`,
+        );
+        const pattern = `%${query}%`;
+        bindings.push(pattern, pattern, pattern);
+      }
+      if (status) {
+        conditions.push('vc.status = ?');
+        bindings.push(status);
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const statement = env.DB.prepare(
+        `SELECT vc.id, vc.batch_id, vc.code_prefix, vc.code_last4,
+                vc.base_credits, vc.face_value_minor, vc.currency, vc.status,
+                vc.sales_channel, vc.sales_order_ref, vc.sales_note,
+                vc.reserved_at, vc.delivered_at, vc.redeemed_at,
+                vc.redeem_order_id, vc.created_at, u.email AS redeemed_email
+         FROM voucher_cards vc
+         LEFT JOIN users u ON u.id = vc.redeemed_by
+         ${where}
+         ORDER BY vc.created_at DESC, vc.id DESC
+         LIMIT 200`
+      );
+      const rows = bindings.length
+        ? await statement.bind(...bindings).all()
+        : await statement.all();
+      return privateJson({
+        vouchers: (rows.results || []).map((card) => ({
+          ...card,
+          redeemed_email: maskEmail(card.redeemed_email),
+        })),
+      }, 200, origin);
+    }
+
+    // POST /api/admin/vouchers/:id/deliver|void → controlled state transitions.
+    const voucherAdminAction = url.pathname.match(
+      /^\/api\/admin\/vouchers\/([^/]+)\/(deliver|void)$/,
+    );
+    if (voucherAdminAction && request.method === 'POST') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      await expireVoucherCards(env);
+      const [, cardId, action] = voucherAdminAction;
+      const targetStatus = action === 'deliver' ? 'delivered' : 'void';
+      const allowedCurrent = action === 'deliver'
+        ? ['generated', 'reserved']
+        : ['generated', 'reserved', 'delivered'];
+      const placeholders = allowedCurrent.map(() => '?').join(', ');
+      const [result] = await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE voucher_cards
+           SET status = ?, delivered_at = CASE WHEN ? = 'delivered' THEN unixepoch() ELSE delivered_at END
+           WHERE id = ? AND status IN (${placeholders})`
+        ).bind(targetStatus, targetStatus, cardId, ...allowedCurrent),
+        env.DB.prepare(
+          `INSERT INTO voucher_admin_audit
+           (id, admin_user_id, action, card_id)
+           SELECT ?, ?, ?, ? WHERE changes() = 1`
+        ).bind(crypto.randomUUID(), admin.sub, action, cardId),
+      ]);
+      if (Number(result.meta?.changes || 0) !== 1) {
+        return privateJson({ error: 'Voucher cannot change to that status' }, 409, origin);
+      }
+      return privateJson({ ok: true, id: cardId, status: targetStatus }, 200, origin);
+    }
+
+    // POST /api/vouchers/redeem → server-side, rate-limited, atomic redemption.
+    if (url.pathname === '/api/vouchers/redeem' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return privateJson({ error: 'Unauthorized' }, 401, origin);
+      if (!env.VOUCHER_HASH_SECRET) {
+        return privateJson({ error: 'Voucher service is not configured' }, 503, origin);
+      }
+      await expireVoucherCards(env);
+      const guest = await getGuestIdentity(request);
+      if (await voucherAttemptIsLimited(env, user.sub, guest.ipHash)) {
+        return privateJson({
+          error: 'Too many voucher attempts. Please try again later.',
+        }, 429, origin);
+      }
+
+      const body = await request.json().catch(() => ({}));
+      if (body.referral_code) {
+        return privateJson({
+          error: 'Referral codes are not available in voucher redemption yet.',
+        }, 409, origin);
+      }
+      const normalized = normalizeVoucherCode(body.code);
+      const genericError = {
+        error: 'Voucher is invalid, already used, or no longer available.',
+      };
+      if (!normalized) {
+        await recordVoucherAttempt(env, {
+          userId: user.sub,
+          guest,
+          codeFingerprint: null,
+          success: false,
+        });
+        return privateJson(genericError, 400, origin);
+      }
+
+      const codeHash = await hashVoucherCode(normalized.display, env);
+      const codeFingerprint = codeHash.slice(0, 16);
+      const card = await env.DB.prepare(
+        `SELECT vc.id, vc.base_credits, vc.face_value_minor, vc.currency,
+                vc.status, vc.redeemed_by, vc.redeemed_at, vc.redeem_order_id,
+                vb.expires_at AS batch_expires_at
+         FROM voucher_cards vc
+         JOIN voucher_batches vb ON vb.id = vc.batch_id
+         WHERE vc.code_hash = ?`
+      ).bind(codeHash).first();
+
+      if (card?.status === 'redeemed' && card.redeemed_by === user.sub) {
+        const credits = await getCreditSummary(env, user.sub);
+        return privateJson({
+          ok: true,
+          already_redeemed: true,
+          credits_added: Number(card.base_credits),
+          redeemed_at: card.redeemed_at,
+          order_id: card.redeem_order_id,
+          balance: credits,
+        }, 200, origin);
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const eligible = card
+        && ['generated', 'reserved', 'delivered'].includes(card.status)
+        && (!card.batch_expires_at || Number(card.batch_expires_at) > now);
+      if (!eligible) {
+        await recordVoucherAttempt(env, {
+          userId: user.sub,
+          guest,
+          codeFingerprint,
+          success: false,
+        });
+        return privateJson(genericError, 400, origin);
+      }
+
+      const orderId = `voucher:${card.id}`;
+      const grantId = `voucher:${card.id}:paid`;
+      try {
+        await env.DB.batch([
+          env.DB.prepare(
+            `INSERT INTO orders
+             (id, user_id, plan, amount, credits, base_credits, bonus_credits,
+              currency, status, completed_at, payment_method, voucher_card_id)
+             SELECT ?, ?, ?, vc.face_value_minor / 100.0, vc.base_credits,
+                    vc.base_credits, 0, vc.currency, 'completed', unixepoch(),
+                    'voucher', vc.id
+             FROM voucher_cards vc
+             JOIN voucher_batches vb ON vb.id = vc.batch_id
+             WHERE vc.id = ?
+               AND vc.status IN ('generated', 'reserved', 'delivered')
+               AND (vb.expires_at IS NULL OR vb.expires_at > unixepoch())`
+          ).bind(orderId, user.sub, `voucher_${card.base_credits}`, card.id),
+          env.DB.prepare(
+            `UPDATE voucher_cards
+             SET status = 'redeemed', redeemed_by = ?, redeemed_at = unixepoch(),
+                 redeem_order_id = ?
+             WHERE id = ?
+               AND status IN ('generated', 'reserved', 'delivered')`
+          ).bind(user.sub, orderId, card.id),
+          env.DB.prepare(
+            `INSERT INTO credit_grants
+             (id, user_id, credit_type, granted_credits, remaining_credits,
+              order_id, idempotency_key)
+             SELECT ?, user_id, 'paid', base_credits, base_credits, id, ?
+             FROM orders WHERE id = ? AND payment_method = 'voucher'`
+          ).bind(grantId, grantId, orderId),
+          env.DB.prepare(
+            `INSERT INTO credit_ledger
+             (id, user_id, delta, balance_type, reason, grant_id, order_id,
+              idempotency_key)
+             SELECT ?, user_id, base_credits, 'paid', 'voucher_redeem', ?, id, ?
+             FROM orders WHERE id = ? AND payment_method = 'voucher'`
+          ).bind(grantId, grantId, grantId, orderId),
+          env.DB.prepare(
+            `UPDATE user_credits
+             SET credits = credits + ?
+             WHERE user_id = ?
+               AND EXISTS (
+                 SELECT 1 FROM orders
+                 WHERE id = ? AND user_id = ? AND payment_method = 'voucher'
+               )`
+          ).bind(card.base_credits, user.sub, orderId, user.sub),
+          env.DB.prepare(
+            `INSERT INTO voucher_attempts
+             (id, user_id, ip_hash, device_hash, code_fingerprint, success)
+             SELECT ?, ?, ?, ?, ?, 1
+             WHERE EXISTS (
+               SELECT 1 FROM orders
+               WHERE id = ? AND user_id = ? AND payment_method = 'voucher'
+             )`
+          ).bind(
+            crypto.randomUUID(),
+            user.sub,
+            guest.ipHash,
+            guest.deviceHash,
+            codeFingerprint,
+            orderId,
+            user.sub,
+          ),
+        ]);
+      } catch (error) {
+        const redeemed = await env.DB.prepare(
+          `SELECT redeemed_by, redeemed_at, redeem_order_id, base_credits
+           FROM voucher_cards WHERE id = ? AND status = 'redeemed'`
+        ).bind(card.id).first();
+        if (redeemed?.redeemed_by === user.sub) {
+          const credits = await getCreditSummary(env, user.sub);
+          return privateJson({
+            ok: true,
+            already_redeemed: true,
+            credits_added: Number(redeemed.base_credits),
+            redeemed_at: redeemed.redeemed_at,
+            order_id: redeemed.redeem_order_id,
+            balance: credits,
+          }, 200, origin);
+        }
+        await recordVoucherAttempt(env, {
+          userId: user.sub,
+          guest,
+          codeFingerprint,
+          success: false,
+        });
+        return privateJson(genericError, 400, origin);
+      }
+
+      const redeemed = await env.DB.prepare(
+        `SELECT redeemed_by, redeemed_at, redeem_order_id
+         FROM voucher_cards WHERE id = ?`
+      ).bind(card.id).first();
+      if (redeemed?.redeemed_by !== user.sub) {
+        await recordVoucherAttempt(env, {
+          userId: user.sub,
+          guest,
+          codeFingerprint,
+          success: false,
+        });
+        return privateJson(genericError, 400, origin);
+      }
+      const credits = await getCreditSummary(env, user.sub);
+      return privateJson({
+        ok: true,
+        credits_added: Number(card.base_credits),
+        redeemed_at: redeemed.redeemed_at,
+        order_id: redeemed.redeem_order_id,
+        balance: credits,
+      }, 200, origin);
     }
 
     // POST /api/paypal/create-order → create PayPal order

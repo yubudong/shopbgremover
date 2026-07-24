@@ -24,6 +24,8 @@ export default defineConfig({
           PAYPAL_SECRET: 'test-paypal-secret',
           PAYPAL_MODE: 'sandbox',
           PAYPAL_WEBHOOK_ID: 'test-paypal-webhook',
+          ADMIN_EMAILS: 'admin@example.com',
+          VOUCHER_HASH_SECRET: 'test-voucher-hash-secret-with-enough-entropy',
           RESEND_API_KEY: 'test-resend-key',
           RESEND_FROM: 'test@example.com',
         },

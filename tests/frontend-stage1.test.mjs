@@ -93,7 +93,7 @@ test('localized terms state lifetime quotas and USD one-time packs', async () =>
     assert.match(html, /USD/, file);
     assert.match(html, /1000/, file);
     assert.match(html, /23[,.]99/, file);
-    assert.doesNotMatch(html, /CNY|¥22|¥60|¥160/, file);
+    assert.doesNotMatch(html, /¥22|¥60|¥160/, file);
     assert.doesNotMatch(html, /3 images per day|3 Bilder pro Tag|3 imágenes por día|3 images par jour|3 imagens por dia/, file);
   }
 });
@@ -103,6 +103,8 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     ...indexFiles,
     ...pricingFiles,
     ...termsFiles,
+    'redeem.html',
+    'admin-vouchers.html',
     'test-paypal.html',
     'shopify-background-remover.html',
     'amazon-ebay-product-images.html',
@@ -131,6 +133,8 @@ test('Pages build contains only the canonical static site', async () => {
   const required = [
     'index.html',
     'pricing.html',
+    'redeem.html',
+    'admin-vouchers.html',
     'de/index.html',
     'es/index.html',
     'fr/index.html',
@@ -146,4 +150,15 @@ test('Pages build contains only the canonical static site', async () => {
   await assert.rejects(readFile(path.join(output, 'worker', 'index.js')));
   await assert.rejects(readFile(path.join(output, 'test-paypal.html')));
   await assert.rejects(readFile(path.join(output, 'public', 'index.html')));
+});
+
+test('pricing links to the server-backed Xianyu voucher redemption page', async () => {
+  for (const file of pricingFiles) {
+    const html = await read(file);
+    assert.match(html, /href="\/redeem\.html"/, file);
+  }
+  const redeem = await read('redeem.html');
+  assert.match(redeem, /\/api\/vouchers\/redeem/);
+  assert.match(redeem, /'X-Device-ID': deviceId/);
+  assert.doesNotMatch(redeem, /localStorage.*voucher|voucher.*localStorage/i);
 });

@@ -23,6 +23,10 @@ beforeEach(async () => {
     DELETE FROM guest_ip_usage;
     DELETE FROM guest_usage;
     DELETE FROM webhook_events;
+    DELETE FROM voucher_attempts;
+    DELETE FROM voucher_admin_audit;
+    DELETE FROM voucher_cards;
+    DELETE FROM voucher_batches;
     DELETE FROM subscriptions;
     DELETE FROM sso_codes;
     DELETE FROM email_otps;
@@ -170,6 +174,26 @@ function completedPayPalOrder({
   };
 }
 
+async function generateVoucher(cookie, {
+  credits = 300,
+  quantity = 1,
+  salesOrderRef = '',
+} = {}) {
+  const response = await exports.default.fetch(authenticatedRequest(
+    '/api/admin/vouchers/generate',
+    cookie,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        credits,
+        quantity,
+        sales_order_ref: salesOrderRef,
+      }),
+    },
+  ));
+  return { response, body: await jsonResponse(response) };
+}
+
 describe('production schema baseline', () => {
   it('creates every Stage 1 business table', async () => {
     const result = await env.DB.prepare(
@@ -195,6 +219,10 @@ describe('production schema baseline', () => {
       'user_credits',
       'user_free_entitlements',
       'users',
+      'voucher_admin_audit',
+      'voucher_attempts',
+      'voucher_batches',
+      'voucher_cards',
       'webhook_events',
     ]);
   });
@@ -217,6 +245,8 @@ describe('production schema baseline', () => {
       'paypal_capture_id',
       'completed_at',
       'refunded_at',
+      'payment_method',
+      'voucher_card_id',
     ]));
   });
 });
@@ -376,6 +406,249 @@ describe('free quota and credit accounting', () => {
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
     ).bind(userId).first();
     expect(credits).toEqual(expect.objectContaining({ credits: 1, total_used: 1 }));
+  });
+});
+
+describe('Xianyu voucher flow', () => {
+  it('requires an allowlisted administrator and stores only a voucher hash', async () => {
+    const regular = await createAuthenticatedUser({
+      email: 'regular@example.com',
+      credits: 0,
+    });
+    const forbidden = await generateVoucher(regular.cookie);
+    expect(forbidden.response.status).toBe(403);
+
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+      deviceId: 'admin-device',
+    });
+    const generated = await generateVoucher(admin.cookie, {
+      credits: 300,
+      salesOrderRef: 'XY-ORDER-1001',
+    });
+    expect(generated.response.status).toBe(201);
+    expect(generated.body.vouchers).toHaveLength(1);
+    const code = generated.body.vouchers[0].code;
+    expect(code).toMatch(/^SBG-[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){3}$/);
+
+    const card = await env.DB.prepare(
+      `SELECT code_hash, code_prefix, code_last4, status, sales_order_ref
+       FROM voucher_cards`
+    ).first();
+    expect(card.code_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(card.status).toBe('reserved');
+    expect(card.sales_order_ref).toBe('XY-ORDER-1001');
+    expect(JSON.stringify(card)).not.toContain(code);
+
+    const duplicate = await generateVoucher(admin.cookie, {
+      credits: 300,
+      salesOrderRef: 'XY-ORDER-1001',
+    });
+    expect(duplicate.response.status).toBe(409);
+  });
+
+  it('marks a reserved card delivered and keeps full codes out of list responses', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, {
+      credits: 100,
+      salesOrderRef: 'XY-DELIVER-1',
+    });
+    const voucher = generated.body.vouchers[0];
+
+    const delivered = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/deliver`,
+      admin.cookie,
+      { method: 'POST' },
+    ));
+    expect(delivered.status).toBe(200);
+    const card = await env.DB.prepare(
+      'SELECT status, delivered_at FROM voucher_cards WHERE id = ?'
+    ).bind(voucher.id).first();
+    expect(card.status).toBe('delivered');
+    expect(card.delivered_at).toBeTypeOf('number');
+    const auditCount = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM voucher_admin_audit
+       WHERE card_id = ? AND action = 'deliver'`
+    ).bind(voucher.id).first('count');
+    expect(auditCount).toBe(1);
+
+    const list = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/vouchers?q=XY-DELIVER-1',
+      admin.cookie,
+    ));
+    const body = await jsonResponse(list);
+    expect(body.vouchers).toHaveLength(1);
+    expect(JSON.stringify(body)).not.toContain(voucher.code);
+  });
+
+  it('redeems once into the unified order, grant, ledger, and aggregate balance', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, {
+      credits: 300,
+      salesOrderRef: 'XY-REDEEM-1',
+    });
+    const voucher = generated.body.vouchers[0];
+    const buyer = await createAuthenticatedUser({
+      email: 'voucher-buyer@example.com',
+      credits: 2,
+      deviceId: 'voucher-buyer-device',
+    });
+
+    const redeem = () => exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      buyer.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'voucher-buyer-device',
+          'CF-Connecting-IP': '203.0.113.80',
+        },
+        body: JSON.stringify({ code: voucher.code }),
+      },
+    ));
+    const first = await redeem();
+    const second = await redeem();
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await jsonResponse(second)).toMatchObject({
+      ok: true,
+      already_redeemed: true,
+      credits_added: 300,
+    });
+
+    const [card, order, balance, grantCount, ledgerCount] = await Promise.all([
+      env.DB.prepare(
+        `SELECT status, redeemed_by, redeem_order_id
+         FROM voucher_cards WHERE id = ?`
+      ).bind(voucher.id).first(),
+      env.DB.prepare(
+        `SELECT payment_method, base_credits, currency, status, voucher_card_id
+         FROM orders WHERE voucher_card_id = ?`
+      ).bind(voucher.id).first(),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(buyer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_grants
+         WHERE order_id = ?`
+      ).bind(`voucher:${voucher.id}`).first('count'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_ledger
+         WHERE order_id = ? AND reason = 'voucher_redeem'`
+      ).bind(`voucher:${voucher.id}`).first('count'),
+    ]);
+    expect(card).toMatchObject({
+      status: 'redeemed',
+      redeemed_by: buyer.userId,
+      redeem_order_id: `voucher:${voucher.id}`,
+    });
+    expect(order).toMatchObject({
+      payment_method: 'voucher',
+      base_credits: 300,
+      currency: 'CNY',
+      status: 'completed',
+      voucher_card_id: voucher.id,
+    });
+    expect(balance).toBe(302);
+    expect(grantCount).toBe(1);
+    expect(ledgerCount).toBe(1);
+  });
+
+  it('atomically allows only one of two users to redeem the same card', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 1000 });
+    const voucher = generated.body.vouchers[0];
+    const firstBuyer = await createAuthenticatedUser({
+      email: 'voucher-first@example.com',
+      credits: 0,
+    });
+    const secondBuyer = await createAuthenticatedUser({
+      email: 'voucher-second@example.com',
+      credits: 0,
+      deviceId: 'voucher-second-device',
+    });
+    const request = (buyer, ip) => exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      buyer.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': `device-${ip}`,
+          'CF-Connecting-IP': ip,
+        },
+        body: JSON.stringify({ code: voucher.code }),
+      },
+    ));
+    const responses = await Promise.all([
+      request(firstBuyer, '203.0.113.81'),
+      request(secondBuyer, '203.0.113.82'),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 400]);
+
+    const balances = await env.DB.prepare(
+      `SELECT credits FROM user_credits
+       WHERE user_id IN (?, ?) ORDER BY credits`
+    ).bind(firstBuyer.userId, secondBuyer.userId).all();
+    expect(balances.results.map((row) => row.credits)).toEqual([0, 1000]);
+    const orders = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM orders WHERE voucher_card_id = ?`
+    ).bind(voucher.id).first('count');
+    expect(orders).toBe(1);
+  });
+
+  it('limits invalid attempts and does not redeem a void card', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 100 });
+    const voucher = generated.body.vouchers[0];
+    const voided = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/void`,
+      admin.cookie,
+      { method: 'POST' },
+    ));
+    expect(voided.status).toBe(200);
+
+    const buyer = await createAuthenticatedUser({
+      email: 'limited@example.com',
+      credits: 0,
+    });
+    const attempt = (code) => exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      buyer.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'rate-limited-device',
+          'CF-Connecting-IP': '203.0.113.90',
+        },
+        body: JSON.stringify({ code }),
+      },
+    ));
+    const voidResponse = await attempt(voucher.code);
+    expect(voidResponse.status).toBe(400);
+    expect(await jsonResponse(voidResponse)).toEqual({
+      error: 'Voucher is invalid, already used, or no longer available.',
+    });
+    for (let index = 0; index < 4; index += 1) {
+      expect((await attempt(`invalid-${index}`)).status).toBe(400);
+    }
+    const limited = await attempt('invalid-5');
+    expect(limited.status).toBe(429);
+    const balance = await env.DB.prepare(
+      'SELECT credits FROM user_credits WHERE user_id = ?'
+    ).bind(buyer.userId).first('credits');
+    expect(balance).toBe(0);
   });
 });
 

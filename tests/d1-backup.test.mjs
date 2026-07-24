@@ -111,7 +111,7 @@ test('backup script exports, restores, hashes, and records metadata', async (t) 
 
   const metadata = await readFile(join(fixture.backupDir, metadataFile), 'utf8');
   assert.match(metadata, /^integrity_check=ok$/m);
-  assert.match(metadata, /^table_count=15$/m);
+  assert.match(metadata, /^table_count=19$/m);
   assert.match(metadata, /^user_count=0$/m);
   assert.match(metadata, /^order_count=0$/m);
   assert.match(metadata, /^sha256=[0-9a-f]{64}$/m);
