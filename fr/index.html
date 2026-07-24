@@ -695,6 +695,28 @@
     return id;
   }
   const DEVICE_ID = getOrCreateDeviceId();
+
+  async function captureReferralFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('ref') || '').trim().toUpperCase();
+    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) return;
+    try {
+      const response = await fetch(`${API}/api/referrals/capture`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
+        body: JSON.stringify({ code }),
+      });
+      if (!response.ok) return;
+      params.delete('ref');
+      const query = params.toString();
+      history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    } catch {
+      // Referral capture must never block the image tool.
+    }
+  }
+  captureReferralFromUrl();
+
 let selectedFiles   = [];
   let processedResults = [];
   let currentUser     = null;

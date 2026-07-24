@@ -162,3 +162,13 @@ test('pricing links to the server-backed Xianyu voucher redemption page', async 
   assert.match(redeem, /'X-Device-ID': deviceId/);
   assert.doesNotMatch(redeem, /localStorage.*voucher|voucher.*localStorage/i);
 });
+
+test('localized homepages capture referral links through the signed server endpoint', async () => {
+  for (const file of indexFiles) {
+    const html = await read(file);
+    assert.match(html, /new URLSearchParams\(window\.location\.search\)/, file);
+    assert.match(html, /\/api\/referrals\/capture/, file);
+    assert.match(html, /credentials:\s*'include'/, file);
+    assert.doesNotMatch(html, /localStorage\.(?:setItem|getItem)\(['"]referral/i, file);
+  }
+});

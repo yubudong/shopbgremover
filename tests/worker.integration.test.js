@@ -32,6 +32,8 @@ beforeEach(async () => {
     DELETE FROM email_otps;
     DELETE FROM free_usage;
     DELETE FROM processing_history;
+    DELETE FROM referrals;
+    DELETE FROM referral_codes;
     DELETE FROM orders;
     DELETE FROM user_credits;
     DELETE FROM users;
@@ -52,19 +54,23 @@ async function createAuthenticatedUser({
   code = '123456',
   credits = 5,
   deviceId = 'test-device-buyer',
+  pendingCookie = '',
 } = {}) {
   const expiresAt = Math.floor(Date.now() / 1000) + 600;
   await env.DB.prepare(
     'INSERT INTO email_otps (email, code, expires_at, attempts) VALUES (?, ?, ?, 0)'
   ).bind(email, code, expiresAt).run();
 
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Device-ID': deviceId,
+    'CF-Connecting-IP': '203.0.113.20',
+  };
+  if (pendingCookie) headers.Cookie = pendingCookie;
+
   const response = await exports.default.fetch(new Request(`${API_ORIGIN}/api/auth/email/verify`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Device-ID': deviceId,
-      'CF-Connecting-IP': '203.0.113.20',
-    },
+    headers,
     body: JSON.stringify({ email, code }),
   }));
 
@@ -214,6 +220,8 @@ describe('production schema baseline', () => {
       'guest_usage',
       'orders',
       'processing_history',
+      'referral_codes',
+      'referrals',
       'sso_codes',
       'subscriptions',
       'user_credits',
@@ -247,7 +255,210 @@ describe('production schema baseline', () => {
       'refunded_at',
       'payment_method',
       'voucher_card_id',
+      'referral_processed_at',
+      'is_first_qualified_purchase',
+      'referrer_user_id_snapshot',
     ]));
+  });
+});
+
+describe('referral relationship foundation', () => {
+  it('creates one stable, non-sequential referral code per user', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({
+      email: 'referrer@example.com',
+      credits: 0,
+    });
+
+    const first = await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      cookie,
+    ));
+    const second = await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      cookie,
+    ));
+    const firstBody = await jsonResponse(first);
+    const secondBody = await jsonResponse(second);
+
+    expect(first.status).toBe(200);
+    expect(firstBody.code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(secondBody.code).toBe(firstBody.code);
+    expect(firstBody.link).toBe(`https://www.shopbgremover.com/?ref=${firstBody.code}`);
+    expect(firstBody.reward_eligible).toBe(false);
+
+    const stored = await env.DB.prepare(
+      'SELECT code, user_id, status FROM referral_codes WHERE user_id = ?'
+    ).bind(userId).first();
+    expect(stored).toEqual(expect.objectContaining({
+      code: firstBody.code,
+      user_id: userId,
+      status: 'active',
+    }));
+  });
+
+  it('binds a valid signed referral cookie only when a new account is created', async () => {
+    const referrer = await createAuthenticatedUser({
+      email: 'qualified-referrer@example.com',
+      credits: 0,
+    });
+    const referralResponse = await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    ));
+    const referral = await jsonResponse(referralResponse);
+
+    const capture = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/referrals/capture`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://www.shopbgremover.com',
+        },
+        body: JSON.stringify({ code: referral.code.toLowerCase() }),
+      },
+    ));
+    expect(capture.status).toBe(200);
+    const pendingCookie = capture.headers.get('Set-Cookie').split(';', 1)[0];
+    expect(capture.headers.get('Set-Cookie')).toContain('HttpOnly');
+    expect(capture.headers.get('Set-Cookie')).toContain('Max-Age=2592000');
+
+    const invitee = await createAuthenticatedUser({
+      email: 'new-invitee@example.com',
+      credits: 0,
+      deviceId: 'new-invitee-device',
+      pendingCookie,
+    });
+    const relationship = await env.DB.prepare(
+      `SELECT referrer_user_id, referred_user_id, referral_code, source, status,
+              created_ip_hash, created_device_hash
+       FROM referrals WHERE referred_user_id = ?`
+    ).bind(invitee.userId).first();
+
+    expect(relationship).toEqual(expect.objectContaining({
+      referrer_user_id: referrer.userId,
+      referred_user_id: invitee.userId,
+      referral_code: referral.code,
+      source: 'link',
+      status: 'bound',
+    }));
+    expect(relationship.created_ip_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(relationship.created_device_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('does not attach a referrer when an existing account signs in', async () => {
+    const referrer = await createAuthenticatedUser({
+      email: 'existing-referrer@example.com',
+      credits: 0,
+    });
+    const existing = await createAuthenticatedUser({
+      email: 'existing-invitee@example.com',
+      credits: 0,
+    });
+    const referral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    )));
+    const capture = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/referrals/capture`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: referral.code }),
+      },
+    ));
+    const pendingCookie = capture.headers.get('Set-Cookie').split(';', 1)[0];
+
+    await createAuthenticatedUser({
+      email: 'existing-invitee@example.com',
+      credits: 0,
+      pendingCookie,
+    });
+
+    const count = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM referrals WHERE referred_user_id = ?'
+    ).bind(existing.userId).first('count');
+    expect(count).toBe(0);
+  });
+
+  it('locks the first valid referral cookie against later referral links', async () => {
+    const firstReferrer = await createAuthenticatedUser({
+      email: 'first-referrer@example.com',
+      credits: 0,
+    });
+    const secondReferrer = await createAuthenticatedUser({
+      email: 'second-referrer@example.com',
+      credits: 0,
+    });
+    const firstReferral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      firstReferrer.cookie,
+    )));
+    const secondReferral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      secondReferrer.cookie,
+    )));
+
+    const firstCapture = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/referrals/capture`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: firstReferral.code }),
+      },
+    ));
+    const pendingCookie = firstCapture.headers.get('Set-Cookie').split(';', 1)[0];
+    const secondCapture = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/referrals/capture`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: pendingCookie,
+        },
+        body: JSON.stringify({ code: secondReferral.code }),
+      },
+    ));
+    const secondBody = await jsonResponse(secondCapture);
+
+    expect(secondBody).toEqual(expect.objectContaining({
+      ok: true,
+      already_captured: true,
+      code: firstReferral.code,
+    }));
+    expect(secondCapture.headers.get('Set-Cookie')).toBeNull();
+
+    const invitee = await createAuthenticatedUser({
+      email: 'locked-attribution@example.com',
+      credits: 0,
+      pendingCookie,
+    });
+    const boundReferrer = await env.DB.prepare(
+      'SELECT referrer_user_id FROM referrals WHERE referred_user_id = ?'
+    ).bind(invitee.userId).first('referrer_user_id');
+    expect(boundReferrer).toBe(firstReferrer.userId);
+  });
+
+  it('rejects unknown codes and ignores a tampered pending cookie', async () => {
+    const invalidCapture = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/referrals/capture`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'ABCDEFGH' }),
+      },
+    ));
+    expect(invalidCapture.status).toBe(400);
+
+    const invitee = await createAuthenticatedUser({
+      email: 'tampered-cookie@example.com',
+      credits: 0,
+      pendingCookie: 'referral_pending=not-a-valid-signature',
+    });
+    const count = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM referrals WHERE referred_user_id = ?'
+    ).bind(invitee.userId).first('count');
+    expect(count).toBe(0);
   });
 });
 

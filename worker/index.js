@@ -21,6 +21,8 @@ const VOUCHER_PACKS = Object.freeze({
 const VOUCHER_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const VOUCHER_ACCOUNT_FAILURE_LIMIT = 5;
 const VOUCHER_IP_FAILURE_LIMIT = 20;
+const REFERRAL_CODE_LENGTH = 8;
+const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -151,6 +153,77 @@ async function hashVoucherCode(code, env) {
   const normalized = normalizeVoucherCode(code);
   if (!normalized) return null;
   return sha256Hex(`${env.VOUCHER_HASH_SECRET}:${normalized.canonical}`);
+}
+
+function normalizeReferralCode(value) {
+  const code = String(value || '').trim().toUpperCase();
+  return new RegExp(`^[${VOUCHER_ALPHABET}]{${REFERRAL_CODE_LENGTH}}$`).test(code)
+    ? code
+    : null;
+}
+
+function generateReferralCode() {
+  const bytes = new Uint8Array(REFERRAL_CODE_LENGTH);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => VOUCHER_ALPHABET[byte & 31]).join('');
+}
+
+async function ensureReferralCode(env, userId) {
+  const existing = await env.DB.prepare(
+    'SELECT code, status FROM referral_codes WHERE user_id = ?'
+  ).bind(userId).first();
+  if (existing) return existing;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = generateReferralCode();
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO referral_codes (code, user_id, status)
+       VALUES (?, ?, 'active')`
+    ).bind(code, userId).run();
+
+    const created = await env.DB.prepare(
+      'SELECT code, status FROM referral_codes WHERE user_id = ?'
+    ).bind(userId).first();
+    if (created) return created;
+  }
+  throw new Error('Unable to allocate a referral code');
+}
+
+function referralCookie(value, maxAge = REFERRAL_COOKIE_MAX_AGE) {
+  return `referral_pending=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Domain=.shopbgremover.com; Max-Age=${maxAge}`;
+}
+
+async function bindPendingReferral(env, request, userId, guest, isNewUser) {
+  if (!isNewUser) return false;
+  const token = getCookie(request, 'referral_pending');
+  if (!token) return false;
+
+  const pending = await verifyJWT(token, env.JWT_SECRET);
+  if (pending?.purpose !== 'referral' || !normalizeReferralCode(pending.code)) {
+    return false;
+  }
+
+  const referrer = await env.DB.prepare(
+    `SELECT user_id, code
+     FROM referral_codes
+     WHERE code = ? AND status = 'active'`
+  ).bind(pending.code).first();
+  if (!referrer || referrer.user_id === userId) return false;
+
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO referrals
+     (id, referrer_user_id, referred_user_id, referral_code, source,
+      created_ip_hash, created_device_hash)
+     VALUES (?, ?, ?, ?, 'link', ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    referrer.user_id,
+    userId,
+    referrer.code,
+    guest.ipHash,
+    guest.deviceHash,
+  ).run();
+  return Number(inserted.meta?.changes || 0) === 1;
 }
 
 async function recordVoucherAttempt(env, {
@@ -578,6 +651,9 @@ export default {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const profile = await profileRes.json();
+      const existingUser = await env.DB.prepare(
+        'SELECT id FROM users WHERE id = ?'
+      ).bind(profile.id).first();
 
       // Upsert user
       await env.DB.prepare(
@@ -586,18 +662,22 @@ export default {
       ).bind(profile.id, profile.email, profile.name, profile.picture).run();
 
       await ensureUserCreditAccount(env, profile.id, guest);
+      await bindPendingReferral(env, request, profile.id, guest, !existingUser);
 
       const token = await signJWT(
         { sub: profile.id, email: profile.email, name: profile.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
         env.JWT_SECRET
       );
 
+      const headers = new Headers({ Location: FRONTEND_URL });
+      headers.append(
+        'Set-Cookie',
+        `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
+      );
+      headers.append('Set-Cookie', referralCookie('', 0));
       return new Response(null, {
         status: 302,
-        headers: {
-          Location: FRONTEND_URL,
-          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
-        },
+        headers,
       });
     }
 
@@ -698,6 +778,7 @@ export default {
 
       // Find or create user by email (shared table with Google users)
       let user = await env.DB.prepare(`SELECT id, name FROM users WHERE email = ?`).bind(email).first();
+      const isNewUser = !user;
       if (!user) {
         const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email));
         const userId  = 'em_' + Array.from(new Uint8Array(hashBuf)).slice(0, 8)
@@ -708,19 +789,25 @@ export default {
         user = { id: userId, name };
       }
       await ensureUserCreditAccount(env, user.id, guest);
+      await bindPendingReferral(env, request, user.id, guest, isNewUser);
 
       const token = await signJWT(
         { sub: user.id, email, name: user.name, exp: Math.floor(Date.now() / 1000) + 86400 * 30 },
         env.JWT_SECRET
       );
 
+      const headers = new Headers({
+        'Content-Type': 'application/json',
+        ...cors(origin),
+      });
+      headers.append(
+        'Set-Cookie',
+        `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
+      );
+      headers.append('Set-Cookie', referralCookie('', 0));
       return new Response(JSON.stringify({ ok: true, name: user.name }), {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...cors(origin),
-          'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=None; Domain=.shopbgremover.com; Max-Age=2592000`,
-        },
+        headers,
       });
     }
 
@@ -730,6 +817,86 @@ export default {
       if (!user) return json({ user: null }, 200, origin);
       const credits = await getCreditSummary(env, user.sub);
       return json({ user: { id: user.sub, email: user.email, name: user.name }, credits }, 200, origin);
+    }
+
+    // POST /api/referrals/capture → validate and store a signed 30-day
+    // first-party referral cookie. The relationship is bound only if login
+    // creates a brand-new account.
+    if (url.pathname === '/api/referrals/capture' && request.method === 'POST') {
+      const existingToken = getCookie(request, 'referral_pending');
+      if (existingToken) {
+        const existingPending = await verifyJWT(existingToken, env.JWT_SECRET);
+        const existingCode = existingPending?.purpose === 'referral'
+          ? normalizeReferralCode(existingPending.code)
+          : null;
+        if (existingCode) {
+          const existingActive = await env.DB.prepare(
+            `SELECT code FROM referral_codes
+             WHERE code = ? AND status = 'active'`
+          ).bind(existingCode).first();
+          if (existingActive) {
+            return privateJson({
+              ok: true,
+              already_captured: true,
+              code: existingCode,
+            }, 200, origin);
+          }
+        }
+      }
+
+      const body = await request.json().catch(() => ({}));
+      const code = normalizeReferralCode(body.code);
+      if (!code) return privateJson({ error: 'Invalid referral code' }, 400, origin);
+
+      const active = await env.DB.prepare(
+        `SELECT code FROM referral_codes
+         WHERE code = ? AND status = 'active'`
+      ).bind(code).first();
+      if (!active) return privateJson({ error: 'Invalid referral code' }, 400, origin);
+
+      const token = await signJWT({
+        purpose: 'referral',
+        code,
+        exp: Math.floor(Date.now() / 1000) + REFERRAL_COOKIE_MAX_AGE,
+      }, env.JWT_SECRET);
+      const response = privateJson({ ok: true }, 200, origin);
+      response.headers.append('Set-Cookie', referralCookie(token));
+      return response;
+    }
+
+    // GET /api/referrals/me → return the current user's stable referral code
+    // and aggregate relationship counts. Codes can exist before a payment,
+    // but rewards become eligible only after a completed top-up.
+    if (url.pathname === '/api/referrals/me' && request.method === 'GET') {
+      const user = await getUser(request, env);
+      if (!user) return privateJson({ error: 'Unauthorized' }, 401, origin);
+
+      const [code, paidOrder, counts] = await Promise.all([
+        ensureReferralCode(env, user.sub),
+        env.DB.prepare(
+          `SELECT id FROM orders
+           WHERE user_id = ? AND status = 'completed' AND base_credits > 0
+           LIMIT 1`
+        ).bind(user.sub).first(),
+        env.DB.prepare(
+          `SELECT
+             COUNT(*) AS registered_count,
+             SUM(CASE WHEN first_paid_order_id IS NOT NULL THEN 1 ELSE 0 END) AS paid_count,
+             SUM(CASE WHEN risk_status = 'review' THEN 1 ELSE 0 END) AS review_count
+           FROM referrals
+           WHERE referrer_user_id = ?`
+        ).bind(user.sub).first(),
+      ]);
+
+      return privateJson({
+        code: code.code,
+        status: code.status,
+        link: `${FRONTEND_URL}/?ref=${code.code}`,
+        reward_eligible: Boolean(paidOrder),
+        registered_count: Number(counts?.registered_count || 0),
+        paid_count: Number(counts?.paid_count || 0),
+        review_count: Number(counts?.review_count || 0),
+      }, 200, origin);
     }
 
     // Direct credit deductions are disabled: only a successful AI task can

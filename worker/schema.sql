@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0004_voucher_cards.sql.
+-- Includes tracked migrations through 0005_referral_foundation.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to
@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS orders (
   failure_detail TEXT,
   payment_method TEXT NOT NULL DEFAULT 'paypal',
   voucher_card_id TEXT,
+  referral_processed_at INTEGER,
+  is_first_qualified_purchase INTEGER NOT NULL DEFAULT 0,
+  referrer_user_id_snapshot TEXT,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -69,6 +72,9 @@ ON orders(user_id, status, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_voucher_card_id
 ON orders(voucher_card_id)
 WHERE voucher_card_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_referral_processing
+ON orders(user_id, referral_processed_at, completed_at);
 
 CREATE TABLE IF NOT EXISTS free_usage (
   ip TEXT PRIMARY KEY,
@@ -308,3 +314,42 @@ ON voucher_admin_audit(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_voucher_admin_audit_card
 ON voucher_admin_audit(card_id, created_at);
+
+CREATE TABLE IF NOT EXISTS referral_codes (
+  code TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'disabled')),
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_codes_status
+ON referral_codes(status, created_at);
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY,
+  referrer_user_id TEXT NOT NULL,
+  referred_user_id TEXT NOT NULL UNIQUE,
+  referral_code TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'link'
+    CHECK (source IN ('link', 'voucher')),
+  status TEXT NOT NULL DEFAULT 'bound'
+    CHECK (status IN ('bound', 'qualified', 'rejected', 'reversed')),
+  bound_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  first_paid_order_id TEXT,
+  first_paid_at INTEGER,
+  created_ip_hash TEXT,
+  created_device_hash TEXT,
+  risk_status TEXT NOT NULL DEFAULT 'normal'
+    CHECK (risk_status IN ('normal', 'review', 'rejected')),
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  CHECK (referrer_user_id <> referred_user_id),
+  FOREIGN KEY (referrer_user_id) REFERENCES users(id),
+  FOREIGN KEY (referred_user_id) REFERENCES users(id),
+  FOREIGN KEY (referral_code) REFERENCES referral_codes(code),
+  FOREIGN KEY (first_paid_order_id) REFERENCES orders(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_status
+ON referrals(referrer_user_id, status, created_at);
