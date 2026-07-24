@@ -176,6 +176,14 @@ test('voucher redemption and referral center use server-backed referral APIs', a
   assert.doesNotMatch(referrals, /localStorage.*referral/i);
 });
 
+test('voucher admin exposes server-backed dispute reversal with an explicit reason', async () => {
+  const admin = await read('admin-vouchers.html');
+  assert.match(admin, /\/dispute-reverse/);
+  assert.match(admin, /JSON\.stringify\(\{\s*reason:\s*normalized\s*\}\)/);
+  assert.match(admin, /争议冲正/);
+  assert.match(admin, /不可撤销/);
+});
+
 test('localized homepages capture referral links through the signed server endpoint', async () => {
   for (const file of indexFiles) {
     const html = await read(file);

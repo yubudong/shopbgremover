@@ -25,6 +25,7 @@ beforeEach(async () => {
     DELETE FROM webhook_events;
     DELETE FROM voucher_attempts;
     DELETE FROM voucher_admin_audit;
+    DELETE FROM voucher_disputes;
     DELETE FROM voucher_cards;
     DELETE FROM voucher_batches;
     DELETE FROM subscriptions;
@@ -275,14 +276,16 @@ describe('production schema baseline', () => {
       'voucher_attempts',
       'voucher_batches',
       'voucher_cards',
+      'voucher_disputes',
       'webhook_events',
     ]);
   });
 
   it('contains the credit-bucket and payment idempotency columns', async () => {
-    const [credits, orders] = await Promise.all([
+    const [credits, orders, voucherCards] = await Promise.all([
       env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
       env.DB.prepare('PRAGMA table_info(orders)').all(),
+      env.DB.prepare('PRAGMA table_info(voucher_cards)').all(),
     ]);
 
     expect(credits.results.map((row) => row.name)).toEqual(expect.arrayContaining([
@@ -302,6 +305,10 @@ describe('production schema baseline', () => {
       'referral_processed_at',
       'is_first_qualified_purchase',
       'referrer_user_id_snapshot',
+    ]));
+    expect(voucherCards.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'dispute_status',
+      'disputed_at',
     ]));
   });
 });
@@ -1563,6 +1570,269 @@ describe('referral purchase rewards', () => {
     expect(orders).toBe(0);
     expect(relationships).toBe(0);
     expect(balance).toBe(0);
+  });
+});
+
+describe('Xianyu voucher dispute reversal', () => {
+  it('requires an administrator, a completed redemption, and a detailed reason', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const regular = await createAuthenticatedUser({
+      email: 'voucher-dispute-regular@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 100 });
+    const voucher = generated.body.vouchers[0];
+
+    const forbidden = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/dispute-reverse`,
+      regular.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'The buyer opened a completed Xianyu dispute.' }),
+      },
+    ));
+    expect(forbidden.status).toBe(403);
+
+    const shortReason = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/dispute-reverse`,
+      admin.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'too short' }),
+      },
+    ));
+    expect(shortReason.status).toBe(400);
+
+    const unredeemed = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/dispute-reverse`,
+      admin.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason: 'The buyer opened a completed Xianyu dispute.' }),
+      },
+    ));
+    expect(unredeemed.status).toBe(409);
+
+    const [disputes, ledgers] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) AS count FROM voucher_disputes').first('count'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_ledger
+         WHERE reason LIKE 'voucher_dispute%'`
+      ).first('count'),
+    ]);
+    expect(disputes).toBe(0);
+    expect(ledgers).toBe(0);
+  });
+
+  it('atomically reverses paid, promotion, and referral credits exactly once', async () => {
+    const { referrer, invitee } = await createReferredPair({
+      label: 'VOUCHER-DISPUTE',
+    });
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, {
+      credits: 300,
+      salesOrderRef: 'XY-DISPUTE-300',
+    });
+    const voucher = generated.body.vouchers[0];
+    const redeem = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      invitee.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'voucher-dispute-invitee',
+          'CF-Connecting-IP': '203.0.113.104',
+        },
+        body: JSON.stringify({ code: voucher.code }),
+      },
+    ));
+    expect(redeem.status).toBe(200);
+
+    const reverse = () => exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/dispute-reverse`,
+      admin.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          reason: 'Xianyu dispute was decided for the buyer and the payment was returned.',
+        }),
+      },
+    ));
+    const first = await reverse();
+    const second = await reverse();
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await jsonResponse(first)).toMatchObject({
+      ok: true,
+      already_reversed: false,
+      dispute: {
+        reversed_paid_credits: 300,
+        reversed_promotion_credits: 30,
+        reversed_referral_credits: 45,
+      },
+    });
+    expect(await jsonResponse(second)).toMatchObject({
+      ok: true,
+      already_reversed: true,
+    });
+
+    const [
+      inviteeBalance,
+      referrerBalance,
+      card,
+      order,
+      grants,
+      reversals,
+      disputeCount,
+      auditCount,
+      relationship,
+    ] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT status, dispute_status, disputed_at
+         FROM voucher_cards WHERE id = ?`
+      ).bind(voucher.id).first(),
+      env.DB.prepare(
+        `SELECT status, is_first_qualified_purchase, refund_amount
+         FROM orders WHERE voucher_card_id = ?`
+      ).bind(voucher.id).first(),
+      env.DB.prepare(
+        `SELECT credit_type, remaining_credits
+         FROM credit_grants WHERE order_id = ?
+         ORDER BY credit_type`
+      ).bind(`voucher:${voucher.id}`).all(),
+      env.DB.prepare(
+        `SELECT reason, delta, reversal_of
+         FROM credit_ledger WHERE order_id = ? AND delta < 0
+         ORDER BY reason`
+      ).bind(`voucher:${voucher.id}`).all(),
+      env.DB.prepare(
+        'SELECT COUNT(*) AS count FROM voucher_disputes WHERE card_id = ?'
+      ).bind(voucher.id).first('count'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM voucher_admin_audit
+         WHERE card_id = ? AND action = 'dispute_reverse'`
+      ).bind(voucher.id).first('count'),
+      env.DB.prepare(
+        `SELECT status, first_paid_order_id
+         FROM referrals WHERE referred_user_id = ?`
+      ).bind(invitee.userId).first(),
+    ]);
+    expect(inviteeBalance).toBe(0);
+    expect(referrerBalance).toBe(0);
+    expect(card).toMatchObject({
+      status: 'redeemed',
+      dispute_status: 'reversed',
+    });
+    expect(card.disputed_at).toBeTypeOf('number');
+    expect(order).toEqual({
+      status: 'refunded',
+      is_first_qualified_purchase: 0,
+      refund_amount: '60.00',
+    });
+    expect(grants.results).toEqual([
+      { credit_type: 'paid', remaining_credits: 0 },
+      { credit_type: 'promotion', remaining_credits: 0 },
+      { credit_type: 'referral', remaining_credits: 0 },
+    ]);
+    expect(reversals.results).toEqual([
+      expect.objectContaining({ reason: 'voucher_dispute', delta: -300 }),
+      expect.objectContaining({ reason: 'voucher_dispute_promotion', delta: -30 }),
+      expect.objectContaining({ reason: 'voucher_dispute_referral', delta: -45 }),
+    ]);
+    expect(reversals.results.every((entry) => entry.reversal_of)).toBe(true);
+    expect(disputeCount).toBe(1);
+    expect(auditCount).toBe(1);
+    expect(relationship).toEqual({ status: 'bound', first_paid_order_id: null });
+
+    const list = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/admin/vouchers?status=disputed',
+      admin.cookie,
+    )));
+    expect(list.vouchers).toHaveLength(1);
+    expect(list.vouchers[0]).toMatchObject({
+      id: voucher.id,
+      status: 'redeemed',
+      dispute_status: 'reversed',
+      dispute_reason: 'Xianyu dispute was decided for the buyer and the payment was returned.',
+    });
+  });
+
+  it('records a negative aggregate balance when redeemed credits were already spent', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const buyer = await createAuthenticatedUser({
+      email: 'voucher-dispute-spent@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 100 });
+    const voucher = generated.body.vouchers[0];
+    const orderId = `voucher:${voucher.id}`;
+    const redeem = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      buyer.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'voucher-dispute-spent',
+          'CF-Connecting-IP': '203.0.113.105',
+        },
+        body: JSON.stringify({ code: voucher.code }),
+      },
+    ));
+    expect(redeem.status).toBe(200);
+
+    const grant = await env.DB.prepare(
+      `SELECT id FROM credit_grants
+       WHERE order_id = ? AND credit_type = 'paid'`
+    ).bind(orderId).first();
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE credit_grants SET remaining_credits = 75 WHERE id = ?`
+      ).bind(grant.id),
+      env.DB.prepare(
+        `UPDATE user_credits SET credits = 75 WHERE user_id = ?`
+      ).bind(buyer.userId),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id,
+          idempotency_key)
+         VALUES ('spent-before-dispute', ?, -25, 'paid',
+                 'ai_background_removal', ?, ?, 'spent-before-dispute')`
+      ).bind(buyer.userId, grant.id, orderId),
+    ]);
+
+    const reversed = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/vouchers/${voucher.id}/dispute-reverse`,
+      admin.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          reason: 'Xianyu dispute completed after some of the purchased credits were consumed.',
+        }),
+      },
+    ));
+    expect(reversed.status).toBe(200);
+
+    const [aggregate, remaining] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(buyer.userId).first('credits'),
+      env.DB.prepare('SELECT remaining_credits FROM credit_grants WHERE id = ?')
+        .bind(grant.id).first('remaining_credits'),
+    ]);
+    expect(aggregate).toBe(-25);
+    expect(remaining).toBe(0);
   });
 });
 

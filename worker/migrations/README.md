@@ -22,12 +22,13 @@ Tracked migrations applied afterward:
 | 4 | `0004_voucher_cards.sql` | 2026-07-24 |
 | 5 | `0005_referral_foundation.sql` | 2026-07-24 |
 | 6 | `0006_referral_reward_idempotency.sql` | 2026-07-24 |
+| 7 | `0007_voucher_dispute_reversal.sql` | pending |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes
 must:
 
-1. start with migration number `0007`;
+1. start with migration number `0008`;
 2. be tested against a copy of production data;
 3. include rollback or forward-repair notes;
 4. be applied with `npm run d1:migrate:remote`, which aborts unless a fresh

@@ -1528,7 +1528,7 @@ export default {
       const query = String(url.searchParams.get('q') || '').trim();
       const status = String(url.searchParams.get('status') || '').trim();
       const allowedStatuses = new Set([
-        'generated', 'reserved', 'delivered', 'redeemed', 'void', 'expired',
+        'generated', 'reserved', 'delivered', 'redeemed', 'disputed', 'void', 'expired',
       ]);
       if (status && !allowedStatuses.has(status)) {
         return privateJson({ error: 'Invalid status' }, 400, origin);
@@ -1544,8 +1544,12 @@ export default {
         bindings.push(pattern, pattern, pattern);
       }
       if (status) {
-        conditions.push('vc.status = ?');
-        bindings.push(status);
+        if (status === 'disputed') {
+          conditions.push(`vc.dispute_status = 'reversed'`);
+        } else {
+          conditions.push('vc.status = ?');
+          bindings.push(status);
+        }
       }
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
       const statement = env.DB.prepare(
@@ -1553,9 +1557,12 @@ export default {
                 vc.base_credits, vc.face_value_minor, vc.currency, vc.status,
                 vc.sales_channel, vc.sales_order_ref, vc.sales_note,
                 vc.reserved_at, vc.delivered_at, vc.redeemed_at,
-                vc.redeem_order_id, vc.created_at, u.email AS redeemed_email
+                vc.redeem_order_id, vc.dispute_status, vc.disputed_at,
+                vc.created_at, u.email AS redeemed_email,
+                vd.reason AS dispute_reason
          FROM voucher_cards vc
          LEFT JOIN users u ON u.id = vc.redeemed_by
+         LEFT JOIN voucher_disputes vd ON vd.card_id = vc.id
          ${where}
          ORDER BY vc.created_at DESC, vc.id DESC
          LIMIT 200`
@@ -1601,6 +1608,226 @@ export default {
         return privateJson({ error: 'Voucher cannot change to that status' }, 409, origin);
       }
       return privateJson({ ok: true, id: cardId, status: targetStatus }, 200, origin);
+    }
+
+    // POST /api/admin/vouchers/:id/dispute-reverse → atomically reverse every
+    // paid, promotion, and referral grant created by a redeemed voucher. The
+    // original card stays "redeemed" for lifecycle audit; dispute_status
+    // records the later Xianyu dispute outcome.
+    const voucherDisputeAction = url.pathname.match(
+      /^\/api\/admin\/vouchers\/([^/]+)\/dispute-reverse$/,
+    );
+    if (voucherDisputeAction && request.method === 'POST') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const cardId = voucherDisputeAction[1];
+      const body = await request.json().catch(() => ({}));
+      const reason = String(body.reason || '').trim();
+      if (reason.length < 10 || reason.length > 500) {
+        return privateJson({
+          error: 'A dispute reason between 10 and 500 characters is required',
+        }, 400, origin);
+      }
+
+      const card = await env.DB.prepare(
+        `SELECT vc.id, vc.status, vc.dispute_status, vc.redeem_order_id,
+                vc.face_value_minor, vc.currency,
+                o.id AS order_id, o.user_id, o.status AS order_status,
+                o.payment_method, o.is_first_qualified_purchase
+         FROM voucher_cards vc
+         LEFT JOIN orders o ON o.id = vc.redeem_order_id
+         WHERE vc.id = ?`
+      ).bind(cardId).first();
+      if (!card) return privateJson({ error: 'Voucher not found' }, 404, origin);
+
+      const existingDispute = await env.DB.prepare(
+        `SELECT id, order_id, reason, reversed_paid_credits,
+                reversed_promotion_credits, reversed_referral_credits, created_at
+         FROM voucher_disputes WHERE card_id = ?`
+      ).bind(cardId).first();
+      if (existingDispute) {
+        return privateJson({
+          ok: true,
+          already_reversed: true,
+          dispute: existingDispute,
+        }, 200, origin);
+      }
+      if (
+        card.status !== 'redeemed'
+        || card.dispute_status !== 'none'
+        || !card.order_id
+        || card.payment_method !== 'voucher'
+        || card.order_status !== 'completed'
+      ) {
+        return privateJson({
+          error: 'Only a completed, redeemed voucher can be dispute-reversed',
+        }, 409, origin);
+      }
+
+      const grants = await env.DB.prepare(
+        `SELECT g.id, g.user_id, g.credit_type, g.granted_credits,
+                (
+                  SELECT l.id FROM credit_ledger l
+                  WHERE l.grant_id = g.id AND l.delta > 0
+                  ORDER BY l.created_at, l.id
+                  LIMIT 1
+                ) AS original_ledger_id
+         FROM credit_grants g
+         WHERE g.order_id = ?
+           AND g.credit_type IN ('paid', 'promotion', 'referral')
+         ORDER BY g.credit_type, g.id`
+      ).bind(card.order_id).all();
+      const grantRows = grants.results || [];
+      if (!grantRows.some((grant) => grant.credit_type === 'paid')) {
+        return privateJson({
+          error: 'The voucher purchase grant is missing; manual review is required',
+        }, 409, origin);
+      }
+
+      const reversedCredits = {
+        paid: 0,
+        promotion: 0,
+        referral: 0,
+      };
+      for (const grant of grantRows) {
+        reversedCredits[grant.credit_type] += Number(grant.granted_credits);
+      }
+
+      const disputeId = `voucher-dispute:${cardId}`;
+      const statements = [
+        env.DB.prepare(
+          `INSERT INTO voucher_disputes
+           (id, card_id, order_id, admin_user_id, reason,
+            reversed_paid_credits, reversed_promotion_credits,
+            reversed_referral_credits)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          disputeId,
+          cardId,
+          card.order_id,
+          admin.sub,
+          reason,
+          reversedCredits.paid,
+          reversedCredits.promotion,
+          reversedCredits.referral,
+        ),
+      ];
+      for (const grant of grantRows) {
+        const reversalId = `${disputeId}:${grant.id}`;
+        const reversalReason = grant.credit_type === 'paid'
+          ? 'voucher_dispute'
+          : grant.credit_type === 'promotion'
+            ? 'voucher_dispute_promotion'
+            : 'voucher_dispute_referral';
+        statements.push(
+          env.DB.prepare(
+            `UPDATE credit_grants
+             SET remaining_credits = 0, updated_at = unixepoch()
+             WHERE id = ?`
+          ).bind(grant.id),
+          env.DB.prepare(
+            `INSERT INTO credit_ledger
+             (id, user_id, delta, balance_type, reason, grant_id, order_id,
+              idempotency_key, reversal_of)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            reversalId,
+            grant.user_id,
+            -Number(grant.granted_credits),
+            grant.credit_type,
+            reversalReason,
+            grant.id,
+            card.order_id,
+            reversalId,
+            grant.original_ledger_id || null,
+          ),
+          env.DB.prepare(
+            'UPDATE user_credits SET credits = credits - ? WHERE user_id = ?'
+          ).bind(grant.granted_credits, grant.user_id),
+        );
+      }
+      statements.push(
+        env.DB.prepare(
+          `UPDATE orders
+           SET status = 'refunded', refunded_at = unixepoch(),
+               refund_amount = ?, failure_detail = 'Voucher dispute reversal',
+               is_first_qualified_purchase = 0
+           WHERE id = ? AND payment_method = 'voucher' AND status = 'completed'`
+        ).bind((Number(card.face_value_minor) / 100).toFixed(2), card.order_id),
+        env.DB.prepare(
+          `UPDATE voucher_cards
+           SET dispute_status = 'reversed', disputed_at = unixepoch()
+           WHERE id = ? AND status = 'redeemed' AND dispute_status = 'none'`
+        ).bind(cardId),
+      );
+      if (Number(card.is_first_qualified_purchase) === 1) {
+        statements.push(
+          env.DB.prepare(
+            `UPDATE referrals
+             SET status = 'bound', first_paid_order_id = NULL, first_paid_at = NULL
+             WHERE referred_user_id = ? AND first_paid_order_id = ?
+               AND risk_status <> 'rejected'
+               AND NOT EXISTS (
+                 SELECT 1 FROM orders
+                 WHERE user_id = ? AND status = 'completed' AND id <> ?
+               )`
+          ).bind(card.user_id, card.order_id, card.user_id, card.order_id),
+        );
+      }
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO voucher_admin_audit
+           (id, admin_user_id, action, card_id, detail_json)
+           VALUES (?, ?, 'dispute_reverse', ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          admin.sub,
+          cardId,
+          JSON.stringify({
+            order_id: card.order_id,
+            reason,
+            reversed_credits: reversedCredits,
+          }),
+        ),
+      );
+
+      try {
+        await env.DB.batch(statements);
+      } catch (error) {
+        const concurrent = await env.DB.prepare(
+          `SELECT id, order_id, reason, reversed_paid_credits,
+                  reversed_promotion_credits, reversed_referral_credits, created_at
+           FROM voucher_disputes WHERE card_id = ?`
+        ).bind(cardId).first();
+        if (concurrent) {
+          return privateJson({
+            ok: true,
+            already_reversed: true,
+            dispute: concurrent,
+          }, 200, origin);
+        }
+        console.error(JSON.stringify({
+          message: 'Voucher dispute reversal failed',
+          cardId,
+          orderId: card.order_id,
+          adminUserId: admin.sub,
+          error: error.message,
+        }));
+        return privateJson({ error: 'Unable to reverse the voucher dispute' }, 500, origin);
+      }
+
+      return privateJson({
+        ok: true,
+        already_reversed: false,
+        dispute: {
+          id: disputeId,
+          order_id: card.order_id,
+          reason,
+          reversed_paid_credits: reversedCredits.paid,
+          reversed_promotion_credits: reversedCredits.promotion,
+          reversed_referral_credits: reversedCredits.referral,
+        },
+      }, 200, origin);
     }
 
     // POST /api/vouchers/redeem → server-side, rate-limited, atomic redemption.

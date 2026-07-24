@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0006_referral_reward_idempotency.sql.
+-- Includes tracked migrations through 0007_voucher_dispute_reversal.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to
@@ -265,6 +265,9 @@ CREATE TABLE IF NOT EXISTS voucher_cards (
   redeemed_by TEXT,
   redeemed_at INTEGER,
   redeem_order_id TEXT,
+  dispute_status TEXT NOT NULL DEFAULT 'none'
+    CHECK (dispute_status IN ('none', 'reversed')),
+  disputed_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (batch_id) REFERENCES voucher_batches(id),
   FOREIGN KEY (redeemed_by) REFERENCES users(id),
@@ -318,6 +321,27 @@ ON voucher_admin_audit(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_voucher_admin_audit_card
 ON voucher_admin_audit(card_id, created_at);
+
+CREATE TABLE IF NOT EXISTS voucher_disputes (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL UNIQUE,
+  order_id TEXT NOT NULL UNIQUE,
+  admin_user_id TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (length(reason) BETWEEN 10 AND 500),
+  reversed_paid_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (reversed_paid_credits >= 0),
+  reversed_promotion_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (reversed_promotion_credits >= 0),
+  reversed_referral_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (reversed_referral_credits >= 0),
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (card_id) REFERENCES voucher_cards(id),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (admin_user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_voucher_disputes_created
+ON voucher_disputes(created_at);
 
 CREATE TABLE IF NOT EXISTS referral_codes (
   code TEXT PRIMARY KEY,
