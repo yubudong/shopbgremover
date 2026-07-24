@@ -25,6 +25,9 @@ FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
 ADMIN_EMAILS = "yubudong2023@gmail.com"
 
+[triggers]
+crons = ["17 * * * *"]
+
 [[routes]]
 pattern = "api.shopbgremover.com/*"
 zone_name = "shopbgremover.com"

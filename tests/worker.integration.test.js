@@ -28,6 +28,7 @@ beforeEach(async () => {
     DELETE FROM voucher_disputes;
     DELETE FROM voucher_cards;
     DELETE FROM voucher_batches;
+    DELETE FROM referral_reward_holds;
     DELETE FROM referral_reward_reviews;
     DELETE FROM subscriptions;
     DELETE FROM sso_codes;
@@ -119,6 +120,15 @@ function authenticatedRequest(path, cookie, init = {}) {
   headers.set('Cookie', cookie);
   if (init.body) headers.set('Content-Type', 'application/json');
   return new Request(`${API_ORIGIN}${path}`, { ...init, headers });
+}
+
+async function releasePendingRewardHolds() {
+  await env.DB.prepare(
+    `UPDATE referral_reward_holds
+     SET release_at = unixepoch() - 1
+     WHERE status = 'pending'`
+  ).run();
+  await exports.default.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, env);
 }
 
 function removeBackgroundRequest({
@@ -267,6 +277,7 @@ describe('production schema baseline', () => {
       'orders',
       'processing_history',
       'referral_codes',
+      'referral_reward_holds',
       'referral_reward_reviews',
       'referrals',
       'sso_codes',
@@ -284,12 +295,13 @@ describe('production schema baseline', () => {
   });
 
   it('contains the credit-bucket and payment idempotency columns', async () => {
-    const [credits, orders, voucherCards, referralCodes, reviews] = await Promise.all([
+    const [credits, orders, voucherCards, referralCodes, reviews, holds] = await Promise.all([
       env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
       env.DB.prepare('PRAGMA table_info(orders)').all(),
       env.DB.prepare('PRAGMA table_info(voucher_cards)').all(),
       env.DB.prepare('PRAGMA table_info(referral_codes)').all(),
       env.DB.prepare('PRAGMA table_info(referral_reward_reviews)').all(),
+      env.DB.prepare('PRAGMA table_info(referral_reward_holds)').all(),
     ]);
 
     expect(credits.results.map((row) => row.name)).toEqual(expect.arrayContaining([
@@ -324,6 +336,14 @@ describe('production schema baseline', () => {
       'pending_referral_credits',
       'risk_score',
       'risk_reasons_json',
+      'status',
+    ]));
+    expect(holds.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'pending_promotion_credits',
+      'pending_referral_credits',
+      'release_at',
+      'released_at',
+      'cancelled_at',
       'status',
     ]));
   });
@@ -1217,7 +1237,7 @@ describe('referral purchase rewards', () => {
       total_reward_credits: 45,
       reversed_reward_credits: 0,
       expired_reward_credits: 0,
-      reward_release_policy: 'immediate',
+      reward_release_policy: 'seven_day_observation',
       registered_count: 1,
       paid_count: 1,
     });
@@ -1276,7 +1296,7 @@ describe('referral purchase rewards', () => {
       available_reward_credits: 0,
       total_reward_credits: 45,
       reversed_reward_credits: 45,
-      reward_release_policy: 'immediate',
+      reward_release_policy: 'seven_day_observation',
     });
     expect(reversed.next_reward_expiry_at).toBeNull();
     expect(reversed.reward_history.find((entry) => entry.id === grantId)).toMatchObject({
@@ -1321,6 +1341,42 @@ describe('referral purchase rewards', () => {
     ));
     expect((await captureRequest()).status).toBe(200);
     expect((await captureRequest()).status).toBe(200);
+    const pendingHold = await env.DB.prepare(
+      `SELECT status, pending_promotion_credits, pending_referral_credits,
+              release_at
+       FROM referral_reward_holds WHERE order_id = 'FIRST-REWARD-ORDER'`
+    ).first();
+    expect(pendingHold).toEqual(expect.objectContaining({
+      status: 'pending',
+      pending_promotion_credits: 30,
+      pending_referral_credits: 45,
+    }));
+    expect(pendingHold.release_at).toBeGreaterThan(
+      Math.floor(Date.now() / 1000) + 6 * 24 * 60 * 60,
+    );
+    await exports.default.scheduled(
+      { cron: '17 * * * *', scheduledTime: Date.now() },
+      env,
+    );
+    expect(await env.DB.prepare(
+      `SELECT status FROM referral_reward_holds
+       WHERE order_id = 'FIRST-REWARD-ORDER'`
+    ).first('status')).toBe('pending');
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(invitee.userId).first('credits')).toBe(300);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(referrer.userId).first('credits')).toBe(0);
+    const pendingOverview = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+    )));
+    expect(pendingOverview).toMatchObject({
+      pending_reward_credits: 45,
+      available_reward_credits: 0,
+      reward_release_policy: 'seven_day_observation',
+    });
+    expect(pendingOverview.next_pending_release_at).toBe(pendingHold.release_at);
+    await releasePendingRewardHolds();
 
     const [inviteeBalance, referrerBalance, order, grants, relationship] = await Promise.all([
       env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
@@ -1415,6 +1471,7 @@ describe('referral purchase rewards', () => {
       ));
       expect(response.status).toBe(200);
     }
+    await releasePendingRewardHolds();
 
     const [inviteeBalance, referrerBalance, secondOrder, secondRewards] = await Promise.all([
       env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
@@ -1481,6 +1538,7 @@ describe('referral purchase rewards', () => {
       capture('DUAL-FIRST-B'),
     ]);
     expect(responses.every((response) => response.status === 200)).toBe(true);
+    await releasePendingRewardHolds();
 
     const [firstCount, inviteeBalance, referrerBalance, promotionCount, referralTotal] = await Promise.all([
       env.DB.prepare(
@@ -1538,6 +1596,7 @@ describe('referral purchase rewards', () => {
       },
     ));
     expect(response.status).toBe(200);
+    await releasePendingRewardHolds();
 
     const [inviteeBalance, referrerBalance, relationship, grants] = await Promise.all([
       env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
@@ -1580,6 +1639,7 @@ describe('referral purchase rewards', () => {
       },
     ));
     expect(response.status).toBe(200);
+    await releasePendingRewardHolds();
 
     const [inviteeBalance, referrerBalance, order] = await Promise.all([
       env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
@@ -1645,6 +1705,7 @@ describe('referral purchase rewards', () => {
       },
     ));
     expect(response.status).toBe(200);
+    await releasePendingRewardHolds();
 
     const [relationship, inviteeBalance, referrerBalance] = await Promise.all([
       env.DB.prepare(
@@ -1808,6 +1869,12 @@ describe('voucher referral risk review', () => {
     expect((await approve()).status).toBe(200);
     expect((await approve()).status).toBe(200);
     expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(invitee.userId).first('credits')).toBe(300);
+    expect(await env.DB.prepare(
+      `SELECT status FROM referral_reward_holds WHERE order_id = ?`
+    ).bind(review.order_id).first('status')).toBe('pending');
+    await releasePendingRewardHolds();
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
       .bind(invitee.userId).first('credits')).toBe(330);
     expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
       .bind(referrer.userId).first('credits')).toBe(45);
@@ -1935,8 +2002,8 @@ describe('Xianyu voucher dispute reversal', () => {
       already_reversed: false,
       dispute: {
         reversed_paid_credits: 300,
-        reversed_promotion_credits: 30,
-        reversed_referral_credits: 45,
+        reversed_promotion_credits: 0,
+        reversed_referral_credits: 0,
       },
     });
     expect(await jsonResponse(second)).toMatchObject({
@@ -1954,6 +2021,7 @@ describe('Xianyu voucher dispute reversal', () => {
       disputeCount,
       auditCount,
       relationship,
+      holdStatus,
     ] = await Promise.all([
       env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
         .bind(invitee.userId).first('credits'),
@@ -1988,6 +2056,9 @@ describe('Xianyu voucher dispute reversal', () => {
         `SELECT status, first_paid_order_id
          FROM referrals WHERE referred_user_id = ?`
       ).bind(invitee.userId).first(),
+      env.DB.prepare(
+        `SELECT status FROM referral_reward_holds WHERE order_id = ?`
+      ).bind(`voucher:${voucher.id}`).first('status'),
     ]);
     expect(inviteeBalance).toBe(0);
     expect(referrerBalance).toBe(0);
@@ -2003,18 +2074,15 @@ describe('Xianyu voucher dispute reversal', () => {
     });
     expect(grants.results).toEqual([
       { credit_type: 'paid', remaining_credits: 0 },
-      { credit_type: 'promotion', remaining_credits: 0 },
-      { credit_type: 'referral', remaining_credits: 0 },
     ]);
     expect(reversals.results).toEqual([
       expect.objectContaining({ reason: 'voucher_dispute', delta: -300 }),
-      expect.objectContaining({ reason: 'voucher_dispute_promotion', delta: -30 }),
-      expect.objectContaining({ reason: 'voucher_dispute_referral', delta: -45 }),
     ]);
     expect(reversals.results.every((entry) => entry.reversal_of)).toBe(true);
     expect(disputeCount).toBe(1);
     expect(auditCount).toBe(1);
     expect(relationship).toEqual({ status: 'bound', first_paid_order_id: null });
+    expect(holdStatus).toBe('cancelled');
 
     const list = await jsonResponse(await exports.default.fetch(authenticatedRequest(
       '/api/admin/vouchers?status=disputed',
@@ -2215,6 +2283,7 @@ describe('PayPal refund webhook', () => {
       },
     ));
     expect(capture.status).toBe(200);
+    await releasePendingRewardHolds();
 
     const event = {
       id: 'WH-REFUND-REWARDS',

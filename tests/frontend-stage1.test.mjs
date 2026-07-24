@@ -177,10 +177,11 @@ test('voucher redemption and referral center use server-backed referral APIs', a
   assert.match(referrals, /credentials:\s*'include'/);
   assert.match(referrals, /available_reward_credits/);
   assert.match(referrals, /pending_reward_credits/);
+  assert.match(referrals, /next_pending_release_at/);
   assert.match(referrals, /'X-Device-ID': deviceId/);
   assert.match(referrals, /reward_history/);
   assert.match(referrals, /renderInvitees\(data\.invitees/);
-  assert.match(referrals, /付款成功并通过风控后立即可用/);
+  assert.match(referrals, /7 天观察期/);
   assert.doesNotMatch(referrals, /\.innerHTML\s*=/);
   assert.doesNotMatch(referrals, /localStorage.*referral/i);
 });
@@ -192,6 +193,11 @@ test('referral review admin uses masked risk queue and explicit decisions', asyn
   assert.match(admin, /same_device/);
   assert.match(admin, /审核说明必须为 3–500 个字符/);
   assert.doesNotMatch(admin, /\.innerHTML\s*=/);
+});
+
+test('referral reward observation release has an hourly cron trigger', async () => {
+  const config = await read('wrangler.toml');
+  assert.match(config, /\[triggers\][\s\S]*crons\s*=\s*\["17 \* \* \* \*"\]/);
 });
 
 test('voucher admin exposes server-backed dispute reversal with an explicit reason', async () => {

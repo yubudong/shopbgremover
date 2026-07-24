@@ -24,6 +24,7 @@ const VOUCHER_IP_FAILURE_LIMIT = 20;
 const REFERRAL_CODE_LENGTH = 8;
 const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 const REFERRAL_REWARD_TTL_SECONDS = 90 * 24 * 60 * 60;
+const REFERRAL_OBSERVATION_SECONDS = 7 * 24 * 60 * 60;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -795,7 +796,7 @@ function orderBenefitStatements(env, {
            is_first_qualified_purchase = ?, referrer_user_id_snapshot = ?
        WHERE id = ? AND user_id = ? AND status = 'completed'`
     ).bind(
-      review?.holdForReview ? 0 : benefits.promotionCredits,
+      0,
       benefits.isFirstPurchase ? 1 : 0,
       referrerSnapshot,
       orderId,
@@ -847,12 +848,33 @@ function orderBenefitStatements(env, {
       statements.push(
         env.DB.prepare(
           `UPDATE referrals
-           SET status = CASE WHEN ? > 0 THEN 'qualified' ELSE status END,
-               first_paid_order_id = COALESCE(first_paid_order_id, ?),
+           SET first_paid_order_id = COALESCE(first_paid_order_id, ?),
                first_paid_at = COALESCE(first_paid_at, unixepoch())
            WHERE id = ?`
-        ).bind(benefits.referralCredits, orderId, benefits.relationship.id),
+        ).bind(orderId, benefits.relationship.id),
       );
+      if (benefits.promotionCredits > 0 || benefits.referralCredits > 0) {
+        statements.push(
+          env.DB.prepare(
+            `INSERT INTO referral_reward_holds
+             (id, order_id, relationship_id, referrer_user_id, referred_user_id,
+              pending_promotion_credits, pending_referral_credits,
+              source, release_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'automatic',
+                     unixepoch() + ?)`
+          ).bind(
+            `hold:${orderId}`,
+            orderId,
+            benefits.relationship.id,
+            benefits.referrerUserId,
+            userId,
+            benefits.promotionCredits,
+            benefits.referralCredits,
+            REFERRAL_OBSERVATION_SECONDS,
+          ),
+        );
+        return statements;
+      }
     }
   }
 
@@ -963,6 +985,139 @@ function paidCreditStatements(env, {
       'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
     ).bind(baseCredits, userId),
   ];
+}
+
+async function releaseDueRewardHolds(env, limit = 50) {
+  const due = await env.DB.prepare(
+    `SELECT h.*, o.is_first_qualified_purchase
+     FROM referral_reward_holds h
+     JOIN orders o ON o.id = h.order_id
+     JOIN referrals r ON r.id = h.relationship_id
+     WHERE h.status = 'pending' AND h.release_at <= unixepoch()
+       AND o.status = 'completed' AND r.risk_status = 'normal'
+     ORDER BY h.release_at, h.id
+     LIMIT ?`
+  ).bind(limit).all();
+  let released = 0;
+
+  for (const hold of due.results || []) {
+    const statements = [
+      env.DB.prepare(
+        `UPDATE referral_reward_holds
+         SET status = 'released', released_at = unixepoch()
+         WHERE id = ? AND status = 'pending' AND release_at <= unixepoch()`
+      ).bind(hold.id),
+      env.DB.prepare(
+        `UPDATE orders SET bonus_credits = ?
+         WHERE id = ? AND status = 'completed'
+           AND EXISTS (
+             SELECT 1 FROM referral_reward_holds
+             WHERE id = ? AND status = 'released'
+           )`
+      ).bind(hold.pending_promotion_credits, hold.order_id, hold.id),
+      env.DB.prepare(
+        `UPDATE referrals
+         SET status = CASE WHEN ? > 0 THEN 'qualified' ELSE status END
+         WHERE id = ? AND risk_status = 'normal'
+           AND EXISTS (
+             SELECT 1 FROM referral_reward_holds
+             WHERE id = ? AND status = 'released'
+           )`
+      ).bind(hold.pending_referral_credits, hold.relationship_id, hold.id),
+    ];
+
+    if (Number(hold.pending_promotion_credits) > 0) {
+      const promotionId = `first-purchase:${hold.order_id}:invitee`;
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO credit_grants
+           (id, user_id, credit_type, granted_credits, remaining_credits,
+            order_id, related_user_id, idempotency_key)
+           SELECT ?, ?, 'promotion', ?, ?, ?, ?, ?
+           FROM referral_reward_holds
+           WHERE id = ? AND status = 'released'`
+        ).bind(
+          promotionId, hold.referred_user_id,
+          hold.pending_promotion_credits, hold.pending_promotion_credits,
+          hold.order_id, hold.referrer_user_id, promotionId, hold.id,
+        ),
+        env.DB.prepare(
+          `INSERT INTO credit_ledger
+           (id, user_id, delta, balance_type, reason, grant_id, order_id,
+            related_user_id, idempotency_key)
+           SELECT ?, ?, ?, 'promotion', 'first_purchase_bonus', ?, ?, ?, ?
+           FROM referral_reward_holds
+           WHERE id = ? AND status = 'released'`
+        ).bind(
+          promotionId, hold.referred_user_id,
+          hold.pending_promotion_credits, promotionId, hold.order_id,
+          hold.referrer_user_id, promotionId, hold.id,
+        ),
+        env.DB.prepare(
+          `UPDATE user_credits SET credits = credits + ?
+           WHERE user_id = ? AND EXISTS (
+             SELECT 1 FROM referral_reward_holds
+             WHERE id = ? AND status = 'released'
+           )`
+        ).bind(hold.pending_promotion_credits, hold.referred_user_id, hold.id),
+      );
+    }
+
+    if (Number(hold.pending_referral_credits) > 0) {
+      const prefix = Number(hold.is_first_qualified_purchase) === 1
+        ? 'first-referral'
+        : 'repeat-referral';
+      const reason = Number(hold.is_first_qualified_purchase) === 1
+        ? 'referral_first_purchase'
+        : 'referral_repeat_purchase';
+      const referralId = `${prefix}:${hold.order_id}:referrer`;
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO credit_grants
+           (id, user_id, credit_type, granted_credits, remaining_credits,
+            order_id, related_user_id, expires_at, idempotency_key)
+           SELECT ?, ?, 'referral', ?, ?, ?, ?, unixepoch() + ?, ?
+           FROM referral_reward_holds
+           WHERE id = ? AND status = 'released'`
+        ).bind(
+          referralId, hold.referrer_user_id,
+          hold.pending_referral_credits, hold.pending_referral_credits,
+          hold.order_id, hold.referred_user_id,
+          REFERRAL_REWARD_TTL_SECONDS, referralId, hold.id,
+        ),
+        env.DB.prepare(
+          `INSERT INTO credit_ledger
+           (id, user_id, delta, balance_type, reason, grant_id, order_id,
+            related_user_id, idempotency_key)
+           SELECT ?, ?, ?, 'referral', ?, ?, ?, ?, ?
+           FROM referral_reward_holds
+           WHERE id = ? AND status = 'released'`
+        ).bind(
+          referralId, hold.referrer_user_id,
+          hold.pending_referral_credits, reason, referralId,
+          hold.order_id, hold.referred_user_id, referralId, hold.id,
+        ),
+        env.DB.prepare(
+          `UPDATE user_credits SET credits = credits + ?
+           WHERE user_id = ? AND EXISTS (
+             SELECT 1 FROM referral_reward_holds
+             WHERE id = ? AND status = 'released'
+           )`
+        ).bind(hold.pending_referral_credits, hold.referrer_user_id, hold.id),
+      );
+    }
+
+    try {
+      await env.DB.batch(statements);
+      released += 1;
+    } catch (error) {
+      const current = await env.DB.prepare(
+        'SELECT status FROM referral_reward_holds WHERE id = ?'
+      ).bind(hold.id).first('status');
+      if (current !== 'released') throw error;
+    }
+  }
+  return released;
 }
 
 // ── Router ────────────────────────────────────────────────────
@@ -1290,10 +1445,18 @@ export default {
            WHERE user_id = ? AND credit_type = 'referral'`
         ).bind(user.sub, user.sub).first(),
         env.DB.prepare(
-          `SELECT COALESCE(SUM(pending_referral_credits), 0) AS credits
-           FROM referral_reward_reviews
-           WHERE referrer_user_id = ? AND status = 'pending'`
-        ).bind(user.sub).first(),
+          `SELECT COALESCE(SUM(pending_referral_credits), 0) AS credits,
+                  MIN(release_at) AS next_release_at
+           FROM (
+             SELECT pending_referral_credits, NULL AS release_at
+             FROM referral_reward_reviews
+             WHERE referrer_user_id = ? AND status = 'pending'
+             UNION ALL
+             SELECT pending_referral_credits, release_at
+             FROM referral_reward_holds
+             WHERE referrer_user_id = ? AND status = 'pending'
+           )`
+        ).bind(user.sub, user.sub).first(),
         env.DB.prepare(
           `SELECT l.id, l.delta, l.reason, l.order_id, l.created_at,
                   l.reversal_of, g.remaining_credits, g.expires_at,
@@ -1340,6 +1503,9 @@ export default {
         paid_count: Number(counts?.paid_count || 0),
         review_count: Number(counts?.review_count || 0),
         pending_reward_credits: Number(pendingRewards?.credits || 0),
+        next_pending_release_at: pendingRewards?.next_release_at == null
+          ? null
+          : Number(pendingRewards.next_release_at),
         available_reward_credits: Number(rewardTotals?.available_credits || 0),
         total_reward_credits: Number(rewardTotals?.total_granted || 0),
         reversed_reward_credits: Number(rewardTotals?.reversed_credits || 0),
@@ -1347,9 +1513,7 @@ export default {
         next_reward_expiry_at: rewardTotals?.next_expiry_at == null
           ? null
           : Number(rewardTotals.next_expiry_at),
-        reward_release_policy: Number(pendingRewards?.credits || 0) > 0
-          ? 'risk_review'
-          : 'immediate',
+        reward_release_policy: 'seven_day_observation',
         reward_history: (rewardHistory.results || []).map((entry) => {
           let entryStatus = 'used';
           if (Number(entry.delta) < 0) entryStatus = 'reversal';
@@ -1646,104 +1810,33 @@ export default {
         statements.push(
           env.DB.prepare(
             `UPDATE referrals
-             SET status = CASE WHEN ? > 0 THEN 'qualified' ELSE status END,
-                 risk_status = 'normal'
+             SET risk_status = 'normal'
              WHERE id = ? AND EXISTS (
                SELECT 1 FROM referral_reward_reviews
                WHERE id = ? AND status = 'approved' AND reviewed_by = ?
              )`
-          ).bind(review.pending_referral_credits, review.relationship_id, reviewId, admin.sub),
+          ).bind(review.relationship_id, reviewId, admin.sub),
           env.DB.prepare(
-            `UPDATE orders
-             SET bonus_credits = ?
-             WHERE id = ? AND EXISTS (
-               SELECT 1 FROM referral_reward_reviews
-               WHERE id = ? AND status = 'approved' AND reviewed_by = ?
-             )`
-          ).bind(review.pending_promotion_credits, review.order_id, reviewId, admin.sub),
+            `INSERT INTO referral_reward_holds
+             (id, order_id, relationship_id, referrer_user_id, referred_user_id,
+              pending_promotion_credits, pending_referral_credits,
+              source, release_at)
+             SELECT ?, order_id, relationship_id, referrer_user_id,
+                    referred_user_id, pending_promotion_credits,
+                    pending_referral_credits, 'risk_approved',
+                    MAX(unixepoch(), (
+                      SELECT completed_at + ?
+                      FROM orders WHERE id = referral_reward_reviews.order_id
+                    ))
+             FROM referral_reward_reviews
+             WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
+          ).bind(
+            `hold:${review.order_id}`,
+            REFERRAL_OBSERVATION_SECONDS,
+            reviewId,
+            admin.sub,
+          ),
         );
-        if (Number(review.pending_promotion_credits) > 0) {
-          const promotionId = `first-purchase:${review.order_id}:invitee`;
-          statements.push(
-            env.DB.prepare(
-              `INSERT INTO credit_grants
-               (id, user_id, credit_type, granted_credits, remaining_credits,
-                order_id, related_user_id, idempotency_key)
-               SELECT ?, ?, 'promotion', ?, ?, ?, ?, ?
-               FROM referral_reward_reviews
-               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
-            ).bind(
-              promotionId, review.referred_user_id,
-              review.pending_promotion_credits, review.pending_promotion_credits,
-              review.order_id, review.referrer_user_id, promotionId,
-              reviewId, admin.sub,
-            ),
-            env.DB.prepare(
-              `INSERT INTO credit_ledger
-               (id, user_id, delta, balance_type, reason, grant_id, order_id,
-                related_user_id, idempotency_key)
-               SELECT ?, ?, ?, 'promotion', 'first_purchase_bonus', ?, ?, ?, ?
-               FROM referral_reward_reviews
-               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
-            ).bind(
-              promotionId, review.referred_user_id,
-              review.pending_promotion_credits, promotionId, review.order_id,
-              review.referrer_user_id, promotionId, reviewId, admin.sub,
-            ),
-            env.DB.prepare(
-              `UPDATE user_credits SET credits = credits + ?
-               WHERE user_id = ? AND EXISTS (
-                 SELECT 1 FROM referral_reward_reviews
-                 WHERE id = ? AND status = 'approved' AND reviewed_by = ?
-               )`
-            ).bind(review.pending_promotion_credits, review.referred_user_id, reviewId, admin.sub),
-          );
-        }
-        if (Number(review.pending_referral_credits) > 0) {
-          const prefix = Number(review.is_first_qualified_purchase) === 1
-            ? 'first-referral'
-            : 'repeat-referral';
-          const reason = Number(review.is_first_qualified_purchase) === 1
-            ? 'referral_first_purchase'
-            : 'referral_repeat_purchase';
-          const referralId = `${prefix}:${review.order_id}:referrer`;
-          statements.push(
-            env.DB.prepare(
-              `INSERT INTO credit_grants
-               (id, user_id, credit_type, granted_credits, remaining_credits,
-                order_id, related_user_id, expires_at, idempotency_key)
-               SELECT ?, ?, 'referral', ?, ?, ?, ?,
-                      unixepoch() + ?, ?
-               FROM referral_reward_reviews
-               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
-            ).bind(
-              referralId, review.referrer_user_id,
-              review.pending_referral_credits, review.pending_referral_credits,
-              review.order_id, review.referred_user_id,
-              REFERRAL_REWARD_TTL_SECONDS, referralId, reviewId, admin.sub,
-            ),
-            env.DB.prepare(
-              `INSERT INTO credit_ledger
-               (id, user_id, delta, balance_type, reason, grant_id, order_id,
-                related_user_id, idempotency_key)
-               SELECT ?, ?, ?, 'referral', ?, ?, ?, ?, ?
-               FROM referral_reward_reviews
-               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
-            ).bind(
-              referralId, review.referrer_user_id,
-              review.pending_referral_credits, reason, referralId,
-              review.order_id, review.referred_user_id, referralId,
-              reviewId, admin.sub,
-            ),
-            env.DB.prepare(
-              `UPDATE user_credits SET credits = credits + ?
-               WHERE user_id = ? AND EXISTS (
-                 SELECT 1 FROM referral_reward_reviews
-                 WHERE id = ? AND status = 'approved' AND reviewed_by = ?
-               )`
-            ).bind(review.pending_referral_credits, review.referrer_user_id, reviewId, admin.sub),
-          );
-        }
       }
 
       try {
@@ -2127,6 +2220,18 @@ export default {
           reversedCredits.promotion,
           reversedCredits.referral,
         ),
+        env.DB.prepare(
+          `UPDATE referral_reward_holds
+           SET status = 'cancelled', cancelled_at = unixepoch(),
+               cancellation_reason = 'voucher_dispute'
+           WHERE order_id = ? AND status = 'pending'`
+        ).bind(card.order_id),
+        env.DB.prepare(
+          `UPDATE referral_reward_reviews
+           SET status = 'rejected', reviewed_at = unixepoch(),
+               review_note = 'Cancelled by voucher dispute'
+           WHERE order_id = ? AND status = 'pending'`
+        ).bind(card.order_id),
       ];
       for (const grant of grantRows) {
         const reversalId = `${disputeId}:${grant.id}`;
@@ -2795,7 +2900,20 @@ export default {
           throw new Error('Paid credit grant not found for refunded order');
         }
 
-        const statements = [];
+        const statements = [
+          env.DB.prepare(
+            `UPDATE referral_reward_holds
+             SET status = 'cancelled', cancelled_at = unixepoch(),
+                 cancellation_reason = 'paypal_refund'
+             WHERE order_id = ? AND status = 'pending'`
+          ).bind(order.id),
+          env.DB.prepare(
+            `UPDATE referral_reward_reviews
+             SET status = 'rejected', reviewed_at = unixepoch(),
+                 review_note = 'Cancelled by PayPal refund'
+             WHERE order_id = ? AND status = 'pending'`
+          ).bind(order.id),
+        ];
         for (const grant of grantRows) {
           const reversalId = `paypal-refund:${captureId}:${grant.id}`;
           const reversalReason = grant.credit_type === 'paid'
@@ -2887,5 +3005,13 @@ export default {
     }
 
     return json({ error: 'Not found' }, 404, origin);
+  },
+
+  async scheduled(_controller, env) {
+    const released = await releaseDueRewardHolds(env);
+    console.log(JSON.stringify({
+      message: 'Referral reward observation release completed',
+      released,
+    }));
   },
 };

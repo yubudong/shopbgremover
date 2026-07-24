@@ -71,7 +71,7 @@
         alert('审核说明必须为 3–500 个字符。');
         return;
       }
-      if (!confirm(decision === 'approve' ? '确认释放双方待审奖励？' : '确认拒绝且不发放奖励？')) return;
+      if (!confirm(decision === 'approve' ? '确认通过风控审核并进入 7 天观察期？' : '确认拒绝且不发放奖励？')) return;
       button.disabled = true;
       try {
         await api(`/api/admin/referral-reviews/${encodeURIComponent(id)}/${decision}`, {

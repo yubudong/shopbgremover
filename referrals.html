@@ -204,9 +204,11 @@
         document.getElementById('pendingRewards').textContent = data.pending_reward_credits;
         document.getElementById('totalRewards').textContent = data.total_reward_credits;
         document.getElementById('reversedRewards').textContent = data.reversed_reward_credits;
-        document.getElementById('rewardPolicy').textContent = data.reward_release_policy === 'risk_review'
-          ? '检测到高风险卡密邀请，相关奖励正在人工审核；购买积分已正常到账。'
-          : '当前规则：付款成功并通过风控后立即可用，因此待生效奖励为 0。';
+        document.getElementById('rewardPolicy').textContent = data.review_count > 0
+          ? '部分卡密邀请正在人工审核；审核通过后仍需满足 7 天观察期，购买积分不受影响。'
+          : data.next_pending_release_at
+            ? `奖励采用 7 天观察期，预计下一批于 ${formatTime(data.next_pending_release_at)} 转为可用。`
+            : '奖励采用 7 天观察期；期内发生退款、争议或拒付将取消奖励。';
         document.getElementById('expiryStatus').textContent = data.next_reward_expiry_at
           ? `最近一批可用奖励将在 ${formatTime(data.next_reward_expiry_at)} 到期；已过期未使用：${data.expired_reward_credits}。`
           : `当前没有待到期的可用奖励；已过期未使用：${data.expired_reward_credits}。`;
