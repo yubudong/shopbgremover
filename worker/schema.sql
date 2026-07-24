@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0005_referral_foundation.sql.
+-- Includes tracked migrations through 0006_referral_reward_idempotency.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to
@@ -75,6 +75,10 @@ WHERE voucher_card_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_referral_processing
 ON orders(user_id, referral_processed_at, completed_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_one_first_qualified_purchase
+ON orders(user_id)
+WHERE is_first_qualified_purchase = 1;
 
 CREATE TABLE IF NOT EXISTS free_usage (
   ip TEXT PRIMARY KEY,

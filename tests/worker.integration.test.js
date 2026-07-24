@@ -163,11 +163,12 @@ function completedPayPalOrder({
   captureId = `CAPTURE-${orderId}`,
   amount = '3.49',
   currency = 'USD',
+  payerId = 'PAYER-1',
 } = {}) {
   return {
     id: orderId,
     status: 'COMPLETED',
-    payer: { payer_id: 'PAYER-1' },
+    payer: { payer_id: payerId },
     purchase_units: [{
       payments: {
         captures: [{
@@ -198,6 +199,49 @@ async function generateVoucher(cookie, {
     },
   ));
   return { response, body: await jsonResponse(response) };
+}
+
+async function createReferredPair({
+  label,
+  referrerPayerId = `REFERRER-PAYER-${label}`,
+} = {}) {
+  const referrer = await createAuthenticatedUser({
+    email: `${label}-referrer@example.com`,
+    credits: 0,
+    deviceId: `${label}-referrer-device`,
+  });
+  await env.DB.prepare(
+    `INSERT INTO orders
+     (id, user_id, plan, amount, credits, base_credits, currency, status,
+      paypal_capture_id, paypal_payer_id, completed_at)
+     VALUES (?, ?, 'credits_100', 3.49, 100, 100, 'USD', 'completed',
+             ?, ?, unixepoch())`
+  ).bind(
+    `${label}-REFERRER-ORDER`,
+    referrer.userId,
+    `${label}-REFERRER-CAPTURE`,
+    referrerPayerId,
+  ).run();
+  const referral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+    '/api/referrals/me',
+    referrer.cookie,
+  )));
+  const capture = await exports.default.fetch(new Request(
+    `${API_ORIGIN}/api/referrals/capture`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: referral.code }),
+    },
+  ));
+  const pendingCookie = capture.headers.get('Set-Cookie').split(';', 1)[0];
+  const invitee = await createAuthenticatedUser({
+    email: `${label}-invitee@example.com`,
+    credits: 0,
+    deviceId: `${label}-invitee-device`,
+    pendingCookie,
+  });
+  return { referrer, invitee, referral };
 }
 
 describe('production schema baseline', () => {
@@ -1097,6 +1141,320 @@ describe('PayPal order flow', () => {
   });
 });
 
+describe('referral purchase rewards', () => {
+  it('grants a 30-credit invitee bonus and 15% first-purchase referral reward once', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'FIRST-REWARD' });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES ('FIRST-REWARD-ORDER', ?, 'credits_300', 8.99, 300, 300, 'USD', 'pending')`
+    ).bind(invitee.userId).run();
+
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({
+          orderId: 'FIRST-REWARD-ORDER',
+          captureId: 'FIRST-REWARD-CAPTURE',
+          amount: '8.99',
+          payerId: 'FIRST-REWARD-BUYER-PAYER',
+        }));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    }));
+
+    const captureRequest = () => exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      invitee.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'FIRST-REWARD-ORDER' }),
+      },
+    ));
+    expect((await captureRequest()).status).toBe(200);
+    expect((await captureRequest()).status).toBe(200);
+
+    const [inviteeBalance, referrerBalance, order, grants, relationship] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT bonus_credits, is_first_qualified_purchase,
+                referrer_user_id_snapshot, referral_processed_at
+         FROM orders WHERE id = 'FIRST-REWARD-ORDER'`
+      ).first(),
+      env.DB.prepare(
+        `SELECT credit_type, granted_credits, expires_at
+         FROM credit_grants
+         WHERE order_id = 'FIRST-REWARD-ORDER'
+         ORDER BY credit_type`
+      ).all(),
+      env.DB.prepare(
+        `SELECT status, first_paid_order_id, risk_status
+         FROM referrals WHERE referred_user_id = ?`
+      ).bind(invitee.userId).first(),
+    ]);
+
+    expect(inviteeBalance).toBe(330);
+    expect(referrerBalance).toBe(45);
+    expect(order).toEqual(expect.objectContaining({
+      bonus_credits: 30,
+      is_first_qualified_purchase: 1,
+      referrer_user_id_snapshot: referrer.userId,
+    }));
+    expect(order.referral_processed_at).toBeTypeOf('number');
+    expect(grants.results.map((grant) => [grant.credit_type, grant.granted_credits])).toEqual([
+      ['paid', 300],
+      ['promotion', 30],
+      ['referral', 45],
+    ]);
+    const referralGrant = grants.results.find((grant) => grant.credit_type === 'referral');
+    expect(referralGrant.expires_at).toBeGreaterThan(
+      Math.floor(Date.now() / 1000) + 89 * 24 * 60 * 60,
+    );
+    expect(relationship).toEqual(expect.objectContaining({
+      status: 'qualified',
+      first_paid_order_id: 'FIRST-REWARD-ORDER',
+      risk_status: 'normal',
+    }));
+  });
+
+  it('uses 10% for a later purchase without repeating the invitee bonus', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'REPEAT-REWARD' });
+    const orders = [
+      ['REPEAT-FIRST', 'credits_300', 8.99, 300],
+      ['REPEAT-SECOND', 'credits_1000', 23.99, 1000],
+    ];
+    for (const [id, plan, amount, credits] of orders) {
+      await env.DB.prepare(
+        `INSERT INTO orders
+         (id, user_id, plan, amount, credits, base_credits, currency, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'USD', 'pending')`
+      ).bind(id, invitee.userId, plan, amount, credits, credits).run();
+    }
+
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.includes('REPEAT-FIRST') && url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({
+          orderId: 'REPEAT-FIRST',
+          captureId: 'REPEAT-FIRST-CAPTURE',
+          amount: '8.99',
+          payerId: 'REPEAT-BUYER-PAYER',
+        }));
+      }
+      if (url.includes('REPEAT-SECOND') && url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({
+          orderId: 'REPEAT-SECOND',
+          captureId: 'REPEAT-SECOND-CAPTURE',
+          amount: '23.99',
+          payerId: 'REPEAT-BUYER-PAYER',
+        }));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    }));
+
+    for (const orderId of ['REPEAT-FIRST', 'REPEAT-SECOND']) {
+      const response = await exports.default.fetch(authenticatedRequest(
+        '/api/paypal/capture-order',
+        invitee.cookie,
+        {
+          method: 'POST',
+          body: JSON.stringify({ orderId }),
+        },
+      ));
+      expect(response.status).toBe(200);
+    }
+
+    const [inviteeBalance, referrerBalance, secondOrder, secondRewards] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT bonus_credits, is_first_qualified_purchase
+         FROM orders WHERE id = 'REPEAT-SECOND'`
+      ).first(),
+      env.DB.prepare(
+        `SELECT credit_type, granted_credits
+         FROM credit_grants WHERE order_id = 'REPEAT-SECOND'
+         ORDER BY credit_type`
+      ).all(),
+    ]);
+    expect(inviteeBalance).toBe(1330);
+    expect(referrerBalance).toBe(145);
+    expect(secondOrder).toEqual({
+      bonus_credits: 0,
+      is_first_qualified_purchase: 0,
+    });
+    expect(secondRewards.results.map((grant) => [grant.credit_type, grant.granted_credits])).toEqual([
+      ['paid', 1000],
+      ['referral', 100],
+    ]);
+  });
+
+  it('classifies exactly one of two concurrent purchases as the first purchase', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'DUAL-FIRST' });
+    for (const orderId of ['DUAL-FIRST-A', 'DUAL-FIRST-B']) {
+      await env.DB.prepare(
+        `INSERT INTO orders
+         (id, user_id, plan, amount, credits, base_credits, currency, status)
+         VALUES (?, ?, 'credits_300', 8.99, 300, 300, 'USD', 'pending')`
+      ).bind(orderId, invitee.userId).run();
+    }
+
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/capture')) {
+        const orderId = url.includes('DUAL-FIRST-A') ? 'DUAL-FIRST-A' : 'DUAL-FIRST-B';
+        return Response.json(completedPayPalOrder({
+          orderId,
+          captureId: `CAPTURE-${orderId}`,
+          amount: '8.99',
+          payerId: 'DUAL-FIRST-BUYER-PAYER',
+        }));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    }));
+
+    const capture = (orderId) => exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      invitee.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId }),
+      },
+    ));
+    const responses = await Promise.all([
+      capture('DUAL-FIRST-A'),
+      capture('DUAL-FIRST-B'),
+    ]);
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+
+    const [firstCount, inviteeBalance, referrerBalance, promotionCount, referralTotal] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM orders
+         WHERE user_id = ? AND is_first_qualified_purchase = 1`
+      ).bind(invitee.userId).first('count'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM credit_grants
+         WHERE user_id = ? AND credit_type = 'promotion'`
+      ).bind(invitee.userId).first('count'),
+      env.DB.prepare(
+        `SELECT SUM(granted_credits) AS total FROM credit_grants
+         WHERE user_id = ? AND credit_type = 'referral'`
+      ).bind(referrer.userId).first('total'),
+    ]);
+    expect(firstCount).toBe(1);
+    expect(inviteeBalance).toBe(630);
+    expect(referrerBalance).toBe(75);
+    expect(promotionCount).toBe(1);
+    expect(referralTotal).toBe(75);
+  });
+
+  it('blocks both rewards when the referrer and invitee use the same PayPal payer', async () => {
+    const { referrer, invitee } = await createReferredPair({
+      label: 'PAYER-CONFLICT',
+      referrerPayerId: 'SHARED-PAYER',
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES ('PAYER-CONFLICT-ORDER', ?, 'credits_300', 8.99, 300, 300, 'USD', 'pending')`
+    ).bind(invitee.userId).run();
+
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      return Response.json(completedPayPalOrder({
+        orderId: 'PAYER-CONFLICT-ORDER',
+        captureId: 'PAYER-CONFLICT-CAPTURE',
+        amount: '8.99',
+        payerId: 'SHARED-PAYER',
+      }));
+    }));
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      invitee.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'PAYER-CONFLICT-ORDER' }),
+      },
+    ));
+    expect(response.status).toBe(200);
+
+    const [inviteeBalance, referrerBalance, relationship, grants] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        'SELECT status, risk_status FROM referrals WHERE referred_user_id = ?'
+      ).bind(invitee.userId).first(),
+      env.DB.prepare(
+        `SELECT credit_type FROM credit_grants
+         WHERE order_id = 'PAYER-CONFLICT-ORDER'`
+      ).all(),
+    ]);
+    expect(inviteeBalance).toBe(300);
+    expect(referrerBalance).toBe(0);
+    expect(relationship).toEqual({ status: 'rejected', risk_status: 'rejected' });
+    expect(grants.results.map((grant) => grant.credit_type)).toEqual(['paid']);
+  });
+
+  it('applies the same first-purchase rewards to a voucher redemption', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'VOUCHER-REWARD' });
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 300 });
+    const voucher = generated.body.vouchers[0];
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      invitee.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': 'voucher-reward-invitee',
+          'CF-Connecting-IP': '203.0.113.101',
+        },
+        body: JSON.stringify({ code: voucher.code }),
+      },
+    ));
+    expect(response.status).toBe(200);
+
+    const [inviteeBalance, referrerBalance, order] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT bonus_credits, is_first_qualified_purchase,
+                referrer_user_id_snapshot
+         FROM orders WHERE voucher_card_id = ?`
+      ).bind(voucher.id).first(),
+    ]);
+    expect(inviteeBalance).toBe(330);
+    expect(referrerBalance).toBe(45);
+    expect(order).toEqual({
+      bonus_credits: 30,
+      is_first_qualified_purchase: 1,
+      referrer_user_id_snapshot: referrer.userId,
+    });
+  });
+});
+
 describe('PayPal refund webhook', () => {
   it('verifies and reverses a full refund exactly once', async () => {
     const { userId } = await createAuthenticatedUser({ credits: 0 });
@@ -1177,5 +1535,114 @@ describe('PayPal refund webhook', () => {
     expect(grant).toBe(0);
     expect(order).toBe('refunded');
     expect(reversals).toBe(1);
+  });
+
+  it('reverses paid, promotion, and referral grants from a referred first purchase', async () => {
+    const { referrer, invitee } = await createReferredPair({ label: 'REFUND-REWARDS' });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status)
+       VALUES ('REFUND-REWARD-ORDER', ?, 'credits_300', 8.99, 300, 300, 'USD', 'pending')`
+    ).bind(invitee.userId).run();
+
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 'TOKEN' });
+      if (url.endsWith('/capture')) {
+        return Response.json(completedPayPalOrder({
+          orderId: 'REFUND-REWARD-ORDER',
+          captureId: 'REFUND-REWARD-CAPTURE',
+          amount: '8.99',
+          payerId: 'REFUND-REWARD-BUYER-PAYER',
+        }));
+      }
+      if (url.endsWith('/v1/notifications/verify-webhook-signature')) {
+        return Response.json({ verification_status: 'SUCCESS' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const capture = await exports.default.fetch(authenticatedRequest(
+      '/api/paypal/capture-order',
+      invitee.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'REFUND-REWARD-ORDER' }),
+      },
+    ));
+    expect(capture.status).toBe(200);
+
+    const event = {
+      id: 'WH-REFUND-REWARDS',
+      event_type: 'PAYMENT.CAPTURE.REFUNDED',
+      resource: {
+        id: 'REFUND-REWARD-CAPTURE',
+        amount: { value: '8.99', currency_code: 'USD' },
+      },
+    };
+    const webhook = () => exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/paypal/webhook`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'PAYPAL-AUTH-ALGO': 'SHA256withRSA',
+          'PAYPAL-CERT-URL': 'https://api.paypal.com/cert.pem',
+          'PAYPAL-TRANSMISSION-ID': 'refund-reward-transmission',
+          'PAYPAL-TRANSMISSION-SIG': 'signature',
+          'PAYPAL-TRANSMISSION-TIME': '2026-07-24T00:00:00Z',
+        },
+        body: JSON.stringify(event),
+      },
+    ));
+    expect((await webhook()).status).toBe(200);
+    expect((await webhook()).status).toBe(200);
+
+    const [
+      inviteeBalance,
+      referrerBalance,
+      order,
+      grants,
+      reversals,
+      relationship,
+    ] = await Promise.all([
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(invitee.userId).first('credits'),
+      env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+        .bind(referrer.userId).first('credits'),
+      env.DB.prepare(
+        `SELECT status, is_first_qualified_purchase
+         FROM orders WHERE id = 'REFUND-REWARD-ORDER'`
+      ).first(),
+      env.DB.prepare(
+        `SELECT credit_type, remaining_credits
+         FROM credit_grants WHERE order_id = 'REFUND-REWARD-ORDER'
+         ORDER BY credit_type`
+      ).all(),
+      env.DB.prepare(
+        `SELECT reason, delta FROM credit_ledger
+         WHERE order_id = 'REFUND-REWARD-ORDER' AND delta < 0
+         ORDER BY reason`
+      ).all(),
+      env.DB.prepare(
+        `SELECT status, first_paid_order_id
+         FROM referrals WHERE referred_user_id = ?`
+      ).bind(invitee.userId).first(),
+    ]);
+    expect(inviteeBalance).toBe(0);
+    expect(referrerBalance).toBe(0);
+    expect(order).toEqual({ status: 'refunded', is_first_qualified_purchase: 0 });
+    expect(grants.results).toEqual([
+      { credit_type: 'paid', remaining_credits: 0 },
+      { credit_type: 'promotion', remaining_credits: 0 },
+      { credit_type: 'referral', remaining_credits: 0 },
+    ]);
+    expect(reversals.results).toEqual([
+      { reason: 'paypal_refund', delta: -300 },
+      { reason: 'paypal_refund_promotion', delta: -30 },
+      { reason: 'paypal_refund_referral', delta: -45 },
+    ]);
+    expect(relationship).toEqual({ status: 'bound', first_paid_order_id: null });
   });
 });

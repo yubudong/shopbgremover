@@ -23,6 +23,7 @@ const VOUCHER_ACCOUNT_FAILURE_LIMIT = 5;
 const VOUCHER_IP_FAILURE_LIMIT = 20;
 const REFERRAL_CODE_LENGTH = 8;
 const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+const REFERRAL_REWARD_TTL_SECONDS = 90 * 24 * 60 * 60;
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -600,6 +601,222 @@ function moneyToMinorUnits(value) {
   if (!Number.isSafeInteger(whole) || !Number.isSafeInteger(fraction)) return null;
   const minorUnits = whole * 100 + fraction;
   return Number.isSafeInteger(minorUnits) ? minorUnits : null;
+}
+
+async function calculateOrderBenefits(env, {
+  orderId,
+  userId,
+  baseCredits,
+  payerId = null,
+}) {
+  const [priorPurchase, relationship] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id FROM orders
+       WHERE user_id = ? AND status = 'completed' AND id <> ?
+       ORDER BY completed_at, created_at, id
+       LIMIT 1`
+    ).bind(userId, orderId).first(),
+    env.DB.prepare(
+      `SELECT id, referrer_user_id, referred_user_id, status, risk_status,
+              first_paid_order_id
+       FROM referrals
+       WHERE referred_user_id = ?`
+    ).bind(userId).first(),
+  ]);
+  const isFirstPurchase = !priorPurchase;
+  if (!relationship || relationship.status === 'rejected' || relationship.risk_status === 'rejected') {
+    return {
+      isFirstPurchase,
+      relationship: null,
+      promotionCredits: 0,
+      referralCredits: 0,
+      referrerUserId: null,
+      rejectRelationship: false,
+    };
+  }
+
+  const [referrerPurchase, payerConflict] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id FROM orders
+       WHERE user_id = ? AND status = 'completed' AND base_credits > 0
+       LIMIT 1`
+    ).bind(relationship.referrer_user_id).first(),
+    payerId
+      ? env.DB.prepare(
+        `SELECT id FROM orders
+         WHERE user_id = ? AND status = 'completed' AND paypal_payer_id = ?
+         LIMIT 1`
+      ).bind(relationship.referrer_user_id, payerId).first()
+      : Promise.resolve(null),
+  ]);
+  const rewardEligible = Boolean(referrerPurchase) && !payerConflict;
+  const referralRate = isFirstPurchase ? 15 : 10;
+
+  return {
+    isFirstPurchase,
+    relationship,
+    promotionCredits: rewardEligible && isFirstPurchase && baseCredits >= 300 ? 30 : 0,
+    referralCredits: rewardEligible
+      ? Math.floor((Number(baseCredits) * referralRate) / 100)
+      : 0,
+    referrerUserId: relationship.referrer_user_id,
+    rejectRelationship: Boolean(payerConflict),
+  };
+}
+
+function orderBenefitStatements(env, {
+  orderId,
+  userId,
+  benefits,
+}) {
+  const statements = [];
+  const referrerSnapshot = benefits.relationship?.referrer_user_id || null;
+  statements.push(
+    env.DB.prepare(
+      `UPDATE orders
+       SET bonus_credits = ?, referral_processed_at = unixepoch(),
+           is_first_qualified_purchase = ?, referrer_user_id_snapshot = ?
+       WHERE id = ? AND user_id = ? AND status = 'completed'`
+    ).bind(
+      benefits.promotionCredits,
+      benefits.isFirstPurchase ? 1 : 0,
+      referrerSnapshot,
+      orderId,
+      userId,
+    ),
+  );
+
+  if (benefits.relationship) {
+    if (benefits.rejectRelationship) {
+      statements.push(
+        env.DB.prepare(
+          `UPDATE referrals
+           SET status = 'rejected', risk_status = 'rejected',
+               first_paid_order_id = COALESCE(first_paid_order_id, ?),
+               first_paid_at = COALESCE(first_paid_at, unixepoch())
+           WHERE id = ?`
+        ).bind(orderId, benefits.relationship.id),
+      );
+    } else {
+      statements.push(
+        env.DB.prepare(
+          `UPDATE referrals
+           SET status = CASE WHEN ? > 0 THEN 'qualified' ELSE status END,
+               first_paid_order_id = COALESCE(first_paid_order_id, ?),
+               first_paid_at = COALESCE(first_paid_at, unixepoch())
+           WHERE id = ?`
+        ).bind(benefits.referralCredits, orderId, benefits.relationship.id),
+      );
+    }
+  }
+
+  if (benefits.promotionCredits > 0) {
+    const grantId = `first-purchase:${orderId}:invitee`;
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO credit_grants
+         (id, user_id, credit_type, granted_credits, remaining_credits,
+          order_id, related_user_id, idempotency_key)
+         VALUES (?, ?, 'promotion', ?, ?, ?, ?, ?)`
+      ).bind(
+        grantId,
+        userId,
+        benefits.promotionCredits,
+        benefits.promotionCredits,
+        orderId,
+        benefits.referrerUserId,
+        grantId,
+      ),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id,
+          related_user_id, idempotency_key)
+         VALUES (?, ?, ?, 'promotion', 'first_purchase_bonus', ?, ?, ?, ?)`
+      ).bind(
+        grantId,
+        userId,
+        benefits.promotionCredits,
+        grantId,
+        orderId,
+        benefits.referrerUserId,
+        grantId,
+      ),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
+      ).bind(benefits.promotionCredits, userId),
+    );
+  }
+
+  if (benefits.referralCredits > 0) {
+    const prefix = benefits.isFirstPurchase ? 'first-referral' : 'repeat-referral';
+    const reason = benefits.isFirstPurchase
+      ? 'referral_first_purchase'
+      : 'referral_repeat_purchase';
+    const grantId = `${prefix}:${orderId}:referrer`;
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO credit_grants
+         (id, user_id, credit_type, granted_credits, remaining_credits,
+          order_id, related_user_id, expires_at, idempotency_key)
+         VALUES (?, ?, 'referral', ?, ?, ?, ?, unixepoch() + ?, ?)`
+      ).bind(
+        grantId,
+        benefits.referrerUserId,
+        benefits.referralCredits,
+        benefits.referralCredits,
+        orderId,
+        userId,
+        REFERRAL_REWARD_TTL_SECONDS,
+        grantId,
+      ),
+      env.DB.prepare(
+        `INSERT INTO credit_ledger
+         (id, user_id, delta, balance_type, reason, grant_id, order_id,
+          related_user_id, idempotency_key)
+         VALUES (?, ?, ?, 'referral', ?, ?, ?, ?, ?)`
+      ).bind(
+        grantId,
+        benefits.referrerUserId,
+        benefits.referralCredits,
+        reason,
+        grantId,
+        orderId,
+        userId,
+        grantId,
+      ),
+      env.DB.prepare(
+        'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
+      ).bind(benefits.referralCredits, benefits.referrerUserId),
+    );
+  }
+
+  return statements;
+}
+
+function paidCreditStatements(env, {
+  orderId,
+  userId,
+  baseCredits,
+  grantId,
+  reason,
+}) {
+  return [
+    env.DB.prepare(
+      `INSERT INTO credit_grants
+       (id, user_id, credit_type, granted_credits, remaining_credits,
+        order_id, idempotency_key)
+       VALUES (?, ?, 'paid', ?, ?, ?, ?)`
+    ).bind(grantId, userId, baseCredits, baseCredits, orderId, grantId),
+    env.DB.prepare(
+      `INSERT INTO credit_ledger
+       (id, user_id, delta, balance_type, reason, grant_id, order_id,
+        idempotency_key)
+       VALUES (?, ?, ?, 'paid', ?, ?, ?, ?)`
+    ).bind(grantId, userId, baseCredits, reason, grantId, orderId, grantId),
+    env.DB.prepare(
+      'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
+    ).bind(baseCredits, userId),
+  ];
 }
 
 // ── Router ────────────────────────────────────────────────────
@@ -1393,92 +1610,91 @@ export default {
 
       const orderId = `voucher:${card.id}`;
       const grantId = `voucher:${card.id}:paid`;
-      try {
-        await env.DB.batch([
-          env.DB.prepare(
-            `INSERT INTO orders
-             (id, user_id, plan, amount, credits, base_credits, bonus_credits,
-              currency, status, completed_at, payment_method, voucher_card_id)
-             SELECT ?, ?, ?, vc.face_value_minor / 100.0, vc.base_credits,
-                    vc.base_credits, 0, vc.currency, 'completed', unixepoch(),
-                    'voucher', vc.id
-             FROM voucher_cards vc
-             JOIN voucher_batches vb ON vb.id = vc.batch_id
-             WHERE vc.id = ?
-               AND vc.status IN ('generated', 'reserved', 'delivered')
-               AND (vb.expires_at IS NULL OR vb.expires_at > unixepoch())`
-          ).bind(orderId, user.sub, `voucher_${card.base_credits}`, card.id),
-          env.DB.prepare(
-            `UPDATE voucher_cards
-             SET status = 'redeemed', redeemed_by = ?, redeemed_at = unixepoch(),
-                 redeem_order_id = ?
-             WHERE id = ?
-               AND status IN ('generated', 'reserved', 'delivered')`
-          ).bind(user.sub, orderId, card.id),
-          env.DB.prepare(
-            `INSERT INTO credit_grants
-             (id, user_id, credit_type, granted_credits, remaining_credits,
-              order_id, idempotency_key)
-             SELECT ?, user_id, 'paid', base_credits, base_credits, id, ?
-             FROM orders WHERE id = ? AND payment_method = 'voucher'`
-          ).bind(grantId, grantId, orderId),
-          env.DB.prepare(
-            `INSERT INTO credit_ledger
-             (id, user_id, delta, balance_type, reason, grant_id, order_id,
-              idempotency_key)
-             SELECT ?, user_id, base_credits, 'paid', 'voucher_redeem', ?, id, ?
-             FROM orders WHERE id = ? AND payment_method = 'voucher'`
-          ).bind(grantId, grantId, grantId, orderId),
-          env.DB.prepare(
-            `UPDATE user_credits
-             SET credits = credits + ?
-             WHERE user_id = ?
-               AND EXISTS (
+      let redemptionCommitted = false;
+      for (let attempt = 0; attempt < 2 && !redemptionCommitted; attempt += 1) {
+        const benefits = await calculateOrderBenefits(env, {
+          orderId,
+          userId: user.sub,
+          baseCredits: Number(card.base_credits),
+        });
+        try {
+          await env.DB.batch([
+            env.DB.prepare(
+              `INSERT INTO orders
+               (id, user_id, plan, amount, credits, base_credits, bonus_credits,
+                currency, status, completed_at, payment_method, voucher_card_id)
+               SELECT ?, ?, ?, vc.face_value_minor / 100.0, vc.base_credits,
+                      vc.base_credits, 0, vc.currency, 'completed', unixepoch(),
+                      'voucher', vc.id
+               FROM voucher_cards vc
+               JOIN voucher_batches vb ON vb.id = vc.batch_id
+               WHERE vc.id = ?
+                 AND vc.status IN ('generated', 'reserved', 'delivered')
+                 AND (vb.expires_at IS NULL OR vb.expires_at > unixepoch())`
+            ).bind(orderId, user.sub, `voucher_${card.base_credits}`, card.id),
+            env.DB.prepare(
+              `UPDATE voucher_cards
+               SET status = 'redeemed', redeemed_by = ?, redeemed_at = unixepoch(),
+                   redeem_order_id = ?
+               WHERE id = ?
+                 AND status IN ('generated', 'reserved', 'delivered')`
+            ).bind(user.sub, orderId, card.id),
+            ...paidCreditStatements(env, {
+              orderId,
+              userId: user.sub,
+              baseCredits: Number(card.base_credits),
+              grantId,
+              reason: 'voucher_redeem',
+            }),
+            ...orderBenefitStatements(env, {
+              orderId,
+              userId: user.sub,
+              benefits,
+            }),
+            env.DB.prepare(
+              `INSERT INTO voucher_attempts
+               (id, user_id, ip_hash, device_hash, code_fingerprint, success)
+               SELECT ?, ?, ?, ?, ?, 1
+               WHERE EXISTS (
                  SELECT 1 FROM orders
                  WHERE id = ? AND user_id = ? AND payment_method = 'voucher'
                )`
-          ).bind(card.base_credits, user.sub, orderId, user.sub),
-          env.DB.prepare(
-            `INSERT INTO voucher_attempts
-             (id, user_id, ip_hash, device_hash, code_fingerprint, success)
-             SELECT ?, ?, ?, ?, ?, 1
-             WHERE EXISTS (
-               SELECT 1 FROM orders
-               WHERE id = ? AND user_id = ? AND payment_method = 'voucher'
-             )`
-          ).bind(
-            crypto.randomUUID(),
-            user.sub,
-            guest.ipHash,
-            guest.deviceHash,
+            ).bind(
+              crypto.randomUUID(),
+              user.sub,
+              guest.ipHash,
+              guest.deviceHash,
+              codeFingerprint,
+              orderId,
+              user.sub,
+            ),
+          ]);
+          redemptionCommitted = true;
+        } catch (error) {
+          const redeemed = await env.DB.prepare(
+            `SELECT redeemed_by, redeemed_at, redeem_order_id, base_credits
+             FROM voucher_cards WHERE id = ? AND status = 'redeemed'`
+          ).bind(card.id).first();
+          if (redeemed?.redeemed_by === user.sub) {
+            const credits = await getCreditSummary(env, user.sub);
+            return privateJson({
+              ok: true,
+              already_redeemed: true,
+              credits_added: Number(redeemed.base_credits),
+              redeemed_at: redeemed.redeemed_at,
+              order_id: redeemed.redeem_order_id,
+              balance: credits,
+            }, 200, origin);
+          }
+          if (attempt === 0 && !redeemed) continue;
+          await recordVoucherAttempt(env, {
+            userId: user.sub,
+            guest,
             codeFingerprint,
-            orderId,
-            user.sub,
-          ),
-        ]);
-      } catch (error) {
-        const redeemed = await env.DB.prepare(
-          `SELECT redeemed_by, redeemed_at, redeem_order_id, base_credits
-           FROM voucher_cards WHERE id = ? AND status = 'redeemed'`
-        ).bind(card.id).first();
-        if (redeemed?.redeemed_by === user.sub) {
-          const credits = await getCreditSummary(env, user.sub);
-          return privateJson({
-            ok: true,
-            already_redeemed: true,
-            credits_added: Number(redeemed.base_credits),
-            redeemed_at: redeemed.redeemed_at,
-            order_id: redeemed.redeem_order_id,
-            balance: credits,
-          }, 200, origin);
+            success: false,
+          });
+          return privateJson(genericError, 400, origin);
         }
-        await recordVoucherAttempt(env, {
-          userId: user.sub,
-          guest,
-          codeFingerprint,
-          success: false,
-        });
-        return privateJson(genericError, 400, origin);
       }
 
       const redeemed = await env.DB.prepare(
@@ -1639,36 +1855,46 @@ export default {
 
         const grantId = `purchase:${orderId}:paid`;
         const payerId = paypalOrder?.payer?.payer_id || null;
-        try {
-          await env.DB.batch([
-            env.DB.prepare(
-              `UPDATE orders
-               SET status = 'completed', paypal_capture_id = ?, paypal_payer_id = ?,
-                   completed_at = unixepoch(), failure_detail = NULL
-               WHERE id = ? AND user_id = ? AND status = 'pending'`
-            ).bind(capture.id, payerId, orderId, user.sub),
-            env.DB.prepare(
-              `INSERT INTO credit_grants
-               (id, user_id, credit_type, granted_credits, remaining_credits,
-                order_id, idempotency_key)
-               VALUES (?, ?, 'paid', ?, ?, ?, ?)`
-            ).bind(grantId, user.sub, order.base_credits, order.base_credits, orderId, grantId),
-            env.DB.prepare(
-              `INSERT INTO credit_ledger
-               (id, user_id, delta, balance_type, reason, grant_id, order_id, idempotency_key)
-               VALUES (?, ?, ?, 'paid', 'paypal_purchase', ?, ?, ?)`
-            ).bind(grantId, user.sub, order.base_credits, grantId, orderId, grantId),
-            env.DB.prepare(
-              'UPDATE user_credits SET credits = credits + ? WHERE user_id = ?'
-            ).bind(order.base_credits, user.sub),
-          ]);
-        } catch (error) {
-          const completed = await env.DB.prepare(
-            `SELECT status, paypal_capture_id FROM orders
-             WHERE id = ? AND user_id = ?`
-          ).bind(orderId, user.sub).first();
-          if (completed?.status !== 'completed' || completed.paypal_capture_id !== capture.id) {
-            throw error;
+        let captureCommitted = false;
+        for (let attempt = 0; attempt < 2 && !captureCommitted; attempt += 1) {
+          const benefits = await calculateOrderBenefits(env, {
+            orderId,
+            userId: user.sub,
+            baseCredits: Number(order.base_credits),
+            payerId,
+          });
+          try {
+            await env.DB.batch([
+              env.DB.prepare(
+                `UPDATE orders
+                 SET status = 'completed', paypal_capture_id = ?, paypal_payer_id = ?,
+                     completed_at = unixepoch(), failure_detail = NULL
+                 WHERE id = ? AND user_id = ? AND status = 'pending'`
+              ).bind(capture.id, payerId, orderId, user.sub),
+              ...paidCreditStatements(env, {
+                orderId,
+                userId: user.sub,
+                baseCredits: Number(order.base_credits),
+                grantId,
+                reason: 'paypal_purchase',
+              }),
+              ...orderBenefitStatements(env, {
+                orderId,
+                userId: user.sub,
+                benefits,
+              }),
+            ]);
+            captureCommitted = true;
+          } catch (error) {
+            const completed = await env.DB.prepare(
+              `SELECT status, paypal_capture_id FROM orders
+               WHERE id = ? AND user_id = ?`
+            ).bind(orderId, user.sub).first();
+            if (completed?.status === 'completed' && completed.paypal_capture_id === capture.id) {
+              captureCommitted = true;
+              break;
+            }
+            if (attempt === 1) throw error;
           }
         }
 
@@ -1759,7 +1985,8 @@ export default {
 
         const captureId = event.resource?.id;
         const order = await env.DB.prepare(
-          `SELECT id, user_id, amount, currency, status
+          `SELECT id, user_id, amount, currency, status,
+                  is_first_qualified_purchase
            FROM orders WHERE paypal_capture_id = ?`
         ).bind(captureId).first();
         if (!order) {
@@ -1805,22 +2032,34 @@ export default {
           return json({ ok: true, review: true }, 200, origin);
         }
 
-        const grant = await env.DB.prepare(
-          `SELECT id, granted_credits
-           FROM credit_grants
-           WHERE order_id = ? AND credit_type = 'paid'`
-        ).bind(order.id).first();
-        if (!grant) {
+        const grants = await env.DB.prepare(
+          `SELECT g.id, g.user_id, g.credit_type, g.granted_credits,
+                  (
+                    SELECT l.id FROM credit_ledger l
+                    WHERE l.grant_id = g.id AND l.delta > 0
+                    ORDER BY l.created_at, l.id
+                    LIMIT 1
+                  ) AS original_ledger_id
+           FROM credit_grants g
+           WHERE g.order_id = ?
+             AND g.credit_type IN ('paid', 'promotion', 'referral')
+           ORDER BY g.credit_type, g.id`
+        ).bind(order.id).all();
+        const grantRows = grants.results || [];
+        const paidGrant = grantRows.find((grant) => grant.credit_type === 'paid');
+        if (!paidGrant) {
           throw new Error('Paid credit grant not found for refunded order');
         }
 
-        const purchaseLedger = await env.DB.prepare(
-          `SELECT id FROM credit_ledger
-           WHERE order_id = ? AND reason = 'paypal_purchase'`
-        ).bind(order.id).first();
-        const reversalId = `paypal-refund:${captureId}`;
-        try {
-          await env.DB.batch([
+        const statements = [];
+        for (const grant of grantRows) {
+          const reversalId = `paypal-refund:${captureId}:${grant.id}`;
+          const reversalReason = grant.credit_type === 'paid'
+            ? 'paypal_refund'
+            : grant.credit_type === 'promotion'
+              ? 'paypal_refund_promotion'
+              : 'paypal_refund_referral';
+          statements.push(
             env.DB.prepare(
               `UPDATE credit_grants
                SET remaining_credits = 0, updated_at = unixepoch()
@@ -1830,35 +2069,60 @@ export default {
               `INSERT INTO credit_ledger
                (id, user_id, delta, balance_type, reason, grant_id, order_id,
                 idempotency_key, reversal_of)
-               VALUES (?, ?, ?, 'paid', 'paypal_refund', ?, ?, ?, ?)`
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
             ).bind(
               reversalId,
-              order.user_id,
+              grant.user_id,
               -Number(grant.granted_credits),
+              grant.credit_type,
+              reversalReason,
               grant.id,
               order.id,
               reversalId,
-              purchaseLedger?.id || null,
+              grant.original_ledger_id || null,
             ),
             env.DB.prepare(
               'UPDATE user_credits SET credits = credits - ? WHERE user_id = ?'
-            ).bind(grant.granted_credits, order.user_id),
+            ).bind(grant.granted_credits, grant.user_id),
+          );
+        }
+        statements.push(
+          env.DB.prepare(
+            `UPDATE orders
+             SET status = 'refunded', refunded_at = unixepoch(), refund_amount = ?,
+                 failure_detail = NULL, is_first_qualified_purchase = 0
+             WHERE id = ?`
+          ).bind(event.resource.amount.value, order.id),
+        );
+        if (Number(order.is_first_qualified_purchase) === 1) {
+          statements.push(
             env.DB.prepare(
-              `UPDATE orders
-               SET status = 'refunded', refunded_at = unixepoch(), refund_amount = ?,
-                   failure_detail = NULL
-               WHERE id = ?`
-            ).bind(event.resource.amount.value, order.id),
-            env.DB.prepare(
-              `UPDATE webhook_events
-               SET status = 'processed', processed_at = unixepoch(), error = NULL
-               WHERE event_id = ?`
-            ).bind(event.id),
-          ]);
+              `UPDATE referrals
+               SET status = 'bound', first_paid_order_id = NULL, first_paid_at = NULL
+               WHERE referred_user_id = ? AND first_paid_order_id = ?
+                 AND risk_status <> 'rejected'
+                 AND NOT EXISTS (
+                   SELECT 1 FROM orders
+                   WHERE user_id = ? AND status = 'completed' AND id <> ?
+                 )`
+            ).bind(order.user_id, order.id, order.user_id, order.id),
+          );
+        }
+        statements.push(
+          env.DB.prepare(
+            `UPDATE webhook_events
+             SET status = 'processed', processed_at = unixepoch(), error = NULL
+             WHERE event_id = ?`
+          ).bind(event.id),
+        );
+
+        const paidReversalId = `paypal-refund:${captureId}:${paidGrant.id}`;
+        try {
+          await env.DB.batch(statements);
         } catch (error) {
           const reversed = await env.DB.prepare(
             'SELECT id FROM credit_ledger WHERE idempotency_key = ?'
-          ).bind(reversalId).first();
+          ).bind(paidReversalId).first();
           if (!reversed) throw error;
         }
 
