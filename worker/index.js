@@ -667,6 +667,54 @@ async function calculateOrderBenefits(env, {
   };
 }
 
+async function calculateVoucherReferralRisk(env, {
+  relationship,
+  guest,
+  hasReward,
+}) {
+  if (!relationship || !hasReward) {
+    return { holdForReview: false, score: 0, reasons: [] };
+  }
+
+  const [owner, recentRedemptions] = await Promise.all([
+    env.DB.prepare(
+      `SELECT owner_ip_hash, owner_device_hash
+       FROM referral_codes
+       WHERE code = ? AND user_id = ?`
+    ).bind(relationship.referral_code, relationship.referrer_user_id).first(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS count
+       FROM orders
+       WHERE payment_method = 'voucher' AND status = 'completed'
+         AND referrer_user_id_snapshot = ?
+         AND completed_at > unixepoch() - 3600`
+    ).bind(relationship.referrer_user_id).first('count'),
+  ]);
+
+  let score = 0;
+  const reasons = [];
+  if (owner?.owner_device_hash && owner.owner_device_hash === guest.deviceHash) {
+    score += 80;
+    reasons.push('same_device');
+  }
+  const boundRecently = !relationship.bound_at
+    || Number(relationship.bound_at) > Math.floor(Date.now() / 1000) - 86400;
+  if (owner?.owner_ip_hash && owner.owner_ip_hash === guest.ipHash && boundRecently) {
+    score += 65;
+    reasons.push('same_ip_recent_binding');
+  }
+  if (Number(recentRedemptions || 0) >= 3) {
+    score += 60;
+    reasons.push('referrer_voucher_burst');
+  }
+
+  return {
+    holdForReview: score >= 60,
+    score: Math.min(score, 100),
+    reasons,
+  };
+}
+
 async function resolveVoucherReferral(env, {
   userId,
   referralCode,
@@ -674,7 +722,7 @@ async function resolveVoucherReferral(env, {
 }) {
   const existing = await env.DB.prepare(
     `SELECT id, referrer_user_id, referred_user_id, referral_code,
-            status, risk_status, first_paid_order_id
+            status, risk_status, first_paid_order_id, bound_at
      FROM referrals WHERE referred_user_id = ?`
   ).bind(userId).first();
   if (!referralCode) return { relationship: existing || null, insert: null };
@@ -720,6 +768,7 @@ async function resolveVoucherReferral(env, {
     status: 'bound',
     risk_status: 'normal',
     first_paid_order_id: null,
+    bound_at: null,
   };
   return {
     relationship,
@@ -735,6 +784,7 @@ function orderBenefitStatements(env, {
   orderId,
   userId,
   benefits,
+  review = null,
 }) {
   const statements = [];
   const referrerSnapshot = benefits.relationship?.referrer_user_id || null;
@@ -745,7 +795,7 @@ function orderBenefitStatements(env, {
            is_first_qualified_purchase = ?, referrer_user_id_snapshot = ?
        WHERE id = ? AND user_id = ? AND status = 'completed'`
     ).bind(
-      benefits.promotionCredits,
+      review?.holdForReview ? 0 : benefits.promotionCredits,
       benefits.isFirstPurchase ? 1 : 0,
       referrerSnapshot,
       orderId,
@@ -754,6 +804,35 @@ function orderBenefitStatements(env, {
   );
 
   if (benefits.relationship) {
+    if (review?.holdForReview) {
+      statements.push(
+        env.DB.prepare(
+          `UPDATE referrals
+           SET risk_status = 'review',
+               first_paid_order_id = COALESCE(first_paid_order_id, ?),
+               first_paid_at = COALESCE(first_paid_at, unixepoch())
+           WHERE id = ?`
+        ).bind(orderId, benefits.relationship.id),
+        env.DB.prepare(
+          `INSERT INTO referral_reward_reviews
+           (id, order_id, relationship_id, referrer_user_id, referred_user_id,
+            pending_promotion_credits, pending_referral_credits,
+            risk_score, risk_reasons_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          `review:${orderId}`,
+          orderId,
+          benefits.relationship.id,
+          benefits.referrerUserId,
+          userId,
+          benefits.promotionCredits,
+          benefits.referralCredits,
+          review.score,
+          JSON.stringify(review.reasons),
+        ),
+      );
+      return statements;
+    }
     if (benefits.rejectRelationship) {
       statements.push(
         env.DB.prepare(
@@ -1154,12 +1233,14 @@ export default {
     if (url.pathname === '/api/referrals/me' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return privateJson({ error: 'Unauthorized' }, 401, origin);
+      const guest = await getGuestIdentity(request);
 
       const [
         code,
         paidOrder,
         counts,
         rewardTotals,
+        pendingRewards,
         rewardHistory,
         invitees,
       ] = await Promise.all([
@@ -1209,6 +1290,11 @@ export default {
            WHERE user_id = ? AND credit_type = 'referral'`
         ).bind(user.sub, user.sub).first(),
         env.DB.prepare(
+          `SELECT COALESCE(SUM(pending_referral_credits), 0) AS credits
+           FROM referral_reward_reviews
+           WHERE referrer_user_id = ? AND status = 'pending'`
+        ).bind(user.sub).first(),
+        env.DB.prepare(
           `SELECT l.id, l.delta, l.reason, l.order_id, l.created_at,
                   l.reversal_of, g.remaining_credits, g.expires_at,
                   CASE WHEN EXISTS (
@@ -1233,6 +1319,16 @@ export default {
            LIMIT 50`
         ).bind(user.sub).all(),
       ]);
+      await env.DB.prepare(
+        `UPDATE referral_codes
+         SET owner_ip_hash = COALESCE(owner_ip_hash, ?),
+             owner_device_hash = COALESCE(owner_device_hash, ?),
+             fingerprint_updated_at = CASE
+               WHEN owner_ip_hash IS NULL OR owner_device_hash IS NULL
+               THEN unixepoch() ELSE fingerprint_updated_at
+             END
+         WHERE user_id = ?`
+      ).bind(guest.ipHash, guest.deviceHash, user.sub).run();
 
       const now = Math.floor(Date.now() / 1000);
       return privateJson({
@@ -1243,7 +1339,7 @@ export default {
         registered_count: Number(counts?.registered_count || 0),
         paid_count: Number(counts?.paid_count || 0),
         review_count: Number(counts?.review_count || 0),
-        pending_reward_credits: 0,
+        pending_reward_credits: Number(pendingRewards?.credits || 0),
         available_reward_credits: Number(rewardTotals?.available_credits || 0),
         total_reward_credits: Number(rewardTotals?.total_granted || 0),
         reversed_reward_credits: Number(rewardTotals?.reversed_credits || 0),
@@ -1251,7 +1347,9 @@ export default {
         next_reward_expiry_at: rewardTotals?.next_expiry_at == null
           ? null
           : Number(rewardTotals.next_expiry_at),
-        reward_release_policy: 'immediate',
+        reward_release_policy: Number(pendingRewards?.credits || 0) > 0
+          ? 'risk_review'
+          : 'immediate',
         reward_history: (rewardHistory.results || []).map((entry) => {
           let entryStatus = 'used';
           if (Number(entry.delta) < 0) entryStatus = 'reversal';
@@ -1456,6 +1554,221 @@ export default {
         `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
       ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
       return json({ ok: true, id }, 200, origin);
+    }
+
+    // GET /api/admin/referral-reviews → pending voucher reward risk queue.
+    if (url.pathname === '/api/admin/referral-reviews' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const status = ['pending', 'approved', 'rejected'].includes(url.searchParams.get('status'))
+        ? url.searchParams.get('status')
+        : 'pending';
+      const rows = await env.DB.prepare(
+        `SELECT rr.id, rr.order_id, rr.pending_promotion_credits,
+                rr.pending_referral_credits, rr.risk_score,
+                rr.risk_reasons_json, rr.status, rr.review_note,
+                rr.reviewed_at, rr.created_at, o.base_credits,
+                referrer.email AS referrer_email,
+                referred.email AS referred_email
+         FROM referral_reward_reviews rr
+         JOIN orders o ON o.id = rr.order_id
+         JOIN users referrer ON referrer.id = rr.referrer_user_id
+         JOIN users referred ON referred.id = rr.referred_user_id
+         WHERE rr.status = ?
+         ORDER BY rr.created_at ASC, rr.id ASC
+         LIMIT 100`
+      ).bind(status).all();
+      return privateJson({
+        reviews: (rows.results || []).map((row) => ({
+          ...row,
+          referrer_email: maskEmail(row.referrer_email),
+          referred_email: maskEmail(row.referred_email),
+          risk_reasons: (() => {
+            try { return JSON.parse(row.risk_reasons_json); } catch { return []; }
+          })(),
+          risk_reasons_json: undefined,
+        })),
+      }, 200, origin);
+    }
+
+    // POST /api/admin/referral-reviews/:id/approve|reject → one final,
+    // idempotent decision. Approval releases the held credits atomically.
+    const referralReviewMatch = url.pathname.match(
+      /^\/api\/admin\/referral-reviews\/([^/]+)\/(approve|reject)$/,
+    );
+    if (referralReviewMatch && request.method === 'POST') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const reviewId = decodeURIComponent(referralReviewMatch[1]);
+      const decision = referralReviewMatch[2];
+      const body = await request.json().catch(() => ({}));
+      const note = String(body.note || '').trim();
+      if (note.length < 3 || note.length > 500) {
+        return privateJson({ error: 'Review note must be 3–500 characters.' }, 400, origin);
+      }
+
+      const review = await env.DB.prepare(
+        `SELECT rr.*, o.is_first_qualified_purchase
+         FROM referral_reward_reviews rr
+         JOIN orders o ON o.id = rr.order_id
+         WHERE rr.id = ?`
+      ).bind(reviewId).first();
+      if (!review) return privateJson({ error: 'Review not found' }, 404, origin);
+      if (review.status !== 'pending') {
+        return privateJson({
+          ok: true,
+          already_reviewed: true,
+          status: review.status,
+        }, 200, origin);
+      }
+
+      const finalStatus = decision === 'approve' ? 'approved' : 'rejected';
+      const statements = [
+        env.DB.prepare(
+          `UPDATE referral_reward_reviews
+           SET status = ?, reviewed_by = ?, review_note = ?,
+               reviewed_at = unixepoch()
+           WHERE id = ? AND status = 'pending'`
+        ).bind(finalStatus, admin.sub, note, reviewId),
+      ];
+      if (decision === 'reject') {
+        statements.push(
+          env.DB.prepare(
+            `UPDATE referrals
+             SET status = 'rejected', risk_status = 'rejected'
+             WHERE id = ? AND EXISTS (
+               SELECT 1 FROM referral_reward_reviews
+               WHERE id = ? AND status = 'rejected' AND reviewed_by = ?
+             )`
+          ).bind(review.relationship_id, reviewId, admin.sub),
+        );
+      } else {
+        statements.push(
+          env.DB.prepare(
+            `UPDATE referrals
+             SET status = CASE WHEN ? > 0 THEN 'qualified' ELSE status END,
+                 risk_status = 'normal'
+             WHERE id = ? AND EXISTS (
+               SELECT 1 FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+             )`
+          ).bind(review.pending_referral_credits, review.relationship_id, reviewId, admin.sub),
+          env.DB.prepare(
+            `UPDATE orders
+             SET bonus_credits = ?
+             WHERE id = ? AND EXISTS (
+               SELECT 1 FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+             )`
+          ).bind(review.pending_promotion_credits, review.order_id, reviewId, admin.sub),
+        );
+        if (Number(review.pending_promotion_credits) > 0) {
+          const promotionId = `first-purchase:${review.order_id}:invitee`;
+          statements.push(
+            env.DB.prepare(
+              `INSERT INTO credit_grants
+               (id, user_id, credit_type, granted_credits, remaining_credits,
+                order_id, related_user_id, idempotency_key)
+               SELECT ?, ?, 'promotion', ?, ?, ?, ?, ?
+               FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
+            ).bind(
+              promotionId, review.referred_user_id,
+              review.pending_promotion_credits, review.pending_promotion_credits,
+              review.order_id, review.referrer_user_id, promotionId,
+              reviewId, admin.sub,
+            ),
+            env.DB.prepare(
+              `INSERT INTO credit_ledger
+               (id, user_id, delta, balance_type, reason, grant_id, order_id,
+                related_user_id, idempotency_key)
+               SELECT ?, ?, ?, 'promotion', 'first_purchase_bonus', ?, ?, ?, ?
+               FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
+            ).bind(
+              promotionId, review.referred_user_id,
+              review.pending_promotion_credits, promotionId, review.order_id,
+              review.referrer_user_id, promotionId, reviewId, admin.sub,
+            ),
+            env.DB.prepare(
+              `UPDATE user_credits SET credits = credits + ?
+               WHERE user_id = ? AND EXISTS (
+                 SELECT 1 FROM referral_reward_reviews
+                 WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+               )`
+            ).bind(review.pending_promotion_credits, review.referred_user_id, reviewId, admin.sub),
+          );
+        }
+        if (Number(review.pending_referral_credits) > 0) {
+          const prefix = Number(review.is_first_qualified_purchase) === 1
+            ? 'first-referral'
+            : 'repeat-referral';
+          const reason = Number(review.is_first_qualified_purchase) === 1
+            ? 'referral_first_purchase'
+            : 'referral_repeat_purchase';
+          const referralId = `${prefix}:${review.order_id}:referrer`;
+          statements.push(
+            env.DB.prepare(
+              `INSERT INTO credit_grants
+               (id, user_id, credit_type, granted_credits, remaining_credits,
+                order_id, related_user_id, expires_at, idempotency_key)
+               SELECT ?, ?, 'referral', ?, ?, ?, ?,
+                      unixepoch() + ?, ?
+               FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
+            ).bind(
+              referralId, review.referrer_user_id,
+              review.pending_referral_credits, review.pending_referral_credits,
+              review.order_id, review.referred_user_id,
+              REFERRAL_REWARD_TTL_SECONDS, referralId, reviewId, admin.sub,
+            ),
+            env.DB.prepare(
+              `INSERT INTO credit_ledger
+               (id, user_id, delta, balance_type, reason, grant_id, order_id,
+                related_user_id, idempotency_key)
+               SELECT ?, ?, ?, 'referral', ?, ?, ?, ?, ?
+               FROM referral_reward_reviews
+               WHERE id = ? AND status = 'approved' AND reviewed_by = ?`
+            ).bind(
+              referralId, review.referrer_user_id,
+              review.pending_referral_credits, reason, referralId,
+              review.order_id, review.referred_user_id, referralId,
+              reviewId, admin.sub,
+            ),
+            env.DB.prepare(
+              `UPDATE user_credits SET credits = credits + ?
+               WHERE user_id = ? AND EXISTS (
+                 SELECT 1 FROM referral_reward_reviews
+                 WHERE id = ? AND status = 'approved' AND reviewed_by = ?
+               )`
+            ).bind(review.pending_referral_credits, review.referrer_user_id, reviewId, admin.sub),
+          );
+        }
+      }
+
+      try {
+        await env.DB.batch(statements);
+      } catch (error) {
+        const concurrent = await env.DB.prepare(
+          'SELECT status FROM referral_reward_reviews WHERE id = ?'
+        ).bind(reviewId).first();
+        if (concurrent?.status !== 'pending') {
+          return privateJson({
+            ok: true,
+            already_reviewed: true,
+            status: concurrent.status,
+          }, 200, origin);
+        }
+        throw error;
+      }
+      const completed = await env.DB.prepare(
+        'SELECT status FROM referral_reward_reviews WHERE id = ?'
+      ).bind(reviewId).first();
+      return privateJson({
+        ok: true,
+        already_reviewed: completed?.status !== finalStatus,
+        status: completed?.status,
+      }, 200, origin);
     }
 
     // POST /api/admin/vouchers/generate → generate plaintext once, persist hashes only.
@@ -2024,6 +2337,11 @@ export default {
           baseCredits: Number(card.base_credits),
           relationshipOverride: voucherReferral.relationship,
         });
+        const review = await calculateVoucherReferralRisk(env, {
+          relationship: benefits.relationship,
+          guest,
+          hasReward: benefits.promotionCredits > 0 || benefits.referralCredits > 0,
+        });
         const referralStatements = voucherReferral.insert
           ? [
             env.DB.prepare(
@@ -2075,6 +2393,7 @@ export default {
               orderId,
               userId: user.sub,
               benefits,
+              review,
             }),
             env.DB.prepare(
               `INSERT INTO voucher_attempts

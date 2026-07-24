@@ -101,6 +101,16 @@
     const content = document.getElementById('content');
     const signIn = document.getElementById('signIn');
     const error = document.getElementById('error');
+    function getOrCreateDeviceId() {
+      let id = localStorage.getItem('sbgrDeviceId');
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem('sbgrDeviceId', id);
+      }
+      document.cookie = `sbgr_device=${encodeURIComponent(id)}; Path=/; Domain=.shopbgremover.com; Max-Age=31536000; Secure; SameSite=Lax`;
+      return id;
+    }
+    const deviceId = getOrCreateDeviceId();
 
     function formatTime(value) {
       return value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
@@ -174,7 +184,10 @@
 
     async function loadReferralCenter() {
       try {
-        const response = await fetch(`${API}/api/referrals/me`, { credentials: 'include' });
+        const response = await fetch(`${API}/api/referrals/me`, {
+          credentials: 'include',
+          headers: { 'X-Device-ID': deviceId },
+        });
         if (response.status === 401) {
           loading.hidden = true;
           signIn.hidden = false;
@@ -191,9 +204,9 @@
         document.getElementById('pendingRewards').textContent = data.pending_reward_credits;
         document.getElementById('totalRewards').textContent = data.total_reward_credits;
         document.getElementById('reversedRewards').textContent = data.reversed_reward_credits;
-        document.getElementById('rewardPolicy').textContent = data.reward_release_policy === 'immediate'
-          ? '当前规则：付款成功并通过风控后立即可用，因此待生效奖励为 0。'
-          : '奖励存在观察期，观察期结束后转为可用。';
+        document.getElementById('rewardPolicy').textContent = data.reward_release_policy === 'risk_review'
+          ? '检测到高风险卡密邀请，相关奖励正在人工审核；购买积分已正常到账。'
+          : '当前规则：付款成功并通过风控后立即可用，因此待生效奖励为 0。';
         document.getElementById('expiryStatus').textContent = data.next_reward_expiry_at
           ? `最近一批可用奖励将在 ${formatTime(data.next_reward_expiry_at)} 到期；已过期未使用：${data.expired_reward_credits}。`
           : `当前没有待到期的可用奖励；已过期未使用：${data.expired_reward_credits}。`;

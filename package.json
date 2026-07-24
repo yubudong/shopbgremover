@@ -30,6 +30,6 @@
     "eslint": "^8.0.0",
     "eslint-config-next": "^15.0.0",
     "vitest": "^4.1.10",
-    "wrangler": "^4.113.0"
+    "wrangler": "^4.114.0"
   }
 }

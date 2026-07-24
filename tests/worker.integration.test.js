@@ -28,6 +28,7 @@ beforeEach(async () => {
     DELETE FROM voucher_disputes;
     DELETE FROM voucher_cards;
     DELETE FROM voucher_batches;
+    DELETE FROM referral_reward_reviews;
     DELETE FROM subscriptions;
     DELETE FROM sso_codes;
     DELETE FROM email_otps;
@@ -266,6 +267,7 @@ describe('production schema baseline', () => {
       'orders',
       'processing_history',
       'referral_codes',
+      'referral_reward_reviews',
       'referrals',
       'sso_codes',
       'subscriptions',
@@ -282,10 +284,12 @@ describe('production schema baseline', () => {
   });
 
   it('contains the credit-bucket and payment idempotency columns', async () => {
-    const [credits, orders, voucherCards] = await Promise.all([
+    const [credits, orders, voucherCards, referralCodes, reviews] = await Promise.all([
       env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
       env.DB.prepare('PRAGMA table_info(orders)').all(),
       env.DB.prepare('PRAGMA table_info(voucher_cards)').all(),
+      env.DB.prepare('PRAGMA table_info(referral_codes)').all(),
+      env.DB.prepare('PRAGMA table_info(referral_reward_reviews)').all(),
     ]);
 
     expect(credits.results.map((row) => row.name)).toEqual(expect.arrayContaining([
@@ -309,6 +313,18 @@ describe('production schema baseline', () => {
     expect(voucherCards.results.map((row) => row.name)).toEqual(expect.arrayContaining([
       'dispute_status',
       'disputed_at',
+    ]));
+    expect(referralCodes.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'owner_ip_hash',
+      'owner_device_hash',
+      'fingerprint_updated_at',
+    ]));
+    expect(reviews.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'pending_promotion_credits',
+      'pending_referral_credits',
+      'risk_score',
+      'risk_reasons_json',
+      'status',
     ]));
   });
 });
@@ -1694,6 +1710,128 @@ describe('referral purchase rewards', () => {
     expect(orders).toBe(0);
     expect(relationships).toBe(0);
     expect(balance).toBe(0);
+  });
+});
+
+describe('voucher referral risk review', () => {
+  async function createRiskReview(label, { sameDevice = true } = {}) {
+    const referrer = await createAuthenticatedUser({
+      email: `${label}-risk-referrer@example.com`,
+      credits: 0,
+      deviceId: `${label}-owner-device`,
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status,
+        completed_at, payment_method)
+       VALUES (?, ?, 'voucher_100', 22, 100, 100, 'CNY', 'completed',
+               unixepoch(), 'voucher')`
+    ).bind(`${label}-RISK-REFERRER-ORDER`, referrer.userId).run();
+    const referral = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/referrals/me',
+      referrer.cookie,
+      {
+        headers: {
+          'X-Device-ID': `${label}-owner-device`,
+          'CF-Connecting-IP': '203.0.113.210',
+        },
+      },
+    )));
+    const invitee = await createAuthenticatedUser({
+      email: `${label}-risk-invitee@example.com`,
+      credits: 0,
+      deviceId: `${label}-invitee-device`,
+    });
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const generated = await generateVoucher(admin.cookie, { credits: 300 });
+    const voucher = generated.body.vouchers[0];
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/vouchers/redeem',
+      invitee.cookie,
+      {
+        method: 'POST',
+        headers: {
+          'X-Device-ID': sameDevice
+            ? `${label}-owner-device`
+            : `${label}-invitee-device`,
+          'CF-Connecting-IP': sameDevice ? '198.51.100.210' : '203.0.113.210',
+        },
+        body: JSON.stringify({
+          code: voucher.code,
+          referral_code: referral.code,
+        }),
+      },
+    ));
+    expect(response.status).toBe(200);
+    const review = await env.DB.prepare(
+      'SELECT * FROM referral_reward_reviews WHERE order_id = ?'
+    ).bind(`voucher:${voucher.id}`).first();
+    return { referrer, invitee, admin, voucher, review };
+  }
+
+  it('holds same-device rewards and approval releases them exactly once', async () => {
+    const { referrer, invitee, admin, review } = await createRiskReview('approve');
+    expect(review).toEqual(expect.objectContaining({
+      pending_promotion_credits: 30,
+      pending_referral_credits: 45,
+      status: 'pending',
+    }));
+    expect(JSON.parse(review.risk_reasons_json)).toContain('same_device');
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(invitee.userId).first('credits')).toBe(300);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(referrer.userId).first('credits')).toBe(0);
+
+    expect((await exports.default.fetch(authenticatedRequest(
+      '/api/admin/referral-reviews?status=pending',
+      invitee.cookie,
+    ))).status).toBe(403);
+    const queue = await jsonResponse(await exports.default.fetch(authenticatedRequest(
+      '/api/admin/referral-reviews?status=pending',
+      admin.cookie,
+    )));
+    expect(queue.reviews[0]).toEqual(expect.objectContaining({
+      risk_reasons: expect.arrayContaining(['same_device']),
+      referrer_email: expect.stringContaining('*'),
+      referred_email: expect.stringContaining('*'),
+    }));
+    expect(JSON.stringify(queue)).not.toContain('owner-device');
+
+    const approve = () => exports.default.fetch(authenticatedRequest(
+      `/api/admin/referral-reviews/${encodeURIComponent(review.id)}/approve`,
+      admin.cookie,
+      { method: 'POST', body: JSON.stringify({ note: '身份核验通过' }) },
+    ));
+    expect((await approve()).status).toBe(200);
+    expect((await approve()).status).toBe(200);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(invitee.userId).first('credits')).toBe(330);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(referrer.userId).first('credits')).toBe(45);
+    expect(await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM credit_ledger WHERE order_id = ?'
+    ).bind(review.order_id).first('count')).toBe(3);
+  });
+
+  it('rejects held rewards permanently and recent same-IP binding only enters review', async () => {
+    const rejected = await createRiskReview('reject');
+    const reject = await exports.default.fetch(authenticatedRequest(
+      `/api/admin/referral-reviews/${encodeURIComponent(rejected.review.id)}/reject`,
+      rejected.admin.cookie,
+      { method: 'POST', body: JSON.stringify({ note: '确认属于自我邀请' }) },
+    ));
+    expect(reject.status).toBe(200);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(rejected.invitee.userId).first('credits')).toBe(300);
+    expect(await env.DB.prepare('SELECT credits FROM user_credits WHERE user_id = ?')
+      .bind(rejected.referrer.userId).first('credits')).toBe(0);
+
+    const sameIp = await createRiskReview('same-ip', { sameDevice: false });
+    expect(sameIp.review).not.toBeNull();
+    expect(JSON.parse(sameIp.review.risk_reasons_json)).toContain('same_ip_recent_binding');
   });
 });
 

@@ -106,6 +106,7 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     'redeem.html',
     'referrals.html',
     'admin-vouchers.html',
+    'admin-referrals.html',
     'test-paypal.html',
     'shopify-background-remover.html',
     'amazon-ebay-product-images.html',
@@ -137,6 +138,7 @@ test('Pages build contains only the canonical static site', async () => {
     'redeem.html',
     'referrals.html',
     'admin-vouchers.html',
+    'admin-referrals.html',
     'de/index.html',
     'es/index.html',
     'fr/index.html',
@@ -175,11 +177,21 @@ test('voucher redemption and referral center use server-backed referral APIs', a
   assert.match(referrals, /credentials:\s*'include'/);
   assert.match(referrals, /available_reward_credits/);
   assert.match(referrals, /pending_reward_credits/);
+  assert.match(referrals, /'X-Device-ID': deviceId/);
   assert.match(referrals, /reward_history/);
   assert.match(referrals, /renderInvitees\(data\.invitees/);
   assert.match(referrals, /付款成功并通过风控后立即可用/);
   assert.doesNotMatch(referrals, /\.innerHTML\s*=/);
   assert.doesNotMatch(referrals, /localStorage.*referral/i);
+});
+
+test('referral review admin uses masked risk queue and explicit decisions', async () => {
+  const admin = await read('admin-referrals.html');
+  assert.match(admin, /\/api\/admin\/referral-reviews/);
+  assert.match(admin, /\/\$\{decision\}/);
+  assert.match(admin, /same_device/);
+  assert.match(admin, /审核说明必须为 3–500 个字符/);
+  assert.doesNotMatch(admin, /\.innerHTML\s*=/);
 });
 
 test('voucher admin exposes server-backed dispute reversal with an explicit reason', async () => {

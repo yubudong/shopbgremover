@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0007_voucher_dispute_reversal.sql.
+-- Includes tracked migrations through 0008_referral_risk_review.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to
@@ -348,6 +348,9 @@ CREATE TABLE IF NOT EXISTS referral_codes (
   user_id TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'disabled')),
+  owner_ip_hash TEXT,
+  owner_device_hash TEXT,
+  fingerprint_updated_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -381,3 +384,34 @@ CREATE TABLE IF NOT EXISTS referrals (
 
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer_status
 ON referrals(referrer_user_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS referral_reward_reviews (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL UNIQUE,
+  relationship_id TEXT NOT NULL,
+  referrer_user_id TEXT NOT NULL,
+  referred_user_id TEXT NOT NULL,
+  pending_promotion_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (pending_promotion_credits >= 0),
+  pending_referral_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (pending_referral_credits >= 0),
+  risk_score INTEGER NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+  risk_reasons_json TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_by TEXT,
+  review_note TEXT,
+  reviewed_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (relationship_id) REFERENCES referrals(id),
+  FOREIGN KEY (referrer_user_id) REFERENCES users(id),
+  FOREIGN KEY (referred_user_id) REFERENCES users(id),
+  FOREIGN KEY (reviewed_by) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_reward_reviews_status_created
+ON referral_reward_reviews(status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_referral_reward_reviews_referrer_status
+ON referral_reward_reviews(referrer_user_id, status, created_at);
