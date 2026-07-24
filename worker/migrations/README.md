@@ -21,7 +21,7 @@ Tracked migrations applied afterward:
 | 3 | `0003_unified_credit_billing.sql` | 2026-07-23 |
 | 4 | `0004_voucher_cards.sql` | 2026-07-24 |
 | 5 | `0005_referral_foundation.sql` | 2026-07-24 |
-| 6 | `0006_referral_reward_idempotency.sql` | pending |
+| 6 | `0006_referral_reward_idempotency.sql` | 2026-07-24 |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes
