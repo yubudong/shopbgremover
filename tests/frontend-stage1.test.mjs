@@ -53,26 +53,39 @@ function extractFunction(source, signature) {
 test('all localized workspaces use stable per-image AI task identities', async () => {
   const workflow = await read('ai-workflow.js');
   assert.match(workflow, /task_id: job\.taskId/);
-  assert.match(workflow, /taskId: DEFAULT_TASK_ID\(\)/);
+  assert.match(workflow, /taskId: restored\?\.taskId \|\| DEFAULT_TASK_ID\(\)/);
   assert.match(workflow, /resetJobForSource\(job/);
   assert.match(workflow, /remaining < plan\.aiCount/);
   assert.match(workflow, /hasTransparentPixel\(context\.getImageData/);
   assert.match(workflow, /job\.foregroundBlob && !job\.needsReprocess/);
   assert.match(workflow, /markCompositionChanged/);
-  assert.doesNotMatch(workflow, /localStorage|indexedDB/);
+  assert.doesNotMatch(workflow, /localStorage/);
+  assert.match(workflow, /globalThis\.indexedDB/);
+  assert.match(workflow, /SESSION_TTL_MS = 24 \* 60 \* 60 \* 1000/);
+  assert.match(workflow, /SESSION_MAX_BYTES = 150 \* 1024 \* 1024/);
+  assert.match(workflow, /deleteExpired/);
+  assert.match(workflow, /restoreSession/);
   assert.equal((workflow.match(/\/api\/remove-bg/g) || []).length, 1);
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5a-v2"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5a-v2"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5b-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
-    assert.match(html, /aiWorkflow\?\.register\(file, i, card\)/, file);
+    assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
     assert.match(html, /aiWorkflow\?\.markSourceChanged\(i\)/, file);
     assert.match(html, /aiWorkflow\.process\(\)/, file);
     assert.match(html, /id="aiRemoveToggle"/, file);
     assert.match(html, /id="aiEstimate"/, file);
+    assert.match(html, /id="aiSessionClear"/, file);
+    assert.match(html, /data-session-restored=/, file);
+    assert.match(html, /getSessionOwner: \(\) => currentUser\?\.id/, file);
+    assert.match(html, /getCompositionState: \(\) => \(\{ bgMode, customHex, outputSize, renameMode \}\)/, file);
+    assert.match(html, /restoreFiles: \(items, composition\)/, file);
+    assert.match(html, /handleFiles\(files, \{ restoredItems = \[\] \} = \{\}\)/, file);
+    assert.match(html, /initialSource: restoredItem\?\.sourceBlob \|\| null/, file);
+    assert.match(html, /window\.addEventListener\('load'[\s\S]*aiWorkflow\.restoreSession\(\)/, file);
     assert.match(html, /data-summary="\{ai\}[^"]+\{total\}[^"]+\{noCharge\}/, file);
     assert.match(html, /const limit = currentUser \? 50 : 1/, file);
     assert.match(html, /slice\(0, Math\.max\(0, limit - selectedFiles\.length\)\)/, file);
@@ -94,6 +107,8 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /document\.getElementById\('localCleanupShortcut'\)/);
   assert.match(cleaner, /cardButtons\[0\]\?\.click\(\)/);
   assert.match(cleaner, /shortcutButton\.disabled = cardButtons\.length === 0/);
+  assert.match(cleaner, /options\.initialSource && options\.initialSource !== file/);
+  assert.match(cleaner, /edits\.set\(file, options\.initialSource\)/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
   assert.match(cleaner, /event\.ctrlKey && !event\.metaKey/);
   assert.match(cleaner, /const compositeMaskValues = dilateCompositeMask\(mask, workWidth, workHeight, 2\)/);
@@ -111,7 +126,7 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   for (const file of indexFiles) {
     const html = await read(file);
     assert.match(html, /href="\/local-cleaner\.css\?v=20260725-credit-center-v4"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-preview-v3"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-ai-stage5b-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
@@ -184,6 +199,30 @@ test('localized terms state lifetime quotas and USD one-time packs', async () =>
     assert.match(html, /23[,.]99/, file);
     assert.doesNotMatch(html, /¥22|¥60|¥160/, file);
     assert.doesNotMatch(html, /3 images per day|3 Bilder pro Tag|3 imágenes por día|3 images par jour|3 imagens por dia/, file);
+  }
+});
+
+test('localized privacy pages disclose browser-only 24-hour workspace recovery', async () => {
+  const privacyFiles = locales.map((locale) => `${locale}privacy.html`);
+  for (const file of privacyFiles) {
+    const html = await read(file);
+    assert.match(html, /IndexedDB/i, file);
+    assert.match(html, /24 (?:hours|Stunden|horas|heures)/i, file);
+    assert.match(html, /localStorage/, file);
+    assert.doesNotMatch(
+      html,
+      /never stored after processing|nie gespeichert|nunca se almacenan después|jamais stockées après|nunca são armazenadas após/i,
+      file,
+    );
+  }
+
+  for (const file of indexFiles) {
+    const html = await read(file);
+    assert.doesNotMatch(
+      html,
+      /No data stored|Keine Datenspeicherung|Sin almacenamiento de datos|Aucun stockage|Sem armazenamento|no server upload|kein Server-Upload|sin subir nada al servidor|sans upload serveur|sem upload no servidor/i,
+      file,
+    );
   }
 });
 

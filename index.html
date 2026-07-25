@@ -48,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="/ai-workflow.js?v=20260725-ai-stage5a-v2"></script>
+  <script src="/ai-workflow.js?v=20260725-ai-stage5b-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -804,7 +804,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5a-v2">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5b-v1">
 </head>
 <body>
 
@@ -952,7 +952,12 @@
         data-credit-check-failed="Could not verify your available credits. No AI request was sent."
         data-processing="Processing {current} / {total}: {name}"
         data-done="✅ Done! {ok} ready{errorsText} · {aiCalls} AI call(s)"
-        data-failed-text=" · {errors} failed">
+        data-failed-text=" · {errors} failed"
+        data-session-restored="Restored {count} image(s) from this browser."
+        data-session-too-large="This workspace is too large for refresh recovery. Current work is still available."
+        data-session-save-failed="Could not save refresh recovery in this browser. Current work is still available."
+        data-session-restore-failed="Could not restore the saved workspace. Uploads were not sent anywhere."
+        data-clear-session-confirm="Clear this browser's saved workspace? This cannot be undone.">
         <div class="ai-workflow-head">
           <div class="ai-workflow-copy">
             <strong>AI remove background</strong>
@@ -964,6 +969,10 @@
           </label>
         </div>
         <div class="ai-estimate" id="aiEstimate">Upload images to calculate AI credit use.</div>
+        <div class="ai-session-row">
+          <span class="ai-session-note">Saved only in this browser for 24 hours.</span>
+          <button class="ai-session-clear" id="aiSessionClear" type="button" hidden>Clear saved workspace</button>
+        </div>
       </div>
 
       <!-- Background -->
@@ -1132,7 +1141,7 @@
     <div class="step-card">
       <div class="step-num">3</div>
       <div class="step-title">Download your ZIP file</div>
-      <div class="step-desc">AI processes each image (3–8 s each). When done, download all as a single ZIP — no server upload.</div>
+      <div class="step-desc">AI processes each enabled image (3–8 s each). Download the finished set as one ZIP without another AI call.</div>
     </div>
   </div>
 </section>
@@ -1146,8 +1155,8 @@
   <div class="trust-grid">
     <div class="trust-card">
       <span class="trust-icon">🔒</span>
-      <h3>No data stored</h3>
-      <p>Images processed in real-time and deleted instantly. GDPR-compliant. We never see, save, or share your photos.</p>
+      <h3>Browser-only recovery</h3>
+      <p>Your workspace is saved locally in this browser for up to 24 hours. Images leave the browser only when you enable AI background removal.</p>
     </div>
     <div class="trust-card">
       <span class="trust-icon">💰</span>
@@ -1348,6 +1357,26 @@ let selectedFiles   = [];
   let customHex       = '#F0F0F0';
   let outputSize      = 'original';   // '2048' | '1000' | '500' | 'original'
   let renameMode      = 'original';   // 'original' | 'sequence' | 'date'
+
+  function restoreCompositionState(settings = {}) {
+    const validBackgrounds = new Set(['white', 'transparent', 'custom']);
+    const validSizes = new Set(['2048', '1000', '500', 'original']);
+    const validRenameModes = new Set(['original', 'sequence', 'date']);
+    if (validBackgrounds.has(settings.bgMode)) bgMode = settings.bgMode;
+    if (/^#[0-9A-Fa-f]{6}$/.test(settings.customHex || '')) customHex = settings.customHex;
+    if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
+    if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
+
+    ['bgWhite','bgTransparent','bgCustom'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById({ white: 'bgWhite', transparent: 'bgTransparent', custom: 'bgCustom' }[bgMode]).classList.add('active');
+    document.getElementById('colorRow').style.display = bgMode === 'custom' ? 'flex' : 'none';
+    document.getElementById('customColorPicker').value = customHex;
+    document.getElementById('customColorHex').value = customHex.toUpperCase();
+    document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
+    document.querySelectorAll('.rename-opt').forEach((option, index) => {
+      option.classList.toggle('active', ['original', 'sequence', 'date'][index] === renameMode);
+    });
+  }
 
   // ── Settings UI ───────────────────────────────────────────
 
@@ -1615,7 +1644,8 @@ let selectedFiles   = [];
     fileInput.value = '';
   });
 
-  function handleFiles(files) {
+  function handleFiles(files, { restoredItems = [] } = {}) {
+    const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
     const limit = currentUser ? 50 : 1;
     const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
     const additions = files
@@ -1645,17 +1675,25 @@ let selectedFiles   = [];
     const grid = document.getElementById('imageGrid');
     additions.forEach((file, offset) => {
       const i = startIndex + offset;
+      const restoredItem = restoredByFile.get(file);
       const card  = document.createElement('div');
       card.className = 'image-card';
       card.id = `card-${i}`;
       const img   = document.createElement('img');
-      img.src = URL.createObjectURL(file);
+      img.src = URL.createObjectURL(restoredItem?.job?.outputBlob || restoredItem?.sourceBlob || file);
       const badge = document.createElement('div');
       badge.className = 'status-badge';
-      badge.textContent = '⏳';
+      badge.textContent = restoredItem?.job?.outputBlob
+        ? '✅'
+        : restoredItem?.job?.status === 'failed'
+          ? '❌'
+          : restoredItem?.sourceBlob
+            ? '✏️'
+            : '⏳';
       card.appendChild(img);
       card.appendChild(badge);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
+        initialSource: restoredItem?.sourceBlob || null,
         onApply: ({ previewUrl, restored }) => {
           if (img.dataset.aiResultUrl) {
             URL.revokeObjectURL(img.dataset.aiResultUrl);
@@ -1681,7 +1719,7 @@ let selectedFiles   = [];
         }
       });
       grid.appendChild(card);
-      aiWorkflow?.register(file, i, card);
+      aiWorkflow?.register(file, i, card, restoredItem?.job || null);
     });
 
     document.getElementById('actionBar').classList.add('visible');
@@ -1849,6 +1887,12 @@ let selectedFiles   = [];
     deviceId: DEVICE_ID,
     getFiles: () => selectedFiles,
     getCurrentUser: () => currentUser,
+    getSessionOwner: () => currentUser?.id ? `user:${currentUser.id}` : `device:${DEVICE_ID}`,
+    getCompositionState: () => ({ bgMode, customHex, outputSize, renameMode }),
+    restoreFiles: (items, composition) => {
+      restoreCompositionState(composition);
+      handleFiles(items.map(item => item.file), { restoredItems: items });
+    },
     getSourceFile: (file) => window.ShopBGLocalCleaner?.getSourceFile(file) || file,
     compressToDataUrl,
     applyBackground,
@@ -1856,6 +1900,19 @@ let selectedFiles   = [];
     setStatus,
     showRegisterModal,
     showUpgradeModal,
+    onSessionNotice: setStatus,
+    onSessionRestored: ({ count, outputs }) => {
+      processedResults = outputs;
+      const data = document.getElementById('aiWorkflowPanel').dataset;
+      setStatus(window.ShopBGAiWorkflow.format(data.sessionRestored, { count }));
+      if (!outputs.length) return;
+      const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
+      const btn = document.getElementById('processBtn');
+      btn.className = 'action-btn action-btn-download';
+      btn.textContent = window.ShopBGAiWorkflow.format("📥 Download ZIP ({size} MB)", { size: totalMB });
+      btn.disabled = false;
+      btn.onclick = downloadZip;
+    },
     onPlanChanged: () => {
       if (selectedFiles.length) setProcessButtonReady();
     },
@@ -1924,7 +1981,10 @@ let selectedFiles   = [];
   });
 
 
-  loadUser();
+  const userReady = loadUser();
+  window.addEventListener('load', () => {
+    userReady.finally(() => aiWorkflow.restoreSession());
+  }, { once: true });
 </script>
 
 <script>
@@ -1947,6 +2007,6 @@ let selectedFiles   = [];
   });
 </script>
 
-<script src="/local-cleaner.js?v=20260725-preview-v3"></script>
+<script src="/local-cleaner.js?v=20260725-ai-stage5b-v1"></script>
 </body>
 </html>

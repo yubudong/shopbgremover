@@ -731,10 +731,13 @@
       syncShortcut();
     },
     decorateCard(card, file, index, options = {}) {
+      if (options.initialSource && options.initialSource !== file) {
+        edits.set(file, options.initialSource);
+      }
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'local-clean-card-btn';
-      button.textContent = copy.edit;
+      button.textContent = edits.has(file) ? copy.edited : copy.edit;
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();

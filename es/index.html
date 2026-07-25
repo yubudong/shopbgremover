@@ -52,7 +52,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="/ai-workflow.js?v=20260725-ai-stage5a-v2"></script>
+  <script src="/ai-workflow.js?v=20260725-ai-stage5b-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -808,7 +808,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5a-v2">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5b-v1">
 </head>
 <body>
 
@@ -955,7 +955,12 @@
         data-credit-check-failed="No se pudieron verificar los créditos disponibles. No se envió ninguna solicitud de IA."
         data-processing="Procesando {current} / {total}: {name}"
         data-done="✅ ¡Listo! {ok} preparadas{errorsText} · {aiCalls} llamada(s) de IA"
-        data-failed-text=" · {errors} con error">
+        data-failed-text=" · {errors} con error"
+        data-session-restored="Se restauraron {count} imagen(es) desde este navegador."
+        data-session-too-large="Este espacio de trabajo es demasiado grande para recuperarlo tras actualizar. El trabajo actual sigue disponible."
+        data-session-save-failed="No se pudo guardar la recuperación tras actualizar en este navegador. El trabajo actual sigue disponible."
+        data-session-restore-failed="No se pudo restaurar el espacio guardado. No se envió ninguna imagen."
+        data-clear-session-confirm="¿Borrar el espacio de trabajo guardado en este navegador? Esta acción no se puede deshacer.">
         <div class="ai-workflow-head">
           <div class="ai-workflow-copy">
             <strong>Eliminar fondo con IA</strong>
@@ -967,6 +972,10 @@
           </label>
         </div>
         <div class="ai-estimate" id="aiEstimate">Sube imágenes para calcular el uso de créditos de IA.</div>
+        <div class="ai-session-row">
+          <span class="ai-session-note">Guardado solo en este navegador durante 24 horas.</span>
+          <button class="ai-session-clear" id="aiSessionClear" type="button" hidden>Borrar espacio guardado</button>
+        </div>
       </div>
 
       <!-- Background -->
@@ -1135,7 +1144,7 @@
     <div class="step-card">
       <div class="step-num">3</div>
       <div class="step-title">Descarga tu ZIP</div>
-      <div class="step-desc">La IA procesa cada imagen (3–8 s cada una). Cuando termine, descarga todo en un único ZIP — sin subir nada al servidor.</div>
+      <div class="step-desc">La IA procesa cada imagen habilitada (3–8 s cada una). Descarga el resultado en un único ZIP sin otra llamada a la IA.</div>
     </div>
   </div>
 </section>
@@ -1149,8 +1158,8 @@
   <div class="trust-grid">
     <div class="trust-card">
       <span class="trust-icon">🔒</span>
-      <h3>Sin almacenamiento de datos</h3>
-      <p>Imágenes procesadas en tiempo real y eliminadas al instante. Cumple con GDPR. Nunca vemos, guardamos ni compartimos tus fotos.</p>
+      <h3>Recuperación solo en el navegador</h3>
+      <p>Tu espacio de trabajo se guarda localmente en este navegador durante un máximo de 24 horas. Las imágenes solo salen del navegador si habilitas la eliminación de fondo con IA.</p>
     </div>
     <div class="trust-card">
       <span class="trust-icon">💰</span>
@@ -1351,6 +1360,26 @@ let selectedFiles   = [];
   let customHex       = '#F0F0F0';
   let outputSize      = 'original';   // '2048' | '1000' | '500' | 'original'
   let renameMode      = 'original';   // 'original' | 'sequence' | 'date'
+
+  function restoreCompositionState(settings = {}) {
+    const validBackgrounds = new Set(['white', 'transparent', 'custom']);
+    const validSizes = new Set(['2048', '1000', '500', 'original']);
+    const validRenameModes = new Set(['original', 'sequence', 'date']);
+    if (validBackgrounds.has(settings.bgMode)) bgMode = settings.bgMode;
+    if (/^#[0-9A-Fa-f]{6}$/.test(settings.customHex || '')) customHex = settings.customHex;
+    if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
+    if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
+
+    ['bgWhite','bgTransparent','bgCustom'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById({ white: 'bgWhite', transparent: 'bgTransparent', custom: 'bgCustom' }[bgMode]).classList.add('active');
+    document.getElementById('colorRow').style.display = bgMode === 'custom' ? 'flex' : 'none';
+    document.getElementById('customColorPicker').value = customHex;
+    document.getElementById('customColorHex').value = customHex.toUpperCase();
+    document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
+    document.querySelectorAll('.rename-opt').forEach((option, index) => {
+      option.classList.toggle('active', ['original', 'sequence', 'date'][index] === renameMode);
+    });
+  }
 
   // ── Settings UI ───────────────────────────────────────────
 
@@ -1618,7 +1647,8 @@ let selectedFiles   = [];
     fileInput.value = '';
   });
 
-  function handleFiles(files) {
+  function handleFiles(files, { restoredItems = [] } = {}) {
+    const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
     const limit = currentUser ? 50 : 1;
     const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
     const additions = files
@@ -1648,17 +1678,25 @@ let selectedFiles   = [];
     const grid = document.getElementById('imageGrid');
     additions.forEach((file, offset) => {
       const i = startIndex + offset;
+      const restoredItem = restoredByFile.get(file);
       const card  = document.createElement('div');
       card.className = 'image-card';
       card.id = `card-${i}`;
       const img   = document.createElement('img');
-      img.src = URL.createObjectURL(file);
+      img.src = URL.createObjectURL(restoredItem?.job?.outputBlob || restoredItem?.sourceBlob || file);
       const badge = document.createElement('div');
       badge.className = 'status-badge';
-      badge.textContent = '⏳';
+      badge.textContent = restoredItem?.job?.outputBlob
+        ? '✅'
+        : restoredItem?.job?.status === 'failed'
+          ? '❌'
+          : restoredItem?.sourceBlob
+            ? '✏️'
+            : '⏳';
       card.appendChild(img);
       card.appendChild(badge);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
+        initialSource: restoredItem?.sourceBlob || null,
         onApply: ({ previewUrl, restored }) => {
           if (img.dataset.aiResultUrl) {
             URL.revokeObjectURL(img.dataset.aiResultUrl);
@@ -1684,7 +1722,7 @@ let selectedFiles   = [];
         }
       });
       grid.appendChild(card);
-      aiWorkflow?.register(file, i, card);
+      aiWorkflow?.register(file, i, card, restoredItem?.job || null);
     });
 
     document.getElementById('actionBar').classList.add('visible');
@@ -1873,6 +1911,12 @@ let selectedFiles   = [];
     deviceId: DEVICE_ID,
     getFiles: () => selectedFiles,
     getCurrentUser: () => currentUser,
+    getSessionOwner: () => currentUser?.id ? `user:${currentUser.id}` : `device:${DEVICE_ID}`,
+    getCompositionState: () => ({ bgMode, customHex, outputSize, renameMode }),
+    restoreFiles: (items, composition) => {
+      restoreCompositionState(composition);
+      handleFiles(items.map(item => item.file), { restoredItems: items });
+    },
     getSourceFile: (file) => window.ShopBGLocalCleaner?.getSourceFile(file) || file,
     compressToDataUrl,
     applyBackground,
@@ -1880,6 +1924,19 @@ let selectedFiles   = [];
     setStatus,
     showRegisterModal,
     showUpgradeModal,
+    onSessionNotice: setStatus,
+    onSessionRestored: ({ count, outputs }) => {
+      processedResults = outputs;
+      const data = document.getElementById('aiWorkflowPanel').dataset;
+      setStatus(window.ShopBGAiWorkflow.format(data.sessionRestored, { count }));
+      if (!outputs.length) return;
+      const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
+      const btn = document.getElementById('processBtn');
+      btn.className = 'action-btn action-btn-download';
+      btn.textContent = window.ShopBGAiWorkflow.format("📥 Descargar ZIP ({size} MB)", { size: totalMB });
+      btn.disabled = false;
+      btn.onclick = downloadZip;
+    },
     onPlanChanged: () => {
       if (selectedFiles.length) setProcessButtonReady();
     },
@@ -1948,8 +2005,11 @@ let selectedFiles   = [];
   });
 
 
-  loadUser();
+  const userReady = loadUser();
+  window.addEventListener('load', () => {
+    userReady.finally(() => aiWorkflow.restoreSession());
+  }, { once: true });
 </script>
-<script src="/local-cleaner.js?v=20260725-preview-v3"></script>
+<script src="/local-cleaner.js?v=20260725-ai-stage5b-v1"></script>
 </body>
 </html>

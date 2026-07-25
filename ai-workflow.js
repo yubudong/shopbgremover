@@ -1,5 +1,10 @@
 (function () {
   const DEFAULT_TASK_ID = () => crypto.randomUUID();
+  const SESSION_DB_NAME = 'shopbg-ai-workspace-v1';
+  const SESSION_STORE_NAME = 'sessions';
+  const SESSION_SCHEMA_VERSION = 1;
+  const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+  const SESSION_MAX_BYTES = 150 * 1024 * 1024;
 
   function format(template, values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => (
@@ -67,17 +72,213 @@
     return job;
   }
 
+  function storedJobState(job) {
+    return {
+      taskId: job.taskId,
+      sourceVersion: Number(job.sourceVersion || 0),
+      aiRequested: Boolean(job.aiRequested),
+      transparent: typeof job.transparent === 'boolean' ? job.transparent : null,
+      foregroundBlob: job.foregroundBlob || null,
+      outputBlob: job.outputBlob || null,
+      outputName: job.outputName || null,
+      hadAiResult: Boolean(job.hadAiResult || job.foregroundBlob),
+      needsReprocess: Boolean(job.needsReprocess),
+      status: job.status === 'processing' ? 'failed' : job.status,
+      error: job.status === 'processing' ? 'interrupted' : (job.error || null),
+    };
+  }
+
+  function sessionByteSize(items) {
+    return items.reduce((total, item) => (
+      total
+      + Number(item.file?.size || 0)
+      + Number(item.sourceBlob?.size || 0)
+      + Number(item.job?.foregroundBlob?.size || 0)
+      + Number(item.job?.outputBlob?.size || 0)
+    ), 0);
+  }
+
+  function buildSessionRecord({
+    ownerKey,
+    files,
+    jobs,
+    getSourceFile,
+    composition,
+    now = Date.now(),
+  }) {
+    const items = files.map((file, index) => {
+      const job = jobs[index];
+      if (!file || !job) return null;
+      const currentSource = getSourceFile(file);
+      return {
+        file,
+        sourceBlob: currentSource && currentSource !== file ? currentSource : null,
+        job: storedJobState(job),
+      };
+    }).filter(Boolean);
+
+    return {
+      ownerKey,
+      schemaVersion: SESSION_SCHEMA_VERSION,
+      updatedAt: now,
+      expiresAt: now + SESSION_TTL_MS,
+      byteSize: sessionByteSize(items),
+      composition: composition || {},
+      items,
+    };
+  }
+
+  function usableSessionRecord(record, ownerKey, now = Date.now()) {
+    return Boolean(
+      record
+      && record.schemaVersion === SESSION_SCHEMA_VERSION
+      && record.ownerKey === ownerKey
+      && Array.isArray(record.items)
+      && record.items.length > 0
+      && Number(record.expiresAt || 0) > now
+      && Number(record.byteSize || 0) <= SESSION_MAX_BYTES
+    );
+  }
+
+  function requestResult(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('indexeddb_request_failed'));
+    });
+  }
+
+  function transactionDone(transaction) {
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('indexeddb_transaction_failed'));
+      transaction.onabort = () => reject(transaction.error || new Error('indexeddb_transaction_aborted'));
+    });
+  }
+
+  function createSessionStore(indexedDb = globalThis.indexedDB) {
+    let databasePromise = null;
+
+    function database() {
+      if (!indexedDb) return Promise.reject(new Error('indexeddb_unavailable'));
+      if (!databasePromise) {
+        databasePromise = new Promise((resolve, reject) => {
+          const request = indexedDb.open(SESSION_DB_NAME, 1);
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(SESSION_STORE_NAME)) {
+              db.createObjectStore(SESSION_STORE_NAME, { keyPath: 'ownerKey' });
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error('indexeddb_open_failed'));
+        });
+      }
+      return databasePromise;
+    }
+
+    return {
+      async deleteExpired(now = Date.now()) {
+        const db = await database();
+        const transaction = db.transaction(SESSION_STORE_NAME, 'readwrite');
+        const done = transactionDone(transaction);
+        const request = transaction.objectStore(SESSION_STORE_NAME).openCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) return;
+          if (Number(cursor.value?.expiresAt || 0) <= now) cursor.delete();
+          cursor.continue();
+        };
+        await done;
+      },
+      async get(ownerKey) {
+        const db = await database();
+        const transaction = db.transaction(SESSION_STORE_NAME, 'readonly');
+        return requestResult(transaction.objectStore(SESSION_STORE_NAME).get(ownerKey));
+      },
+      async put(record) {
+        const db = await database();
+        const transaction = db.transaction(SESSION_STORE_NAME, 'readwrite');
+        transaction.objectStore(SESSION_STORE_NAME).put(record);
+        await transactionDone(transaction);
+      },
+      async delete(ownerKey) {
+        const db = await database();
+        const transaction = db.transaction(SESSION_STORE_NAME, 'readwrite');
+        transaction.objectStore(SESSION_STORE_NAME).delete(ownerKey);
+        await transactionDone(transaction);
+      },
+    };
+  }
+
   function create(options) {
     const panel = document.getElementById('aiWorkflowPanel');
     const globalToggle = document.getElementById('aiRemoveToggle');
     const estimate = document.getElementById('aiEstimate');
+    const clearSessionButton = document.getElementById('aiSessionClear');
     if (!panel || !globalToggle || !estimate) {
       throw new Error('AI workflow controls are missing');
     }
 
     const text = panel.dataset;
     const jobs = [];
+    const sessionStore = createSessionStore();
     let processing = false;
+    let restoring = false;
+    let clearing = false;
+    let persistenceDisabled = false;
+    let persistTimer = null;
+    let lastStorageNotice = null;
+
+    function sessionOwnerKey() {
+      return String(options.getSessionOwner?.() || `device:${options.deviceId}`);
+    }
+
+    function notifyStorage(message) {
+      if (!message || message === lastStorageNotice) return;
+      lastStorageNotice = message;
+      options.onSessionNotice?.(message);
+    }
+
+    async function persistSession() {
+      if (restoring || clearing || persistenceDisabled) return false;
+      const files = options.getFiles();
+      const ownerKey = sessionOwnerKey();
+      try {
+        await sessionStore.deleteExpired();
+        if (!files.length) {
+          await sessionStore.delete(ownerKey);
+          return true;
+        }
+        const record = buildSessionRecord({
+          ownerKey,
+          files,
+          jobs,
+          getSourceFile: options.getSourceFile,
+          composition: options.getCompositionState?.(),
+        });
+        if (record.byteSize > SESSION_MAX_BYTES) {
+          persistenceDisabled = true;
+          await sessionStore.delete(ownerKey);
+          notifyStorage(text.sessionTooLarge);
+          return false;
+        }
+        await sessionStore.put(record);
+        return true;
+      } catch {
+        persistenceDisabled = true;
+        notifyStorage(text.sessionSaveFailed);
+        return false;
+      }
+    }
+
+    function schedulePersist() {
+      if (restoring || clearing || persistenceDisabled) return;
+      clearTimeout(persistTimer);
+      persistTimer = setTimeout(() => {
+        persistTimer = null;
+        persistSession();
+      }, 250);
+    }
 
     function jobStateText(job) {
       if (job.status === 'checking') return text.checking;
@@ -123,6 +324,10 @@
         globalToggle.indeterminate = false;
       }
       globalToggle.disabled = processing || selectable.length === 0;
+      if (clearSessionButton) {
+        clearSessionButton.hidden = activeJobs.length === 0;
+        clearSessionButton.disabled = processing;
+      }
       activeJobs.forEach(syncCard);
       if (notify) options.onPlanChanged?.(plan);
       return plan;
@@ -168,6 +373,7 @@
         job.status = 'ready';
       }
       sync({ notify: true });
+      schedulePersist();
     }
 
     function createCardControl(job, card) {
@@ -193,32 +399,46 @@
         job.outputName = null;
         options.onOutputsChanged?.(getOutputs());
         sync({ notify: true });
+        schedulePersist();
       });
 
       job.control = { wrapper, input, state };
     }
 
-    function register(file, index, card) {
+    function register(file, index, card, initialState = null) {
       if (jobs[index]) return jobs[index];
+      const restored = initialState && typeof initialState.taskId === 'string'
+        ? initialState
+        : null;
       const job = {
         file,
         index,
-        taskId: DEFAULT_TASK_ID(),
-        sourceVersion: 0,
-        aiRequested: globalToggle.checked,
-        transparent: null,
-        foregroundBlob: null,
-        outputBlob: null,
-        outputName: null,
-        hadAiResult: false,
-        needsReprocess: false,
-        status: 'checking',
-        error: null,
+        taskId: restored?.taskId || DEFAULT_TASK_ID(),
+        sourceVersion: Number(restored?.sourceVersion || 0),
+        aiRequested: restored ? Boolean(restored.aiRequested) : globalToggle.checked,
+        transparent: typeof restored?.transparent === 'boolean' ? restored.transparent : null,
+        foregroundBlob: restored?.foregroundBlob || null,
+        outputBlob: restored?.outputBlob || null,
+        outputName: restored?.outputName || null,
+        hadAiResult: Boolean(restored?.hadAiResult || restored?.foregroundBlob),
+        needsReprocess: Boolean(restored?.needsReprocess),
+        status: restored?.status || 'checking',
+        error: restored?.error || null,
       };
+      if (job.transparent === true) job.aiRequested = false;
+      if (job.status === 'processing') {
+        job.status = 'failed';
+        job.error = 'interrupted';
+      }
       jobs[index] = job;
       createCardControl(job, card);
       sync({ notify: true });
-      refreshTransparency(job, file);
+      if (typeof job.transparent === 'boolean') {
+        syncCard(job);
+        schedulePersist();
+      } else {
+        refreshTransparency(job, options.getSourceFile(file));
+      }
       return job;
     }
 
@@ -229,6 +449,7 @@
       options.onOutputsChanged?.(getOutputs());
       sync({ notify: true });
       refreshTransparency(job, options.getSourceFile(job.file));
+      schedulePersist();
     }
 
     function markCompositionChanged() {
@@ -239,6 +460,7 @@
       }
       options.onOutputsChanged?.(getOutputs());
       sync({ notify: true });
+      schedulePersist();
     }
 
     function getOutputs() {
@@ -350,6 +572,8 @@
             if (job.foregroundBlob && !job.needsReprocess) {
               foreground = job.foregroundBlob;
             } else {
+              job.status = 'processing';
+              await persistSession();
               foreground = await requestAi(job, source);
               actualAiCalls += 1;
               job.foregroundBlob = foreground;
@@ -386,6 +610,7 @@
       const outputs = getOutputs();
       options.onOutputsChanged?.(outputs);
       sync();
+      await persistSession();
       options.onComplete?.({
         outputs,
         errors,
@@ -402,6 +627,53 @@
       };
     }
 
+    async function restoreSession() {
+      if (restoring || options.getFiles().length) return { restored: false, count: 0 };
+      const ownerKey = sessionOwnerKey();
+      let record;
+      try {
+        await sessionStore.deleteExpired();
+        record = await sessionStore.get(ownerKey);
+        if (!usableSessionRecord(record, ownerKey)) {
+          if (record) await sessionStore.delete(ownerKey);
+          return { restored: false, count: 0 };
+        }
+        restoring = true;
+        await options.restoreFiles?.(record.items, record.composition || {});
+        const outputs = getOutputs();
+        options.onOutputsChanged?.(outputs);
+        sync({ notify: true });
+        options.onSessionRestored?.({
+          count: record.items.length,
+          outputs,
+          expiresAt: record.expiresAt,
+        });
+        return { restored: true, count: record.items.length, outputs };
+      } catch {
+        if (record) await sessionStore.delete(ownerKey).catch(() => {});
+        notifyStorage(text.sessionRestoreFailed);
+        return { restored: false, count: 0 };
+      } finally {
+        restoring = false;
+        if (record) schedulePersist();
+      }
+    }
+
+    async function clearSession() {
+      clearing = true;
+      clearTimeout(persistTimer);
+      persistTimer = null;
+      try {
+        await sessionStore.delete(sessionOwnerKey());
+        options.onSessionCleared?.();
+        return true;
+      } catch {
+        clearing = false;
+        notifyStorage(text.sessionSaveFailed);
+        return false;
+      }
+    }
+
     globalToggle.addEventListener('change', () => {
       for (const job of jobs) {
         if (!job || job.transparent === true) continue;
@@ -411,6 +683,13 @@
       }
       options.onOutputsChanged?.(getOutputs());
       sync({ notify: true });
+      schedulePersist();
+    });
+
+    clearSessionButton?.addEventListener('click', async () => {
+      if (!window.confirm(text.clearSessionConfirm)) return;
+      const cleared = await clearSession();
+      if (cleared) window.location.reload();
     });
 
     sync();
@@ -421,6 +700,9 @@
       getOutputs,
       getPlan: () => planJobs(options.getFiles().map((_, index) => jobs[index])),
       process,
+      restoreSession,
+      clearSession,
+      persistSession,
     };
   }
 
@@ -431,5 +713,12 @@
     isPng,
     planJobs,
     resetJobForSource,
+    buildSessionRecord,
+    sessionByteSize,
+    storedJobState,
+    usableSessionRecord,
+    SESSION_MAX_BYTES,
+    SESSION_SCHEMA_VERSION,
+    SESSION_TTL_MS,
   };
 })();
