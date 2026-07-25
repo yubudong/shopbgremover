@@ -72,6 +72,9 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /Only edit images you own or are authorized to modify/);
   assert.match(cleaner, /document\.body\.append\(link\)/);
   assert.match(cleaner, /link\.download = `\$\{baseName\}-cleaned\.png`/);
+  assert.match(cleaner, /document\.getElementById\('localCleanupShortcut'\)/);
+  assert.match(cleaner, /cardButtons\[0\]\?\.click\(\)/);
+  assert.match(cleaner, /shortcutButton\.disabled = cardButtons\.length === 0/);
   assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
   assert.doesNotMatch(worker, /\bfetch\s*\(/);
   assert.doesNotMatch(core, /\bfetch\s*\(/);
@@ -81,6 +84,11 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     const html = await read(file);
     assert.match(html, /href="\/local-cleaner\.css"/, file);
     assert.match(html, /src="\/local-cleaner\.js"/, file);
+    assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
+    assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
+    assert.match(html, /local-clean-entry-pill/, file);
+    assert.match(html, /🧽/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.getSourceFile\(selectedFiles\[i\]\)/, file);

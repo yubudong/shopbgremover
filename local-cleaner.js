@@ -16,6 +16,9 @@
       help: 'Best for small areas on simple backgrounds. Complex textures may need more than one pass.',
       rights: 'Only edit images you own or are authorized to modify. No image is uploaded and no credit is used.',
       close: 'Close local editor',
+      shortcutEmpty: 'Upload an image to start',
+      shortcutReady: 'Open local cleanup',
+      shortcutBatch: 'Open first image · edit each separately',
     },
     de: {
       edit: 'Lokal bereinigen', edited: 'Bereinigt', title: 'Lokale Fotobereinigung',
@@ -30,6 +33,9 @@
       help: 'Am besten für kleine Bereiche auf einfachen Hintergründen. Komplexe Texturen können mehrere Durchgänge benötigen.',
       rights: 'Bearbeite nur eigene oder autorisierte Bilder. Es wird nichts hochgeladen und kein Credit verbraucht.',
       close: 'Lokalen Editor schließen',
+      shortcutEmpty: 'Bild hochladen, um zu starten',
+      shortcutReady: 'Lokale Bereinigung öffnen',
+      shortcutBatch: 'Erstes Bild öffnen · einzeln bearbeiten',
     },
     es: {
       edit: 'Limpiar localmente', edited: 'Limpia', title: 'Limpieza local de fotos',
@@ -44,6 +50,9 @@
       help: 'Funciona mejor en áreas pequeñas con fondos sencillos. Las texturas complejas pueden requerir varias pasadas.',
       rights: 'Edita solo imágenes propias o autorizadas. No se sube la imagen ni se consumen créditos.',
       close: 'Cerrar editor local',
+      shortcutEmpty: 'Sube una imagen para empezar',
+      shortcutReady: 'Abrir limpieza local',
+      shortcutBatch: 'Abrir primera imagen · editar por separado',
     },
     fr: {
       edit: 'Nettoyer localement', edited: 'Nettoyée', title: 'Nettoyage local de photo',
@@ -58,6 +67,9 @@
       help: 'Idéal pour de petites zones sur un fond simple. Les textures complexes peuvent nécessiter plusieurs passages.',
       rights: 'Modifiez uniquement vos images ou celles que vous êtes autorisé à modifier. Aucun envoi ni crédit utilisé.',
       close: 'Fermer l’éditeur local',
+      shortcutEmpty: 'Importez une image pour commencer',
+      shortcutReady: 'Ouvrir le nettoyage local',
+      shortcutBatch: 'Ouvrir la première · modifier séparément',
     },
     'pt-BR': {
       edit: 'Limpar localmente', edited: 'Limpa', title: 'Limpeza local de foto',
@@ -72,6 +84,9 @@
       help: 'Funciona melhor em áreas pequenas e fundos simples. Texturas complexas podem exigir mais de uma aplicação.',
       rights: 'Edite apenas imagens próprias ou autorizadas. Nada é enviado e nenhum crédito é consumido.',
       close: 'Fechar editor local',
+      shortcutEmpty: 'Envie uma imagem para começar',
+      shortcutReady: 'Abrir limpeza local',
+      shortcutBatch: 'Abrir primeira imagem · editar separadamente',
     },
   }[language] || null;
   if (!copy) return;
@@ -80,8 +95,10 @@
   let active = null;
   let worker = null;
   let workerSequence = 0;
+  let cardButtons = [];
   const pendingWorkerJobs = new Map();
   const previewUrls = new Set();
+  const shortcutButton = document.getElementById('localCleanupShortcut');
 
   const overlay = document.createElement('div');
   overlay.className = 'local-clean-overlay';
@@ -148,6 +165,16 @@
   const clearButton = document.getElementById('localCleanClear');
   const downloadButton = document.getElementById('localCleanDownload');
   const restoreButton = document.getElementById('localCleanRestore');
+
+  function syncShortcut() {
+    if (!shortcutButton) return;
+    shortcutButton.disabled = cardButtons.length === 0;
+    shortcutButton.textContent = cardButtons.length > 1
+      ? copy.shortcutBatch
+      : cardButtons.length === 1
+        ? copy.shortcutReady
+        : copy.shortcutEmpty;
+  }
 
   function ensureWorker() {
     if (worker) return worker;
@@ -553,12 +580,19 @@
   applyButton.addEventListener('click', applyCleanup);
   downloadButton.addEventListener('click', downloadCleaned);
   restoreButton.addEventListener('click', restoreOriginal);
+  shortcutButton?.addEventListener('click', () => {
+    cardButtons = cardButtons.filter((button) => button.isConnected);
+    syncShortcut();
+    cardButtons[0]?.click();
+  });
 
   window.ShopBGLocalCleaner = {
     clearAll() {
       for (const url of previewUrls) URL.revokeObjectURL(url);
       previewUrls.clear();
       edits = new WeakMap();
+      cardButtons = [];
+      syncShortcut();
     },
     decorateCard(card, file, index, options = {}) {
       const button = document.createElement('button');
@@ -571,6 +605,8 @@
         openEditor(file, index, button, options.onApply);
       });
       card.append(button);
+      cardButtons.push(button);
+      syncShortcut();
       return button;
     },
     getSourceFile(file) {
@@ -580,4 +616,5 @@
       return edits.has(file);
     },
   };
+  syncShortcut();
 })();
