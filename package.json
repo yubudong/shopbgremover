@@ -13,7 +13,7 @@
     "lint": "next lint",
     "test": "npm run test:backup && npm run test:frontend && npm run test:worker",
     "test:backup": "node --test tests/d1-backup.test.mjs",
-    "test:frontend": "node --test tests/frontend-stage1.test.mjs tests/local-inpaint.test.mjs",
+    "test:frontend": "node --test tests/frontend-stage1.test.mjs tests/local-inpaint.test.mjs tests/ai-workflow.test.mjs",
     "test:worker": "vitest run --config vitest.config.mjs"
   },
   "dependencies": {

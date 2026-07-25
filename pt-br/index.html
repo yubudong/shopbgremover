@@ -52,6 +52,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="/ai-workflow.js?v=20260725-ai-stage5a-v2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -274,6 +275,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5a-v2">
 </head>
 <body>
 
@@ -392,6 +394,37 @@
         </div>
         <p>Pinte ou enquadre uma área pequena. A imagem permanece neste navegador e nenhum crédito é usado.</p>
         <button class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled>Envie uma imagem para começar</button>
+      </div>
+
+      <div class="ai-workflow-panel" id="aiWorkflowPanel"
+        data-empty="Envie imagens para calcular o uso de créditos de IA."
+        data-summary="{ai} de {total} precisam de IA · estimativa {ai} créditos · {noCharge} sem custo"
+        data-card-label="IA"
+        data-checking="Verificando transparência…"
+        data-transparent="PNG transparente · IA ignorada"
+        data-off="IA desativada · sem crédito"
+        data-cached="Resultado de IA salvo · sem novo crédito"
+        data-reprocess="Editada após IA · 1 novo crédito"
+        data-ready="IA ativada · 1 crédito após sucesso"
+        data-failed="Falha · nova tentativa mantém a mesma tarefa"
+        data-confirm="Este lote contém {total} imagens. {ai} precisam de remoção de fundo com IA e podem usar até {ai} créditos após o processamento bem-sucedido. {noCharge} não usarão créditos de IA. Continuar?"
+        data-confirm-reprocess="{count} imagem(ns) já processada(s) foram alteradas. Processá-las novamente pode usar {count} crédito(s) adicional(is). Continuar?"
+        data-insufficient="Este lote precisa de {needed} créditos, mas apenas {remaining} estão disponíveis."
+        data-credit-check-failed="Não foi possível verificar os créditos disponíveis. Nenhuma solicitação de IA foi enviada."
+        data-processing="Processando {current} / {total}: {name}"
+        data-done="✅ Concluído! {ok} prontas{errorsText} · {aiCalls} chamada(s) de IA"
+        data-failed-text=" · {errors} com falha">
+        <div class="ai-workflow-head">
+          <div class="ai-workflow-copy">
+            <strong>Remover fundo com IA</strong>
+            <span>O processamento concluído com IA custa 1 crédito por imagem. Limpeza local, ajustes de fundo e exportação continuam grátis.</span>
+          </div>
+          <label class="ai-master-toggle" title="Ativar IA para todas as imagens não transparentes">
+            <input id="aiRemoveToggle" type="checkbox" checked aria-label="Ativar IA para todas as imagens não transparentes">
+            <i aria-hidden="true"></i>
+          </label>
+        </div>
+        <div class="ai-estimate" id="aiEstimate">Envie imagens para calcular o uso de créditos de IA.</div>
       </div>
 
       <div class="setting-group">
@@ -741,6 +774,7 @@
 
 let selectedFiles   = [];
   let processedResults = [];
+  let aiWorkflow = null;
   let currentUser     = null;
   let bgMode          = 'white';
   let customHex       = '#F0F0F0';
@@ -753,7 +787,8 @@ let selectedFiles   = [];
     const map = { white: 'bgWhite', transparent: 'bgTransparent', custom: 'bgCustom' };
     document.getElementById(map[mode]).classList.add('active');
     document.getElementById('colorRow').style.display = mode === 'custom' ? 'flex' : 'none';
-  }
+    aiWorkflow?.markCompositionChanged();
+}
 
   function syncColor(from) {
     const picker = document.getElementById('customColorPicker');
@@ -768,19 +803,22 @@ let selectedFiles   = [];
         customHex = val;
       }
     }
-  }
+    aiWorkflow?.markCompositionChanged();
+}
 
   function setSize(el, val) {
     outputSize = val;
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
-  }
+    aiWorkflow?.markCompositionChanged();
+}
 
   function setRename(el, mode) {
     renameMode = mode;
     document.querySelectorAll('.rename-opt').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
-  }
+    aiWorkflow?.markCompositionChanged();
+}
 
   function doLogin()        { window.location = `${API}/auth/login`; }
   function openLoginModal() { document.getElementById('loginOverlay').classList.add('visible'); }
@@ -1039,11 +1077,15 @@ let selectedFiles   = [];
       card.appendChild(badge);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
         onApply: ({ previewUrl, restored }) => {
-          if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+          if (img.dataset.aiResultUrl) {
+            URL.revokeObjectURL(img.dataset.aiResultUrl);
+            delete img.dataset.aiResultUrl;
+          }
           img.src = previewUrl;
           updateWorkspacePreview(i, previewUrl);
           badge.textContent = restored ? '⏳' : '✏️';
-          resetProcessActionAfterLocalEdit(restored);
+          aiWorkflow?.markSourceChanged(i);
+          resetProcessActionAfterLocalEdit(i, restored);
         },
       });
       img.tabIndex = 0;
@@ -1059,36 +1101,36 @@ let selectedFiles   = [];
         }
       });
       grid.appendChild(card);
+      aiWorkflow?.register(file, i, card);
     });
 
     document.getElementById('actionBar').classList.add('visible');
     document.body.style.paddingBottom = '80px';
 
-    const btn = document.getElementById('processBtn');
-    btn.textContent = `Remover fundo (${selectedFiles.length} ${selectedFiles.length > 1 ? 'imagens' : 'imagem'})`;
-    btn.disabled = false;
-    btn.className = 'action-btn action-btn-primary';
-    btn.onclick = startProcessing;
+    setProcessButtonReady();
     setStatus(`${additions.length} ${additions.length > 1 ? 'imagens adicionadas' : 'imagem adicionada'} · ${selectedFiles.length} prontas`);
-    processedResults = [];
+    processedResults = aiWorkflow?.getOutputs() || processedResults;
   }
 
   function setStatus(msg) {
     document.getElementById('statusText').textContent = msg;
   }
 
-  function resetProcessActionAfterLocalEdit(restored = false) {
-    processedResults = [];
-    document.getElementById('progressTrack').style.display = 'none';
-    document.getElementById('progressBar').style.width = '0%';
+  function setProcessButtonReady() {
     const btn = document.getElementById('processBtn');
-    btn.textContent = `Remover fundo (${selectedFiles.length} ${selectedFiles.length > 1 ? 'imagens' : 'imagem'})`;
-    btn.disabled = false;
+    btn.textContent = "Processar imagens" + ` (${selectedFiles.length})`;
+    btn.disabled = selectedFiles.length === 0;
     btn.className = 'action-btn action-btn-primary';
     btn.onclick = startProcessing;
+  }
+
+  function resetProcessActionAfterLocalEdit(index, restored = false) {
+    document.getElementById('progressTrack').style.display = 'none';
+    document.getElementById('progressBar').style.width = '0%';
+    setProcessButtonReady();
     setStatus(restored
-      ? 'Original restaurado. Pronto para remover o fundo com IA.'
-      : 'Limpeza local salva. Pronto para remover o fundo com IA.');
+      ? "Original restaurado. Apenas esta imagem precisa ser preparada novamente."
+      : "Limpeza local salva. Apenas esta imagem precisa ser preparada novamente.");
   }
 
   async function compressToDataUrl(file) {
@@ -1164,106 +1206,27 @@ let selectedFiles   = [];
   document.getElementById('processBtn').onclick = startProcessing;
 
   async function startProcessing() {
-    if (!selectedFiles.length) return;
-
-    try {
-      const cr = await fetch(`${API}/api/check-credit`, { method: 'GET', credentials: 'include', headers: { 'X-Device-ID': DEVICE_ID } });
-      if (cr.ok) {
-        const cd = await cr.json();
-        if (cd.reason === 'free_limit')  { showRegisterModal(); return; }
-        if (cd.reason === 'no_credits')  { showUpgradeModal();  return; }
-      }
-    } catch (e) {}
-
-    const btn = document.getElementById('processBtn');
-    btn.disabled = true;
-    btn.textContent = 'Processando…';
-    document.getElementById('progressTrack').style.display = 'block';
-    processedResults = [];
-    let errors = 0;
-
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const card  = document.getElementById(`card-${i}`);
-      const badge = card ? card.querySelector('.status-badge') : null;
-      if (badge) badge.textContent = '⏳';
-
-      setStatus(`Processando ${i + 1} / ${selectedFiles.length}: ${selectedFiles[i].name}`);
-      document.getElementById('progressBar').style.width = `${(i / selectedFiles.length) * 100}%`;
-
-      try {
-        const sourceFile = window.ShopBGLocalCleaner?.getSourceFile(selectedFiles[i]) || selectedFiles[i];
-        const dataUrl = await compressToDataUrl(sourceFile);
-        const res = await fetch(`${API}/api/remove-bg`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
-          body: JSON.stringify({ image_url: dataUrl, task_id: crypto.randomUUID() }),
-        });
-
-        if (res.ok) {
-          const rawBlob       = await res.blob();
-          const processedBlob = await applyBackground(rawBlob);
-          const name          = getFileName(selectedFiles[i].name, processedResults.length);
-          processedResults.push({ name, blob: processedBlob });
-
-          if (card) {
-            card.classList.add('flipping');
-            const objUrl = URL.createObjectURL(processedBlob);
-            setTimeout(() => {
-              card.querySelector('img').src = objUrl;
-              updateWorkspacePreview(i, objUrl);
-              card.classList.remove('flipping');
-              if (badge) badge.textContent = '✅';
-            }, 300);
-          }
-        } else {
-          const err = await res.json().catch(() => ({}));
-          if (err.reason === 'free_limit') { showRegisterModal(); break; }
-          if (err.reason === 'no_credits') { showUpgradeModal();  break; }
-          errors++;
-          if (badge) badge.textContent = '❌';
-        }
-      } catch (e) {
-        errors++;
-        if (badge) badge.textContent = '❌';
-      }
-    }
-
-    document.getElementById('progressBar').style.width = '100%';
-    const ok = processedResults.length;
-    const totalMB = (processedResults.reduce((s, r) => s + r.blob.size, 0) / 1048576).toFixed(1);
-    setStatus(`✅ Pronto! ${ok} processada${ok !== 1 ? 's' : ''}${errors ? ` · ${errors} com erro` : ''}`);
-
-    btn.className   = 'action-btn action-btn-download';
-    btn.textContent = `📥 Baixar ZIP (${totalMB} MB)`;
-    btn.disabled    = false;
-    btn.onclick     = downloadZip;
-
-    if (currentUser && ok > 0) {
-      fetch(`${API}/api/history`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
-        body: JSON.stringify({ file_count: ok, settings: { bgMode } }),
-      });
-      loadUser();
-    }
+    if (!selectedFiles.length || !aiWorkflow) return;
+    await aiWorkflow.process();
   }
 
   async function downloadZip() {
     if (!processedResults.length) return;
     const btn = document.getElementById('processBtn');
-    btn.textContent = 'Compactando…';
+    btn.textContent = "Compactando…";
 
     const zip = new JSZip();
-    processedResults.forEach(r => zip.file(r.name, r.blob));
+    processedResults.forEach(result => zip.file(result.name, result.blob));
     const blob = await zip.generateAsync({ type: 'blob' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'shopbg-processed.zip'; a.click();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'shopbg-processed.zip';
+    link.click();
     URL.revokeObjectURL(url);
 
-    const totalMB = (processedResults.reduce((s, r) => s + r.blob.size, 0) / 1048576).toFixed(1);
-    btn.textContent = `📥 Baixar ZIP (${totalMB} MB)`;
+    const totalMB = (processedResults.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
+    btn.textContent = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
   }
 
   function showRegisterModal() {
@@ -1299,6 +1262,86 @@ let selectedFiles   = [];
       if (menu) menu.classList.remove('open');
     }
   });
+
+  aiWorkflow = window.ShopBGAiWorkflow.create({
+    api: API,
+    deviceId: DEVICE_ID,
+    getFiles: () => selectedFiles,
+    getCurrentUser: () => currentUser,
+    getSourceFile: (file) => window.ShopBGLocalCleaner?.getSourceFile(file) || file,
+    compressToDataUrl,
+    applyBackground,
+    getFileName,
+    setStatus,
+    showRegisterModal,
+    showUpgradeModal,
+    onPlanChanged: () => {
+      if (selectedFiles.length) setProcessButtonReady();
+    },
+    onStart: () => {
+      const btn = document.getElementById('processBtn');
+      btn.disabled = true;
+      btn.textContent = "Processando…";
+      document.getElementById('progressTrack').style.display = 'block';
+    },
+    onProgress: (index, total) => {
+      document.getElementById('progressBar').style.width = `${(index / total) * 100}%`;
+    },
+    onResult: (index, processedBlob) => {
+      const card = document.getElementById(`card-${index}`);
+      const image = card?.querySelector('img');
+      if (!card || !image) return;
+      if (image.dataset.aiResultUrl) URL.revokeObjectURL(image.dataset.aiResultUrl);
+      const objectUrl = URL.createObjectURL(processedBlob);
+      image.dataset.aiResultUrl = objectUrl;
+      card.classList.add('flipping');
+      setTimeout(() => {
+        image.src = objectUrl;
+        updateWorkspacePreview(index, objectUrl);
+        card.classList.remove('flipping');
+      }, 300);
+    },
+    onOutputsChanged: (outputs) => {
+      processedResults = outputs;
+    },
+    onComplete: ({ outputs, errors, actualAiCalls }) => {
+      document.getElementById('progressBar').style.width = '100%';
+      const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
+      const data = document.getElementById('aiWorkflowPanel').dataset;
+      const errorsText = errors
+        ? window.ShopBGAiWorkflow.format(data.failedText, { errors })
+        : '';
+      setStatus(window.ShopBGAiWorkflow.format(data.done, {
+        ok: outputs.length,
+        errorsText,
+        aiCalls: actualAiCalls,
+      }));
+
+      const btn = document.getElementById('processBtn');
+      if (outputs.length) {
+        btn.className = 'action-btn action-btn-download';
+        btn.textContent = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
+        btn.disabled = false;
+        btn.onclick = downloadZip;
+      } else {
+        setProcessButtonReady();
+      }
+
+      if (currentUser && outputs.length > 0) {
+        fetch(`${API}/api/history`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
+          body: JSON.stringify({
+            file_count: outputs.length,
+            settings: { bgMode, ai_calls: actualAiCalls },
+          }),
+        });
+        loadUser();
+      }
+    },
+  });
+
 
   loadUser();
 </script>

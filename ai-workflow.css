@@ -1,0 +1,44 @@
+.ai-workflow-panel{
+  margin-bottom:18px;padding:14px;border:1px solid #bfdbfe;border-radius:12px;
+  background:linear-gradient(145deg,#eff6ff,#f8fafc)
+}
+.ai-workflow-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ai-workflow-copy{min-width:0}
+.ai-workflow-copy strong{display:block;color:#111827;font-size:13px;font-weight:800;line-height:1.3}
+.ai-workflow-copy span{display:block;margin-top:4px;color:#475569;font-size:10px;line-height:1.4}
+.ai-master-toggle{position:relative;width:42px;height:24px;flex:0 0 auto}
+.ai-master-toggle input{position:absolute;opacity:0;pointer-events:none}
+.ai-master-toggle i{
+  position:absolute;inset:0;border-radius:999px;background:#cbd5e1;cursor:pointer;transition:.2s
+}
+.ai-master-toggle i::after{
+  content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.25);transition:.2s
+}
+.ai-master-toggle input:checked+i{background:#2563eb}
+.ai-master-toggle input:checked+i::after{transform:translateX(18px)}
+.ai-master-toggle input:focus-visible+i{outline:3px solid rgba(37,99,235,.28);outline-offset:2px}
+.ai-master-toggle input:disabled+i{cursor:not-allowed;opacity:.55}
+.ai-estimate{
+  margin-top:11px;padding:9px 10px;border-radius:9px;background:#fff;color:#1e3a8a;
+  font-size:11px;font-weight:750;line-height:1.45;box-shadow:0 1px 4px rgba(37,99,235,.08)
+}
+.ai-card-control{
+  position:absolute;left:7px;top:7px;z-index:3;max-width:calc(100% - 42px);
+  border:1px solid rgba(255,255,255,.75);border-radius:8px;padding:5px 7px;
+  background:rgba(30,64,175,.9);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.2);
+  backdrop-filter:blur(5px)
+}
+.ai-card-control label{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:850;cursor:pointer}
+.ai-card-control input{width:13px;height:13px;margin:0;accent-color:#fff}
+.ai-card-control small{
+  display:block;max-width:120px;margin-top:3px;overflow:hidden;font-size:8px;font-weight:650;
+  line-height:1.25;text-overflow:ellipsis;white-space:nowrap;opacity:.9
+}
+.ai-card-control.is-transparent,.ai-card-control.is-cached{background:rgba(4,120,87,.92)}
+.ai-card-control.is-off{background:rgba(71,85,105,.9)}
+.ai-card-control.needs-reprocess{background:rgba(180,83,9,.93)}
+@media(max-width:640px){
+  .ai-workflow-panel{padding:12px}
+  .ai-card-control small{max-width:100px}
+}

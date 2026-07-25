@@ -50,15 +50,33 @@ function extractFunction(source, signature) {
   throw new Error(`unterminated ${signature}`);
 }
 
-test('all localized workspaces send device and task idempotency identifiers', async () => {
+test('all localized workspaces use stable per-image AI task identities', async () => {
+  const workflow = await read('ai-workflow.js');
+  assert.match(workflow, /task_id: job\.taskId/);
+  assert.match(workflow, /taskId: DEFAULT_TASK_ID\(\)/);
+  assert.match(workflow, /resetJobForSource\(job/);
+  assert.match(workflow, /remaining < plan\.aiCount/);
+  assert.match(workflow, /hasTransparentPixel\(context\.getImageData/);
+  assert.match(workflow, /job\.foregroundBlob && !job\.needsReprocess/);
+  assert.match(workflow, /markCompositionChanged/);
+  assert.doesNotMatch(workflow, /localStorage|indexedDB/);
+  assert.equal((workflow.match(/\/api\/remove-bg/g) || []).length, 1);
+
   for (const file of indexFiles) {
     const html = await read(file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5a-v2"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5a-v2"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
-    assert.match(html, /task_id: crypto\.randomUUID\(\)/, file);
+    assert.match(html, /aiWorkflow\?\.register\(file, i, card\)/, file);
+    assert.match(html, /aiWorkflow\?\.markSourceChanged\(i\)/, file);
+    assert.match(html, /aiWorkflow\.process\(\)/, file);
+    assert.match(html, /id="aiRemoveToggle"/, file);
+    assert.match(html, /id="aiEstimate"/, file);
+    assert.match(html, /data-summary="\{ai\}[^"]+\{total\}[^"]+\{noCharge\}/, file);
     assert.match(html, /const limit = currentUser \? 50 : 1/, file);
     assert.match(html, /slice\(0, Math\.max\(0, limit - selectedFiles\.length\)\)/, file);
-    assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
+    assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
   }
 });
 
@@ -104,18 +122,18 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     assert.match(html, /additions\.forEach\(\(file, offset\)/, file);
     assert.match(html, /fileInput\.value = ''/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
-    assert.match(html, /ShopBGLocalCleaner\?\.getSourceFile\(selectedFiles\[i\]\)/, file);
+    assert.match(html, /getSourceFile: \(file\) => window\.ShopBGLocalCleaner\?\.getSourceFile\(file\) \|\| file/, file);
     assert.match(html, /onApply: \(\{ previewUrl, restored \}\)/, file);
-    assert.match(html, /resetProcessActionAfterLocalEdit\(restored = false\)/, file);
+    assert.match(html, /resetProcessActionAfterLocalEdit\(index, restored = false\)/, file);
     assert.match(html, /badge\.textContent = restored \? '⏳' : '✏️'/, file);
     assert.equal((html.match(/id="workspacePreview"/g) || []).length, 1, file);
     assert.equal((html.match(/id="workspacePreviewImage"/g) || []).length, 1, file);
     assert.match(html, /function showWorkspacePreview\(index\)/, file);
     assert.match(html, /function updateWorkspacePreview\(index, imageUrl\)/, file);
     assert.match(html, /updateWorkspacePreview\(i, previewUrl\)/, file);
-    assert.match(html, /updateWorkspacePreview\(i, objUrl\)/, file);
+    assert.match(html, /updateWorkspacePreview\(index, objectUrl\)/, file);
     assert.match(html, /card\.addEventListener\('click'/, file);
-    assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
+    assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
   }
 });
 
@@ -181,6 +199,8 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     'admin.html',
     'admin-vouchers.html',
     'admin-referrals.html',
+    'ai-workflow.css',
+    'ai-workflow.js',
     'test-paypal.html',
     'shopify-background-remover.html',
     'amazon-ebay-product-images.html',

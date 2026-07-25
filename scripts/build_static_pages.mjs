@@ -10,6 +10,8 @@ const rootFiles = [
   'admin.html',
   'admin-vouchers.html',
   'admin-referrals.html',
+  'ai-workflow.css',
+  'ai-workflow.js',
   'amazon-ebay-product-images.html',
   'contact.html',
   'credits.html',
