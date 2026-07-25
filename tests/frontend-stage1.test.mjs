@@ -56,7 +56,8 @@ test('all localized workspaces send device and task idempotency identifiers', as
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /task_id: crypto\.randomUUID\(\)/, file);
-    assert.match(html, /slice\(0, currentUser \? 50 : 1\)/, file);
+    assert.match(html, /const limit = currentUser \? 50 : 1/, file);
+    assert.match(html, /slice\(0, Math\.max\(0, limit - selectedFiles\.length\)\)/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
   }
 });
@@ -75,6 +76,13 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /document\.getElementById\('localCleanupShortcut'\)/);
   assert.match(cleaner, /cardButtons\[0\]\?\.click\(\)/);
   assert.match(cleaner, /shortcutButton\.disabled = cardButtons\.length === 0/);
+  assert.match(cleaner, /stage\.addEventListener\('wheel'/);
+  assert.match(cleaner, /event\.ctrlKey && !event\.metaKey/);
+  assert.match(cleaner, /repairedAreaContext\.globalCompositeOperation = 'destination-in'/);
+  assert.match(worker, /import \{ dilateMask, inpaintRgba \}/);
+  assert.match(worker, /maskBuffer: expandedMask\.buffer/);
+  assert.match(worker, /sampleRadius: 6/);
+  assert.match(worker, /smoothingPasses: 8/);
   assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
   assert.doesNotMatch(worker, /\bfetch\s*\(/);
   assert.doesNotMatch(core, /\bfetch\s*\(/);
@@ -82,14 +90,17 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-discoverability"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-discoverability"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-workspace-v2"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-workspace-v2"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
     assert.match(html, /local-clean-entry-pill/, file);
     assert.match(html, /🧽/, file);
-    assert.match(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
+    assert.doesNotMatch(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
+    assert.match(html, /selectedFiles\.push\(\.\.\.additions\)/, file);
+    assert.match(html, /additions\.forEach\(\(file, offset\)/, file);
+    assert.match(html, /fileInput\.value = ''/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.getSourceFile\(selectedFiles\[i\]\)/, file);
     assert.match(html, /onApply: \(\{ previewUrl, restored \}\)/, file);

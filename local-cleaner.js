@@ -16,6 +16,8 @@
       help: 'Best for small areas on simple backgrounds. Complex textures may need more than one pass.',
       rights: 'Only edit images you own or are authorized to modify. No image is uploaded and no credit is used.',
       close: 'Close local editor',
+      zoom: 'Zoom', zoomOut: 'Zoom out', zoomIn: 'Zoom in', fit: 'Fit',
+      navigation: 'Scroll to move · Ctrl/⌘ + wheel to zoom',
       shortcutEmpty: 'Upload an image to start',
       shortcutReady: 'Open local cleanup',
       shortcutBatch: 'Open first image · edit each separately',
@@ -33,6 +35,8 @@
       help: 'Am besten für kleine Bereiche auf einfachen Hintergründen. Komplexe Texturen können mehrere Durchgänge benötigen.',
       rights: 'Bearbeite nur eigene oder autorisierte Bilder. Es wird nichts hochgeladen und kein Credit verbraucht.',
       close: 'Lokalen Editor schließen',
+      zoom: 'Zoom', zoomOut: 'Verkleinern', zoomIn: 'Vergrößern', fit: 'Einpassen',
+      navigation: 'Scrollen zum Bewegen · Strg/⌘ + Mausrad zum Zoomen',
       shortcutEmpty: 'Bild hochladen, um zu starten',
       shortcutReady: 'Lokale Bereinigung öffnen',
       shortcutBatch: 'Erstes Bild öffnen · einzeln bearbeiten',
@@ -50,6 +54,8 @@
       help: 'Funciona mejor en áreas pequeñas con fondos sencillos. Las texturas complejas pueden requerir varias pasadas.',
       rights: 'Edita solo imágenes propias o autorizadas. No se sube la imagen ni se consumen créditos.',
       close: 'Cerrar editor local',
+      zoom: 'Zoom', zoomOut: 'Alejar', zoomIn: 'Acercar', fit: 'Ajustar',
+      navigation: 'Desplaza para mover · Ctrl/⌘ + rueda para ampliar',
       shortcutEmpty: 'Sube una imagen para empezar',
       shortcutReady: 'Abrir limpieza local',
       shortcutBatch: 'Abrir primera imagen · editar por separado',
@@ -67,6 +73,8 @@
       help: 'Idéal pour de petites zones sur un fond simple. Les textures complexes peuvent nécessiter plusieurs passages.',
       rights: 'Modifiez uniquement vos images ou celles que vous êtes autorisé à modifier. Aucun envoi ni crédit utilisé.',
       close: 'Fermer l’éditeur local',
+      zoom: 'Zoom', zoomOut: 'Réduire', zoomIn: 'Agrandir', fit: 'Ajuster',
+      navigation: 'Faites défiler pour déplacer · Ctrl/⌘ + molette pour zoomer',
       shortcutEmpty: 'Importez une image pour commencer',
       shortcutReady: 'Ouvrir le nettoyage local',
       shortcutBatch: 'Ouvrir la première · modifier séparément',
@@ -84,6 +92,8 @@
       help: 'Funciona melhor em áreas pequenas e fundos simples. Texturas complexas podem exigir mais de uma aplicação.',
       rights: 'Edite apenas imagens próprias ou autorizadas. Nada é enviado e nenhum crédito é consumido.',
       close: 'Fechar editor local',
+      zoom: 'Zoom', zoomOut: 'Reduzir', zoomIn: 'Ampliar', fit: 'Ajustar',
+      navigation: 'Role para mover · Ctrl/⌘ + roda para ampliar',
       shortcutEmpty: 'Envie uma imagem para começar',
       shortcutReady: 'Abrir limpeza local',
       shortcutBatch: 'Abrir primeira imagem · editar separadamente',
@@ -113,9 +123,17 @@
             <div class="local-clean-title" id="localCleanTitle">${copy.title}</div>
             <div class="local-clean-subtitle">${copy.subtitle}</div>
           </div>
-          <button class="local-clean-close" id="localCleanClose" type="button" aria-label="${copy.close}">×</button>
+          <div class="local-clean-head-actions">
+            <div class="local-clean-zoom" role="group" aria-label="${copy.zoom}">
+              <button type="button" id="localCleanZoomOut" aria-label="${copy.zoomOut}">−</button>
+              <button type="button" id="localCleanZoomFit">${copy.fit}</button>
+              <span id="localCleanZoomValue">100%</span>
+              <button type="button" id="localCleanZoomIn" aria-label="${copy.zoomIn}">+</button>
+            </div>
+            <button class="local-clean-close" id="localCleanClose" type="button" aria-label="${copy.close}">×</button>
+          </div>
         </div>
-        <div class="local-clean-stage">
+        <div class="local-clean-stage" id="localCleanStage">
           <div class="local-clean-canvas-wrap">
             <canvas id="localCleanBase"></canvas>
             <canvas id="localCleanMask"></canvas>
@@ -132,6 +150,7 @@
           </div>
           <label class="local-clean-label" for="localCleanBrush" style="margin-top:15px">${copy.size} · <span id="localCleanBrushValue">36</span></label>
           <input class="local-clean-range" id="localCleanBrush" type="range" min="8" max="120" value="36">
+          <p class="local-clean-help">${copy.navigation}</p>
         </div>
         <div class="local-clean-section">
           <div class="local-clean-row">
@@ -154,6 +173,8 @@
 
   const baseCanvas = document.getElementById('localCleanBase');
   const maskCanvas = document.getElementById('localCleanMask');
+  const stage = document.getElementById('localCleanStage');
+  const canvasWrap = overlay.querySelector('.local-clean-canvas-wrap');
   const baseContext = baseCanvas.getContext('2d', { alpha: true });
   const maskContext = maskCanvas.getContext('2d');
   const status = document.getElementById('localCleanStatus');
@@ -165,6 +186,10 @@
   const clearButton = document.getElementById('localCleanClear');
   const downloadButton = document.getElementById('localCleanDownload');
   const restoreButton = document.getElementById('localCleanRestore');
+  const zoomOutButton = document.getElementById('localCleanZoomOut');
+  const zoomFitButton = document.getElementById('localCleanZoomFit');
+  const zoomInButton = document.getElementById('localCleanZoomIn');
+  const zoomValue = document.getElementById('localCleanZoomValue');
 
   function syncShortcut() {
     if (!shortcutButton) return;
@@ -184,7 +209,10 @@
       if (!job) return;
       pendingWorkerJobs.delete(event.data.id);
       if (event.data.error) job.reject(new Error(event.data.error));
-      else job.resolve(new Uint8ClampedArray(event.data.rgbaBuffer));
+      else job.resolve({
+        rgba: new Uint8ClampedArray(event.data.rgbaBuffer),
+        mask: new Uint8Array(event.data.maskBuffer),
+      });
     });
     worker.addEventListener('error', () => {
       for (const job of pendingWorkerJobs.values()) job.reject(new Error(copy.failed));
@@ -286,6 +314,46 @@
     applyButton.disabled = markCount === 0 || Boolean(active?.processing);
     downloadButton.disabled = !active || !edits.has(active.file) || Boolean(active.processing);
     restoreButton.disabled = !active || !edits.has(active.file) || Boolean(active.processing);
+  }
+
+  function applyZoom() {
+    if (!active || !stage.clientWidth || !stage.clientHeight) return;
+    const style = getComputedStyle(stage);
+    const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const availableWidth = Math.max(1, stage.clientWidth - horizontalPadding);
+    const availableHeight = Math.max(1, stage.clientHeight - verticalPadding);
+    const fitScale = Math.min(
+      availableWidth / baseCanvas.width,
+      availableHeight / baseCanvas.height,
+    );
+    const displayScale = fitScale * active.zoom;
+    const displayWidth = Math.max(1, Math.round(baseCanvas.width * displayScale));
+    const displayHeight = Math.max(1, Math.round(baseCanvas.height * displayScale));
+    canvasWrap.style.width = `${displayWidth}px`;
+    canvasWrap.style.height = `${displayHeight}px`;
+    canvasWrap.style.marginLeft = `${Math.max(0, (availableWidth - displayWidth) / 2)}px`;
+    canvasWrap.style.marginRight = `${Math.max(0, (availableWidth - displayWidth) / 2)}px`;
+    canvasWrap.style.marginTop = `${Math.max(0, (availableHeight - displayHeight) / 2)}px`;
+    canvasWrap.style.marginBottom = `${Math.max(0, (availableHeight - displayHeight) / 2)}px`;
+    zoomValue.textContent = `${Math.round(active.zoom * 100)}%`;
+    zoomOutButton.disabled = active.zoom <= 0.25;
+    zoomInButton.disabled = active.zoom >= 5;
+  }
+
+  function setZoom(nextZoom, anchor = null) {
+    if (!active) return;
+    const oldRect = canvasWrap.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    const anchorX = anchor?.x ?? (stageRect.left + stageRect.width / 2);
+    const anchorY = anchor?.y ?? (stageRect.top + stageRect.height / 2);
+    const imageX = oldRect.width ? (anchorX - oldRect.left) / oldRect.width : 0.5;
+    const imageY = oldRect.height ? (anchorY - oldRect.top) / oldRect.height : 0.5;
+    active.zoom = Math.max(0.25, Math.min(5, nextZoom));
+    applyZoom();
+    const newRect = canvasWrap.getBoundingClientRect();
+    stage.scrollLeft += (newRect.left + imageX * newRect.width) - anchorX;
+    stage.scrollTop += (newRect.top + imageY * newRect.height) - anchorY;
   }
 
   function pointerPosition(event) {
@@ -427,7 +495,28 @@
       for (let index = 0; index < mask.length; index += 1) mask[index] = maskPixels[index * 4] > 127 ? 1 : 0;
 
       const result = await runInpaint(imageData, mask);
-      workContext.putImageData(new ImageData(result, workWidth, workHeight), 0, 0);
+      workContext.putImageData(new ImageData(result.rgba, workWidth, workHeight), 0, 0);
+
+      const compositeMask = document.createElement('canvas');
+      compositeMask.width = workWidth;
+      compositeMask.height = workHeight;
+      const compositeMaskContext = compositeMask.getContext('2d');
+      const compositeMaskPixels = compositeMaskContext.createImageData(workWidth, workHeight);
+      for (let index = 0; index < result.mask.length; index += 1) {
+        compositeMaskPixels.data[index * 4] = 255;
+        compositeMaskPixels.data[index * 4 + 1] = 255;
+        compositeMaskPixels.data[index * 4 + 2] = 255;
+        compositeMaskPixels.data[index * 4 + 3] = result.mask[index] ? 255 : 0;
+      }
+      compositeMaskContext.putImageData(compositeMaskPixels, 0, 0);
+
+      const repairedArea = document.createElement('canvas');
+      repairedArea.width = workWidth;
+      repairedArea.height = workHeight;
+      const repairedAreaContext = repairedArea.getContext('2d', { alpha: true });
+      repairedAreaContext.drawImage(workCanvas, 0, 0);
+      repairedAreaContext.globalCompositeOperation = 'destination-in';
+      repairedAreaContext.drawImage(compositeMask, 0, 0);
 
       const output = document.createElement('canvas');
       output.width = sourceWidth;
@@ -436,7 +525,7 @@
       outputContext.drawImage(active.bitmap, 0, 0);
       outputContext.imageSmoothingEnabled = true;
       outputContext.imageSmoothingQuality = 'high';
-      outputContext.drawImage(workCanvas, crop.x, crop.y, crop.width, crop.height);
+      outputContext.drawImage(repairedArea, crop.x, crop.y, crop.width, crop.height);
       const blob = await canvasBlob(output);
 
       const previous = edits.get(active.file);
@@ -477,22 +566,25 @@
     baseContext.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
     baseContext.imageSmoothingQuality = 'high';
     baseContext.drawImage(active.bitmap, 0, 0, baseCanvas.width, baseCanvas.height);
+    applyZoom();
   }
 
   async function openEditor(file, index, button, onApply) {
     closeBitmap(active?.bitmap);
     active = {
       file, index, button, onApply, bitmap: await bitmapFrom(currentSource(file)),
-      marks: [], redo: [], drawing: null, pointerId: null, tool: 'brush', processing: false,
+      marks: [], redo: [], drawing: null, pointerId: null, tool: 'brush', processing: false, zoom: 1,
     };
     document.querySelectorAll('[data-clean-tool]').forEach((element) => {
       element.classList.toggle('active', element.dataset.cleanTool === 'brush');
     });
+    overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+    stage.scrollLeft = 0;
+    stage.scrollTop = 0;
     drawActiveBitmap();
     redrawMarks();
     status.textContent = copy.ready;
-    overlay.classList.add('visible');
-    document.body.style.overflow = 'hidden';
     updateControls();
   }
 
@@ -554,6 +646,18 @@
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && overlay.classList.contains('visible')) closeEditor(); });
   brushInput.addEventListener('input', () => {
     document.getElementById('localCleanBrushValue').textContent = brushInput.value;
+  });
+  zoomOutButton.addEventListener('click', () => setZoom((active?.zoom || 1) / 1.25));
+  zoomFitButton.addEventListener('click', () => setZoom(1));
+  zoomInButton.addEventListener('click', () => setZoom((active?.zoom || 1) * 1.25));
+  stage.addEventListener('wheel', (event) => {
+    if (!active || (!event.ctrlKey && !event.metaKey)) return;
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+    setZoom(active.zoom * factor, { x: event.clientX, y: event.clientY });
+  }, { passive: false });
+  window.addEventListener('resize', () => {
+    if (active && overlay.classList.contains('visible')) applyZoom();
   });
   document.querySelectorAll('[data-clean-tool]').forEach((button) => {
     button.addEventListener('click', () => {

@@ -74,6 +74,38 @@ test('fully transparent repairs normalize hidden color channels to zero', () => 
   assert.deepEqual(Array.from(output.slice(center * 4, center * 4 + 4)), [0, 0, 0, 0]);
 });
 
+test('quality smoothing keeps every unmasked source pixel exact', () => {
+  const width = 5;
+  const height = 3;
+  const input = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      input.set([x * 50, 120, 200 - x * 30, 255], (y * width + x) * 4);
+    }
+  }
+  const center = 1 * width + 2;
+  input.set([255, 0, 0, 255], center * 4);
+  const mask = new Uint8Array(width * height);
+  mask[center] = 1;
+
+  const output = inpaintRgba(input, width, height, mask, {
+    expansion: 0,
+    sampleRadius: 3,
+    smoothingPasses: 8,
+  });
+
+  for (let index = 0; index < mask.length; index += 1) {
+    if (mask[index]) continue;
+    assert.deepEqual(
+      Array.from(output.slice(index * 4, index * 4 + 4)),
+      Array.from(input.slice(index * 4, index * 4 + 4)),
+    );
+  }
+  const repaired = Array.from(output.slice(center * 4, center * 4 + 4));
+  assert.ok(repaired[0] >= 90 && repaired[0] <= 110);
+  assert.equal(repaired[3], 255);
+});
+
 test('768px work crop remains bounded for a small local selection', () => {
   const width = 768;
   const height = 768;
@@ -84,7 +116,11 @@ test('768px work crop remains bounded for a small local selection', () => {
   }
 
   const started = performance.now();
-  const output = inpaintRgba(input, width, height, mask, { expansion: 2, sampleRadius: 4 });
+  const output = inpaintRgba(input, width, height, mask, {
+    expansion: 2,
+    sampleRadius: 6,
+    smoothingPasses: 8,
+  });
   const elapsed = performance.now() - started;
 
   assert.equal(output.length, input.length);

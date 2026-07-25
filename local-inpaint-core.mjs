@@ -121,10 +121,65 @@ function fillPixel(index, output, known, width, height, sampleRadius) {
   return true;
 }
 
+function smoothMaskedPixels(rgba, mask, width, height, passes) {
+  let current = rgba;
+  let next = new Uint8ClampedArray(rgba);
+  const neighbours = [
+    [-1, -1, 1], [0, -1, 2], [1, -1, 1],
+    [-1, 0, 2],                [1, 0, 2],
+    [-1, 1, 1],  [0, 1, 2],  [1, 1, 1],
+  ];
+
+  for (let pass = 0; pass < passes; pass += 1) {
+    next.set(current);
+    for (let index = 0; index < mask.length; index += 1) {
+      if (!mask[index]) continue;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      const premultipliedTotals = [0, 0, 0];
+      let alphaTotal = 0;
+      let visibleWeight = 0;
+      let totalWeight = 0;
+
+      for (const [dx, dy, weight] of neighbours) {
+        const sampleX = x + dx;
+        const sampleY = y + dy;
+        if (sampleX < 0 || sampleX >= width || sampleY < 0 || sampleY >= height) continue;
+        const sourceOffset = (sampleY * width + sampleX) * 4;
+        const alpha = current[sourceOffset + 3] / 255;
+        const alphaWeight = alpha * weight;
+        premultipliedTotals[0] += current[sourceOffset] * alphaWeight;
+        premultipliedTotals[1] += current[sourceOffset + 1] * alphaWeight;
+        premultipliedTotals[2] += current[sourceOffset + 2] * alphaWeight;
+        alphaTotal += current[sourceOffset + 3] * weight;
+        visibleWeight += alphaWeight;
+        totalWeight += weight;
+      }
+
+      if (!totalWeight) continue;
+      const targetOffset = index * 4;
+      if (visibleWeight > 0) {
+        next[targetOffset] = Math.round(premultipliedTotals[0] / visibleWeight);
+        next[targetOffset + 1] = Math.round(premultipliedTotals[1] / visibleWeight);
+        next[targetOffset + 2] = Math.round(premultipliedTotals[2] / visibleWeight);
+      } else {
+        next[targetOffset] = 0;
+        next[targetOffset + 1] = 0;
+        next[targetOffset + 2] = 0;
+      }
+      next[targetOffset + 3] = Math.round(alphaTotal / totalWeight);
+    }
+    [current, next] = [next, current];
+  }
+
+  return current;
+}
+
 export function inpaintRgba(rgba, width, height, mask, options = {}) {
   assertDimensions(rgba, width, height, mask);
   const expansion = options.expansion ?? 1;
   const sampleRadius = Math.max(1, Math.min(8, Math.round(options.sampleRadius ?? 3)));
+  const smoothingPasses = Math.max(0, Math.min(16, Math.round(options.smoothingPasses ?? 0)));
   const activeMask = dilateMask(mask, width, height, expansion);
   const output = new Uint8ClampedArray(rgba);
   const known = new Uint8Array(activeMask.length);
@@ -175,5 +230,7 @@ export function inpaintRgba(rgba, width, height, mask, options = {}) {
     }
   }
 
-  return output;
+  return smoothingPasses
+    ? smoothMaskedPixels(output, activeMask, width, height, smoothingPasses)
+    : output;
 }

@@ -802,7 +802,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260725-discoverability">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260725-workspace-v2">
 </head>
 <body>
 
@@ -1529,12 +1529,31 @@ let selectedFiles   = [];
     uploadArea.classList.remove('drag-over');
     handleFiles(Array.from(e.dataTransfer.files));
   });
-  fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+  fileInput.addEventListener('change', () => {
+    handleFiles(Array.from(fileInput.files));
+    fileInput.value = '';
+  });
 
   function handleFiles(files) {
-    window.ShopBGLocalCleaner?.clearAll();
-    selectedFiles = files.filter(f => f.type.startsWith('image/')).slice(0, currentUser ? 50 : 1);
-    if (!selectedFiles.length) return;
+    const limit = currentUser ? 50 : 1;
+    const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
+    const additions = files
+      .filter(file => file.type.startsWith('image/'))
+      .filter(file => {
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      })
+      .slice(0, Math.max(0, limit - selectedFiles.length));
+    if (!additions.length) {
+      if (selectedFiles.length >= limit) setStatus(currentUser
+        ? 'The 50-image batch limit has been reached.'
+        : 'Sign in to add more than one image.');
+      return;
+    }
+    const startIndex = selectedFiles.length;
+    selectedFiles.push(...additions);
 
     uploadArea.style.minHeight = '72px';
     uploadArea.style.padding = '18px 24px';
@@ -1543,8 +1562,8 @@ let selectedFiles   = [];
     uploadArea.querySelector('p').textContent  = 'Click to add more or drag new files';
 
     const grid = document.getElementById('imageGrid');
-    grid.innerHTML = '';
-    selectedFiles.forEach((file, i) => {
+    additions.forEach((file, offset) => {
+      const i = startIndex + offset;
       const card  = document.createElement('div');
       card.className = 'image-card';
       card.id = `card-${i}`;
@@ -1574,7 +1593,7 @@ let selectedFiles   = [];
     btn.disabled = false;
     btn.className = 'action-btn action-btn-primary';
     btn.onclick = startProcessing;
-    setStatus('Ready to process');
+    setStatus(`${additions.length} image${additions.length > 1 ? 's' : ''} added · ${selectedFiles.length} ready to process`);
     processedResults = [];
   }
 
@@ -1833,6 +1852,6 @@ let selectedFiles   = [];
   });
 </script>
 
-<script src="/local-cleaner.js?v=20260725-discoverability"></script>
+<script src="/local-cleaner.js?v=20260725-workspace-v2"></script>
 </body>
 </html>
