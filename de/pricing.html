@@ -46,7 +46,7 @@ a{color:var(--accent2);text-decoration:none}
 .nav-links a{color:#9CA3AF;text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
 .nav-links a:hover{color:#fff}
 .nav-right{display:flex;align-items:center;gap:12px}
-.credits-badge{display:none;align-items:center;background:rgba(59,130,246,0.12);color:#60A5FA;border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600}
+.credits-badge{display:none;align-items:center;background:rgba(59,130,246,0.12);color:#60A5FA;border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;text-decoration:none}
 .credits-badge.show{display:flex}
 .user-name{font-size:13px;color:#D1D5DB}
 .btn-nav{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}
@@ -55,6 +55,7 @@ a{color:var(--accent2);text-decoration:none}
 @media(max-width:800px){.nav-links{display:none}.navbar{padding:0 20px}}
 .hero{text-align:center;padding:64px 24px 24px;max-width:680px;margin:0 auto}
 .hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);color:var(--green);font-size:13px;font-weight:600;padding:6px 16px;border-radius:100px;margin-bottom:24px;border:1px solid rgba(0,184,148,0.2)}
+.credit-shortcuts{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px}.credit-shortcuts a{padding:9px 14px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text-2);font-size:13px;font-weight:700;text-decoration:none}.credit-shortcuts a:hover{border-color:var(--blue);color:var(--blue)}
 .hero h1{font-size:clamp(32px,5vw,52px);font-weight:800;letter-spacing:-0.035em;line-height:1.1;margin-bottom:16px}
 .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero p{font-size:17px;color:var(--text2);max-width:480px;margin:0 auto}
@@ -178,7 +179,7 @@ a{color:var(--accent2);text-decoration:none}
     <a href="/de/amazon-ebay-product-images">Amazon &amp; eBay</a>
   </div>
   <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge"><span id="creditsText">— Credits</span></div>
+    <a class="credits-badge" id="creditsBadge" href="/credits.html?lang=de"><span id="creditsText">— Credits</span></a>
     <span class="user-name" id="userName"></span>
     <div class="lang-switcher">
       <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Sprache ändern" aria-haspopup="true">
@@ -193,7 +194,7 @@ a{color:var(--accent2);text-decoration:none}
         <li role="none"><a role="menuitem" href="/fr/pricing" hreflang="fr">Français <span class="lang-code">FR</span></a></li>
       </ul>
     </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/de/'">Anmelden</button>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='https://api.shopbgremover.com/auth/login'">Anmelden</button>
   </div>
 </nav>
 
@@ -201,6 +202,7 @@ a{color:var(--accent2);text-decoration:none}
   <div class="hero-badge">⚡ Einmalige Credits · kein Abonnement</div>
   <h1>Credits, die <em>nie verfallen</em></h1>
   <p>Starte mit einem einmaligen Gratisguthaben und kaufe danach nur, was du brauchst. Eine erfolgreiche KI-Hintergrundentfernung kostet einen Credit.</p>
+  <div class="credit-shortcuts"><a href="/credits.html?lang=de">Meine Credits &amp; Verlauf</a><a href="/redeem.html">Xianyu-Gutschein einlösen</a></div>
 </section>
 
 <div class="plans" id="plans">
@@ -312,6 +314,14 @@ async function loadUser() {
     const response = await fetch(`${API}/api/me`, { credentials: 'include' });
     const data = await response.json();
     currentUser = data.user || null;
+    if (currentUser) {
+      document.getElementById('creditsText').textContent = `${data.credits?.credits ?? 0} Credits`;
+      document.getElementById('creditsBadge').classList.add('show');
+      document.getElementById('userName').textContent = currentUser.name || currentUser.email;
+      const auth = document.getElementById('authBtn');
+      auth.textContent = 'Abmelden';
+      auth.onclick = () => { window.location = `${API}/auth/logout`; };
+    }
   } catch {}
   renderPayPalButtons();
 }

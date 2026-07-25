@@ -707,6 +707,85 @@ describe('free quota and credit accounting', () => {
   });
 });
 
+describe('credit center and administrator overview', () => {
+  it('returns only the signed-in user credit grants, ledger, and orders', async () => {
+    const anonymous = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/credits/center`,
+    ));
+    expect(anonymous.status).toBe(401);
+
+    const buyer = await createAuthenticatedUser({
+      email: 'credit-center@example.com',
+      credits: 12,
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status,
+        completed_at, payment_method)
+       VALUES ('CENTER-ORDER', ?, 'credits_100', 3.49, 100, 100, 'USD',
+               'completed', unixepoch(), 'paypal')`
+    ).bind(buyer.userId).run();
+
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/credits/center',
+      buyer.cookie,
+    ));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await jsonResponse(response);
+    expect(body.user.email).toBe('credit-center@example.com');
+    expect(body.credits.credits).toBe(12);
+    expect(body.grants).toHaveLength(1);
+    expect(body.grants[0]).toEqual(expect.objectContaining({
+      credit_type: 'legacy',
+      remaining_credits: 12,
+    }));
+    expect(body.ledger).toHaveLength(1);
+    expect(body.ledger[0].reason).toBe('test_opening');
+    expect(body.orders).toHaveLength(1);
+    expect(body.orders[0]).toEqual(expect.objectContaining({
+      id: 'CENTER-ORDER',
+      payment_method: 'paypal',
+      base_credits: 100,
+    }));
+  });
+
+  it('restricts the overview to administrators and returns auditable totals', async () => {
+    const regular = await createAuthenticatedUser({
+      email: 'overview-regular@example.com',
+      credits: 5,
+    });
+    const forbidden = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/overview',
+      regular.cookie,
+    ));
+    expect(forbidden.status).toBe(403);
+
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 7,
+      deviceId: 'overview-admin-device',
+    });
+    const response = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/overview',
+      admin.cookie,
+    ));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await jsonResponse(response);
+    expect(body.admin.email).toBe('admin@example.com');
+    expect(body.totals).toEqual(expect.objectContaining({
+      users: 2,
+      active_credits: 12,
+      total_used: 0,
+      orders: 0,
+      voucher_cards: 0,
+    }));
+    expect(body.recent_ledger).toHaveLength(2);
+    expect(body.recent_orders).toEqual([]);
+  });
+});
+
 describe('Xianyu voucher flow', () => {
   it('requires an allowlisted administrator and stores only a voucher hash', async () => {
     const regular = await createAuthenticatedUser({

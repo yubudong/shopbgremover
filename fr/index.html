@@ -273,12 +273,12 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260725-preview-v3">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
 </head>
 <body>
 
 <div class="low-banner" id="lowBanner">
-  ⚡ Vos crédits s'épuisent — renouvelez maintenant et obtenez 10 % de réduction.
+  ⚡ Vos crédits s'épuisent — achetez un pack ponctuel quand vous en avez besoin.
   <a onclick="showUpgradeModal()">Acheter des crédits →</a>
 </div>
 
@@ -294,9 +294,10 @@
     <a href="/fr/amazon-ebay-product-images">Amazon et eBay</a>
   </div>
   <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge">
+    <a class="credits-badge" id="creditsBadge" href="/credits.html?lang=fr" aria-label="Ouvrir le centre de crédits">
       <span id="creditsText">— crédits</span>
-    </div>
+      <span class="credits-add">＋ Recharger</span>
+    </a>
     <span class="user-name" id="userName"></span>
     <div class="lang-switcher">
       <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Changer de langue" aria-haspopup="true">
@@ -698,7 +699,7 @@
 
 <div class="upgrade-toast" id="upgradToast">
   <h4>⚡ Crédits bas</h4>
-  <p>Renouvelez maintenant et obtenez <strong>10 % de réduction</strong> le mois prochain.</p>
+  <p>Achetez un <strong>pack de crédits ponctuel</strong>. Les crédits payés n’expirent jamais.</p>
   <button onclick="showUpgradeModal()">Acheter des crédits →</button>
 </div>
 

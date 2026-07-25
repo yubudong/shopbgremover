@@ -273,13 +273,13 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260725-preview-v3">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
 </head>
 <body>
 
 <div class="low-banner" id="lowBanner">
-  ⚡ Seus créditos estão acabando — renove agora e ganhe 10% de desconto.
-  <a onclick="showUpgradeModal()">Fazer upgrade →</a>
+  ⚡ Seus créditos estão acabando — compre um pacote único quando precisar.
+  <a onclick="showUpgradeModal()">Comprar créditos →</a>
 </div>
 
 <nav class="navbar">
@@ -294,9 +294,10 @@
     <a href="/pt-br/amazon-ebay-product-images">Amazon e eBay</a>
   </div>
   <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge">
+    <a class="credits-badge" id="creditsBadge" href="/credits.html?lang=pt-br" aria-label="Abrir central de créditos">
       <span id="creditsText">— créditos</span>
-    </div>
+      <span class="credits-add">＋ Recarregar</span>
+    </a>
     <span class="user-name" id="userName"></span>
     <div class="lang-switcher">
       <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Mudar idioma" aria-haspopup="true">
@@ -698,7 +699,7 @@
 
 <div class="upgrade-toast" id="upgradToast">
   <h4>⚡ Créditos acabando</h4>
-  <p>Renove agora e ganhe <strong>10% de desconto</strong> no próximo mês.</p>
+  <p>Compre um <strong>pacote único de créditos</strong>. Créditos pagos nunca expiram.</p>
   <button onclick="showUpgradeModal()">Comprar créditos →</button>
 </div>
 

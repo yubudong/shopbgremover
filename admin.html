@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>管理后台 · ShopBG Remover</title>
+  <link rel="icon" href="/favicon.svg">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f6fa;color:#172033;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{height:64px;padding:0 max(20px,calc((100vw - 1180px)/2));display:flex;align-items:center;justify-content:space-between;background:#111c2f;color:#fff}
+    header a{color:#afbdd1;text-decoration:none;font-size:13px}.brand{font-size:18px;font-weight:850}
+    main{width:min(1180px,calc(100% - 32px));margin:32px auto 72px}h1{margin:0 0 8px;font-size:32px}.sub{margin:0 0 24px;color:#64748b}
+    .notice{padding:15px;border-radius:10px;background:#fff;border:1px solid #dfe5ee;color:#526078}.notice.error{background:#fff1f2;border-color:#fecdd3;color:#9f1239}
+    .app{display:none}.app.visible{display:block}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+    .stat,.panel,.portal{background:#fff;border:1px solid #dfe5ee;border-radius:14px;box-shadow:0 8px 26px rgba(24,39,75,.05)}
+    .stat{padding:17px}.stat span{display:block;color:#64748b;font-size:11px;font-weight:750}.stat strong{display:block;margin-top:6px;font-size:27px}
+    .portals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.portal{padding:18px;text-decoration:none}.portal:hover{border-color:#93c5fd}.portal b{display:block;margin:8px 0 5px}.portal small{color:#64748b;line-height:1.5}
+    .panel{padding:19px;margin-top:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}.panel h2{margin:0;font-size:18px}.panel-head span{color:#64748b;font-size:12px}
+    .table-wrap{overflow:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:12px}th,td{padding:10px 8px;border-bottom:1px solid #edf1f6;text-align:left;vertical-align:top}th{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.05em}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#64748b}.positive{color:#047857;font-weight:800}.negative{color:#b91c1c;font-weight:800}
+    @media(max-width:850px){.stats{grid-template-columns:1fr 1fr}.portals{grid-template-columns:1fr}}@media(max-width:480px){main{width:calc(100% - 20px)}.stat strong{font-size:23px}}
+  </style>
+</head>
+<body>
+  <header><span class="brand">ShopBG Remover · 管理后台</span><a href="/">返回网站</a></header>
+  <main>
+    <h1>积分与订单总览</h1>
+    <p class="sub" id="authStatus">正在验证管理员身份并加载数据…</p>
+    <div class="notice" id="notice">请稍候。</div>
+    <div class="app" id="adminApp">
+      <section class="stats">
+        <div class="stat"><span>用户数</span><strong id="users">—</strong></div>
+        <div class="stat"><span>当前可用积分</span><strong id="activeCredits">—</strong></div>
+        <div class="stat"><span>累计消耗积分</span><strong id="totalUsed">—</strong></div>
+        <div class="stat"><span>已完成充值订单</span><strong id="completedOrders">—</strong></div>
+        <div class="stat"><span>待支付订单</span><strong id="pendingOrders">—</strong></div>
+        <div class="stat"><span>已兑换卡密</span><strong id="redeemedVouchers">—</strong></div>
+        <div class="stat"><span>待审核推荐</span><strong id="pendingReviews">—</strong></div>
+        <div class="stat"><span>观察期待发奖励</span><strong id="pendingHolds">—</strong></div>
+      </section>
+      <section class="portals">
+        <a class="portal" href="/admin-vouchers"><span>🎟️</span><b>闲鱼卡密管理</b><small>生成、发货、作废、查询和争议冲正</small></a>
+        <a class="portal" href="/admin-referrals"><span>🛡️</span><b>推荐奖励审核</b><small>处理卡密邀请风险与人工审核队列</small></a>
+        <a class="portal" href="/credits.html?lang=en"><span>👤</span><b>用户积分中心预览</b><small>查看用户实际看到的余额、订单和流水界面</small></a>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>最近充值订单</h2><span>最多 30 条 · 只读</span></div>
+        <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>方式</th><th>金额</th><th>积分</th><th>状态</th><th>订单</th></tr></thead><tbody id="orderRows"></tbody></table></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>最近积分流水</h2><span>最多 30 条 · 只读</span></div>
+        <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>变化</th><th>类型</th><th>原因</th><th>订单</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const API = 'https://api.shopbgremover.com';
+    const notice = document.getElementById('notice');
+    const cell = (row, value, className = '') => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      if (className) td.className = className;
+      row.append(td);
+    };
+    const formatTime = value => value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
+    const shortId = value => {
+      const text = String(value || '');
+      return text.length > 22 ? `${text.slice(0, 11)}…${text.slice(-7)}` : text || '—';
+    };
+    function renderOrders(orders) {
+      const body = document.getElementById('orderRows');
+      body.replaceChildren();
+      orders.forEach(order => {
+        const row = document.createElement('tr');
+        cell(row, formatTime(order.completed_at || order.created_at));
+        cell(row, order.email);
+        cell(row, order.payment_method);
+        cell(row, `${order.currency} ${Number(order.amount || 0).toFixed(2)}`);
+        cell(row, String(Number(order.base_credits || 0) + Number(order.bonus_credits || 0)));
+        cell(row, order.refunded_at ? 'refunded' : order.status);
+        cell(row, shortId(order.id), 'mono');
+        body.append(row);
+      });
+    }
+    function renderLedger(entries) {
+      const body = document.getElementById('ledgerRows');
+      body.replaceChildren();
+      entries.forEach(entry => {
+        const row = document.createElement('tr');
+        cell(row, formatTime(entry.created_at));
+        cell(row, entry.email);
+        cell(row, `${Number(entry.delta) > 0 ? '+' : ''}${entry.delta}`, Number(entry.delta) > 0 ? 'positive' : 'negative');
+        cell(row, entry.balance_type);
+        cell(row, entry.reason);
+        cell(row, shortId(entry.order_id), 'mono');
+        body.append(row);
+      });
+    }
+    fetch(`${API}/api/admin/overview`, { credentials: 'include' })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有管理员权限。' : (data.error || `HTTP ${response.status}`));
+        return data;
+      })
+      .then(data => {
+        document.getElementById('authStatus').textContent = `管理员：${data.admin.email}`;
+        const fields = {
+          users: data.totals.users,
+          activeCredits: data.totals.active_credits,
+          totalUsed: data.totals.total_used,
+          completedOrders: data.totals.completed_orders,
+          pendingOrders: data.totals.pending_orders,
+          redeemedVouchers: data.totals.redeemed_vouchers,
+          pendingReviews: data.totals.pending_referral_reviews,
+          pendingHolds: data.totals.pending_reward_holds,
+        };
+        Object.entries(fields).forEach(([id, value]) => { document.getElementById(id).textContent = value; });
+        renderOrders(data.recent_orders || []);
+        renderLedger(data.recent_ledger || []);
+        notice.style.display = 'none';
+        document.getElementById('adminApp').classList.add('visible');
+      })
+      .catch(error => {
+        document.getElementById('authStatus').textContent = '无法打开管理后台';
+        notice.textContent = `${error.message} 请先使用管理员账号登录网站。`;
+        notice.classList.add('error');
+      });
+  </script>
+</body>
+</html>

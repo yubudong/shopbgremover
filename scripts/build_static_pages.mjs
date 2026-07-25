@@ -7,10 +7,14 @@ const output = path.join(root, '.pages-dist');
 
 const rootFiles = [
   '404.html',
+  'admin.html',
   'admin-vouchers.html',
   'admin-referrals.html',
   'amazon-ebay-product-images.html',
   'contact.html',
+  'credits.html',
+  'credits-center.css',
+  'credits-center.js',
   'favicon.svg',
   'index.html',
   'local-cleaner.css',

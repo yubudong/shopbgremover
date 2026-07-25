@@ -1,4 +1,6 @@
 .workspace{align-items:stretch}
+.credits-badge{text-decoration:none;cursor:pointer;gap:8px}
+.credits-add{padding-left:8px;border-left:1px solid currentColor;font-size:10px;font-weight:850;opacity:.9;white-space:nowrap}
 .canvas-area{display:flex;flex-direction:column}
 .canvas-area .tool-features{flex:1}
 .settings-panel{align-self:stretch}

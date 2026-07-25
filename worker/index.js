@@ -1337,6 +1337,48 @@ export default {
       return json({ user: { id: user.sub, email: user.email, name: user.name }, credits }, 200, origin);
     }
 
+    // GET /api/credits/center → private balance, grant, ledger, and order history.
+    if (url.pathname === '/api/credits/center' && request.method === 'GET') {
+      const user = await getUser(request, env);
+      if (!user) return privateJson({ error: 'Unauthorized' }, 401, origin);
+
+      const [credits, grants, ledger, orders] = await Promise.all([
+        getCreditSummary(env, user.sub),
+        env.DB.prepare(
+          `SELECT id, credit_type, granted_credits, remaining_credits, order_id,
+                  expires_at, created_at
+           FROM credit_grants
+           WHERE user_id = ?
+           ORDER BY created_at DESC, id DESC
+           LIMIT 100`
+        ).bind(user.sub).all(),
+        env.DB.prepare(
+          `SELECT id, delta, balance_type, reason, order_id, task_id,
+                  reversal_of, created_at
+           FROM credit_ledger
+           WHERE user_id = ?
+           ORDER BY created_at DESC, id DESC
+           LIMIT 100`
+        ).bind(user.sub).all(),
+        env.DB.prepare(
+          `SELECT id, plan, amount, base_credits, bonus_credits, currency,
+                  status, payment_method, completed_at, refunded_at, created_at
+           FROM orders
+           WHERE user_id = ?
+           ORDER BY created_at DESC, id DESC
+           LIMIT 50`
+        ).bind(user.sub).all(),
+      ]);
+
+      return privateJson({
+        user: { id: user.sub, email: user.email, name: user.name },
+        credits,
+        grants: grants.results || [],
+        ledger: ledger.results || [],
+        orders: orders.results || [],
+      }, 200, origin);
+    }
+
     // POST /api/referrals/capture → validate and store a signed 30-day
     // first-party referral cookie. The relationship is bound only if login
     // creates a brand-new account.
@@ -1718,6 +1760,89 @@ export default {
         `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
       ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
       return json({ ok: true, id }, 200, origin);
+    }
+
+    // GET /api/admin/overview → read-only billing and credit operations summary.
+    if (url.pathname === '/api/admin/overview' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+
+      const [
+        userTotals,
+        orderTotals,
+        voucherTotals,
+        referralTotals,
+        recentOrders,
+        recentLedger,
+      ] = await Promise.all([
+        env.DB.prepare(
+          `SELECT COUNT(*) AS users,
+                  COALESCE(SUM(credits), 0) AS active_credits,
+                  COALESCE(SUM(total_used), 0) AS total_used
+           FROM user_credits`
+        ).first(),
+        env.DB.prepare(
+          `SELECT COUNT(*) AS orders,
+                  SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+                  SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+                  SUM(CASE WHEN refunded_at IS NOT NULL THEN 1 ELSE 0 END) AS refunded
+           FROM orders`
+        ).first(),
+        env.DB.prepare(
+          `SELECT COUNT(*) AS cards,
+                  SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered,
+                  SUM(CASE WHEN status = 'redeemed' THEN 1 ELSE 0 END) AS redeemed,
+                  SUM(CASE WHEN status = 'void' THEN 1 ELSE 0 END) AS voided
+           FROM voucher_cards`
+        ).first(),
+        env.DB.prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM referrals) AS relationships,
+             (SELECT COUNT(*) FROM referral_reward_reviews
+              WHERE status = 'pending') AS pending_reviews,
+             (SELECT COUNT(*) FROM referral_reward_holds
+              WHERE status = 'pending') AS pending_holds`
+        ).first(),
+        env.DB.prepare(
+          `SELECT o.id, o.plan, o.amount, o.base_credits, o.bonus_credits,
+                  o.currency, o.status, o.payment_method, o.completed_at,
+                  o.refunded_at, o.created_at, u.email
+           FROM orders o
+           JOIN users u ON u.id = o.user_id
+           ORDER BY o.created_at DESC, o.id DESC
+           LIMIT 30`
+        ).all(),
+        env.DB.prepare(
+          `SELECT l.id, l.delta, l.balance_type, l.reason, l.order_id,
+                  l.created_at, u.email
+           FROM credit_ledger l
+           JOIN users u ON u.id = l.user_id
+           ORDER BY l.created_at DESC, l.id DESC
+           LIMIT 30`
+        ).all(),
+      ]);
+
+      return privateJson({
+        admin: { email: admin.email },
+        totals: {
+          users: Number(userTotals?.users || 0),
+          active_credits: Number(userTotals?.active_credits || 0),
+          total_used: Number(userTotals?.total_used || 0),
+          orders: Number(orderTotals?.orders || 0),
+          completed_orders: Number(orderTotals?.completed || 0),
+          pending_orders: Number(orderTotals?.pending || 0),
+          refunded_orders: Number(orderTotals?.refunded || 0),
+          voucher_cards: Number(voucherTotals?.cards || 0),
+          delivered_vouchers: Number(voucherTotals?.delivered || 0),
+          redeemed_vouchers: Number(voucherTotals?.redeemed || 0),
+          voided_vouchers: Number(voucherTotals?.voided || 0),
+          referral_relationships: Number(referralTotals?.relationships || 0),
+          pending_referral_reviews: Number(referralTotals?.pending_reviews || 0),
+          pending_reward_holds: Number(referralTotals?.pending_holds || 0),
+        },
+        recent_orders: recentOrders.results || [],
+        recent_ledger: recentLedger.results || [],
+      }, 200, origin);
     }
 
     // GET /api/admin/referral-reviews → pending voucher reward risk queue.

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Credit center · ShopBG Remover</title>
+  <meta name="description" content="View your ShopBG Remover credit balance, top-up orders, and transaction history.">
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/credits-center.css?v=20260725-credit-center-v1">
+</head>
+<body>
+  <header class="cc-nav">
+    <a class="cc-brand" href="/">ShopBG Remover</a>
+    <nav class="cc-navlinks">
+      <a id="homeLink" href="/" data-i18n="home">Back to workspace</a>
+      <a id="pricingLink" href="/pricing" data-i18n="pricing">Pricing</a>
+    </nav>
+  </header>
+  <main class="cc-shell">
+    <div class="cc-hero">
+      <div>
+        <div class="cc-eyebrow" data-i18n="eyebrow">Account &amp; billing</div>
+        <h1 data-i18n="title">Credit center</h1>
+        <p class="cc-lead" data-i18n="lead">Check your balance, add credits, and review every account change.</p>
+      </div>
+      <div class="cc-account" id="accountText"></div>
+    </div>
+
+    <section class="cc-message" id="signinMessage">
+      <strong data-i18n="signinTitle">Sign in to view your credits</strong>
+      <div data-i18n="signinBody">Your balance, orders, and transaction history are private to your account.</div>
+      <a class="cc-signin" href="https://api.shopbgremover.com/auth/login" data-i18n="signin">Sign in</a>
+    </section>
+    <section class="cc-message" id="loadMessage" role="status"></section>
+
+    <div class="cc-app" id="creditApp">
+      <section class="cc-summary">
+        <div class="cc-stat"><span class="cc-stat-label" data-i18n="total">Available credits</span><strong class="cc-stat-value" id="totalCredits">—</strong><span class="cc-stat-note" data-i18n="totalNote">Ready for AI removal</span></div>
+        <div class="cc-stat"><span class="cc-stat-label" data-i18n="paid">Paid credits</span><strong class="cc-stat-value" id="paidCredits">—</strong><span class="cc-stat-note" data-i18n="paidNote">Never expire</span></div>
+        <div class="cc-stat"><span class="cc-stat-label" data-i18n="rewards">Free &amp; rewards</span><strong class="cc-stat-value" id="rewardCredits">—</strong><span class="cc-stat-note" data-i18n="rewardsNote">May have expiry dates</span></div>
+        <div class="cc-stat"><span class="cc-stat-label" data-i18n="used">Total used</span><strong class="cc-stat-value" id="usedCredits">—</strong><span class="cc-stat-note" data-i18n="usedNote">Successful AI jobs</span></div>
+      </section>
+
+      <section class="cc-actions">
+        <a class="cc-action" id="paypalAction" href="/pricing#plans"><span class="cc-action-icon">💳</span><strong data-i18n="paypal">Buy with PayPal</strong><span data-i18n="paypalDesc">100, 300, or 1000 permanent credits in USD.</span></a>
+        <a class="cc-action" href="/redeem.html"><span class="cc-action-icon">🎟️</span><strong data-i18n="voucher">Redeem a voucher</strong><span data-i18n="voucherDesc">Enter a one-time code purchased through Xianyu.</span></a>
+        <a class="cc-action" id="referralAction" href="/referrals"><span class="cc-action-icon">🎁</span><strong data-i18n="referral">Referral center</strong><span data-i18n="referralDesc">View your referral code and pending rewards.</span></a>
+      </section>
+
+      <section class="cc-panel">
+        <div class="cc-panel-head"><h2 data-i18n="orders">Top-up orders</h2><span class="cc-panel-note" data-i18n="ordersNote">PayPal payments and voucher redemptions</span></div>
+        <div class="cc-table-wrap"><table><thead><tr><th data-i18n="dateCol">Date</th><th data-i18n="methodCol">Method</th><th data-i18n="amountCol">Amount</th><th data-i18n="creditsCol">Credits</th><th data-i18n="statusCol">Status</th></tr></thead><tbody id="orderRows"></tbody></table></div>
+      </section>
+      <section class="cc-panel">
+        <div class="cc-panel-head"><h2 data-i18n="transactions">Credit transactions</h2><span class="cc-panel-note" data-i18n="transactionsNote">Every credit addition and deduction</span></div>
+        <div class="cc-table-wrap"><table><thead><tr><th data-i18n="dateCol">Date</th><th data-i18n="changeCol">Change</th><th data-i18n="typeCol">Type</th><th data-i18n="reasonCol">Reason</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+      </section>
+      <section class="cc-panel">
+        <div class="cc-panel-head"><h2 data-i18n="grants">Credit batches</h2><span class="cc-panel-note" data-i18n="grantsNote">Remaining amount and expiration for each batch</span></div>
+        <div class="cc-table-wrap"><table><thead><tr><th data-i18n="dateCol">Date</th><th data-i18n="typeCol">Type</th><th data-i18n="creditsCol">Credits</th><th data-i18n="remainingCol">Remaining</th><th data-i18n="expiresCol">Expires</th></tr></thead><tbody id="grantRows"></tbody></table></div>
+      </section>
+    </div>
+  </main>
+  <script src="/credits-center.js?v=20260725-credit-center-v1"></script>
+</body>
+</html>

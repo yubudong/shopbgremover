@@ -806,14 +806,14 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260725-preview-v3">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
 </head>
 <body>
 
 <!-- Low Credits Banner -->
 <div class="low-banner" id="lowBanner">
-  ⚡ Te estás quedando sin créditos — renueva ahora y obtén 10 % de descuento.
-  <a onclick="showUpgradeModal()">Mejorar plan →</a>
+  ⚡ Te estás quedando sin créditos — compra un paquete único cuando lo necesites.
+  <a onclick="showUpgradeModal()">Comprar créditos →</a>
 </div>
 
 <!-- Navbar -->
@@ -832,9 +832,10 @@
   </div>
 
   <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge">
+    <a class="credits-badge" id="creditsBadge" href="/credits.html?lang=es" aria-label="Abrir centro de créditos">
       <span id="creditsText">— créditos</span>
-    </div>
+      <span class="credits-add">＋ Recargar</span>
+    </a>
     <span class="user-name" id="userName"></span>
     <div class="lang-switcher">
       <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Cambiar idioma" aria-haspopup="true">
@@ -1269,7 +1270,7 @@
 <!-- Low-credits toast (top-right) -->
 <div class="upgrade-toast" id="upgradToast">
   <h4>⚡ Pocos créditos</h4>
-  <p>Renueva ahora y obtén <strong>10 % de descuento</strong> el próximo mes.</p>
+  <p>Compra un <strong>paquete de créditos único</strong>. Los créditos pagados nunca caducan.</p>
   <button onclick="showUpgradeModal()">Comprar créditos →</button>
 </div>
 

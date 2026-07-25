@@ -92,7 +92,7 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-preview-v3"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-credit-center-v4"/, file);
     assert.match(html, /src="\/local-cleaner\.js\?v=20260725-preview-v3"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
@@ -175,8 +175,10 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     ...pricingFiles,
     ...termsFiles,
     'redeem.html',
+    'credits.html',
     'referrals.html',
     ...localizedReferralFiles,
+    'admin.html',
     'admin-vouchers.html',
     'admin-referrals.html',
     'test-paypal.html',
@@ -207,6 +209,9 @@ test('Pages build contains only the canonical static site', async () => {
   const required = [
     'index.html',
     'pricing.html',
+    'credits.html',
+    'credits-center.css',
+    'credits-center.js',
     'redeem.html',
     'referrals.html',
     'referrals-localized.css',
@@ -215,6 +220,7 @@ test('Pages build contains only the canonical static site', async () => {
     'local-cleaner.js',
     'local-cleaner-worker.js',
     'local-inpaint-core.mjs',
+    'admin.html',
     'admin-vouchers.html',
     'admin-referrals.html',
     'de/index.html',
@@ -247,6 +253,58 @@ test('pricing links to the server-backed Xianyu voucher redemption page', async 
   assert.match(redeem, /\/api\/vouchers\/redeem/);
   assert.match(redeem, /'X-Device-ID': deviceId/);
   assert.doesNotMatch(redeem, /localStorage.*voucher|voucher.*localStorage/i);
+});
+
+test('credit center is visible from every localized workspace and pricing page', async () => {
+  const languageParams = ['en', 'de', 'es', 'fr', 'pt-br'];
+  for (let index = 0; index < indexFiles.length; index += 1) {
+    const home = await read(indexFiles[index]);
+    const pricing = await read(pricingFiles[index]);
+    const target = `/credits.html?lang=${languageParams[index]}`;
+    assert.ok(home.includes(`href="${target}"`), indexFiles[index]);
+    assert.ok(pricing.includes(`href="${target}"`), pricingFiles[index]);
+    assert.match(pricing, /credit-shortcuts/, pricingFiles[index]);
+    assert.match(pricing, /href="\/redeem\.html"/, pricingFiles[index]);
+  }
+
+  const center = await read('credits.html');
+  const script = await read('credits-center.js');
+  assert.match(center, /id="creditApp"/);
+  assert.match(center, /id="paypalAction"/);
+  assert.match(center, /href="\/redeem\.html"/);
+  assert.match(await read('redeem.html'), /href="\/credits\.html\?lang=en"/);
+  assert.match(script, /\/api\/credits\/center/);
+  assert.match(script, /credentials:\s*'include'/);
+  assert.match(script, /registration_free/);
+  assert.match(script, /first_purchase_bonus/);
+  assert.match(script, /replaceChildren\(\)/);
+  assert.doesNotMatch(script, /\.innerHTML\s*=/);
+
+  for (const file of pricingFiles) {
+    assert.match(
+      await read(file),
+      /id="authBtn" onclick="window\.location\.href='https:\/\/api\.shopbgremover\.com\/auth\/login'"/,
+      file,
+    );
+  }
+});
+
+test('administrator overview links all billing operations without exposing balance mutation', async () => {
+  const admin = await read('admin.html');
+  assert.match(admin, /\/api\/admin\/overview/);
+  assert.match(admin, /href="\/admin-vouchers"/);
+  assert.match(admin, /href="\/admin-referrals"/);
+  assert.match(admin, /credentials:\s*'include'/);
+  assert.doesNotMatch(admin, /UPDATE user_credits|manual-credit|adjust-balance/i);
+  assert.match(await read('admin-vouchers.html'), /href="\/admin"/);
+  assert.match(await read('admin-referrals.html'), /href="\/admin"/);
+});
+
+test('localized low-credit prompts no longer advertise subscriptions or fake discounts', async () => {
+  for (const file of indexFiles) {
+    const html = await read(file);
+    assert.doesNotMatch(html, /10\s*%|next month|próximo mes|prochain|nächsten Monat|próximo mês/i, file);
+  }
 });
 
 test('voucher redemption and referral center use server-backed referral APIs', async () => {
