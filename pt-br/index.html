@@ -52,7 +52,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="/ai-workflow.js?v=20260725-ai-stage5c-v1"></script>
+<script src="/ai-workflow.js?v=20260725-ai-stage5d-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -627,6 +627,9 @@
     </div>
     <button class="action-btn action-btn-primary" id="processBtn" disabled>
       Remover fundo
+    </button>
+    <button class="action-btn action-btn-download" id="downloadBtn" type="button" hidden>
+      Baixar ZIP
     </button>
   </div>
 </div>
@@ -1250,7 +1253,8 @@ let selectedFiles   = [];
 
   async function downloadZip() {
     if (!processedResults.length) return;
-    const btn = document.getElementById('processBtn');
+    const secondary = document.getElementById('downloadBtn');
+    const btn = secondary.hidden ? document.getElementById('processBtn') : secondary;
     btn.textContent = "Compactando…";
 
     const zip = new JSZip();
@@ -1265,6 +1269,29 @@ let selectedFiles   = [];
 
     const totalMB = (processedResults.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
     btn.textContent = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
+  }
+
+  function setDownloadActions(outputs, keepProcessReady = false) {
+    const btn = document.getElementById('processBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (!outputs.length) {
+      downloadBtn.hidden = true;
+      return;
+    }
+    const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
+    const label = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
+    if (keepProcessReady) {
+      setProcessButtonReady();
+      downloadBtn.hidden = false;
+      downloadBtn.textContent = label;
+      downloadBtn.onclick = downloadZip;
+      return;
+    }
+    downloadBtn.hidden = true;
+    btn.className = 'action-btn action-btn-download';
+    btn.textContent = label;
+    btn.disabled = false;
+    btn.onclick = downloadZip;
   }
 
   function showRegisterModal() {
@@ -1324,19 +1351,14 @@ let selectedFiles   = [];
       processedResults = outputs;
       const data = document.getElementById('aiWorkflowPanel').dataset;
       setStatus(window.ShopBGAiWorkflow.format(data.sessionRestored, { count }));
-      if (!outputs.length) return;
-      const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
-      const btn = document.getElementById('processBtn');
-      btn.className = 'action-btn action-btn-download';
-      btn.textContent = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
-      btn.disabled = false;
-      btn.onclick = downloadZip;
+      setDownloadActions(outputs, aiWorkflow.getPlan().aiCount > 0);
     },
     onPlanChanged: () => {
       if (selectedFiles.length) setProcessButtonReady();
     },
     onStart: () => {
       const btn = document.getElementById('processBtn');
+      document.getElementById('downloadBtn').hidden = true;
       btn.disabled = true;
       btn.textContent = "Processando…";
       document.getElementById('progressTrack').style.display = 'block';
@@ -1363,7 +1385,6 @@ let selectedFiles   = [];
     },
     onComplete: ({ outputs, errors, actualAiCalls }) => {
       document.getElementById('progressBar').style.width = '100%';
-      const totalMB = (outputs.reduce((sum, result) => sum + result.blob.size, 0) / 1048576).toFixed(1);
       const data = document.getElementById('aiWorkflowPanel').dataset;
       const errorsText = errors
         ? window.ShopBGAiWorkflow.format(data.failedText, { errors })
@@ -1374,14 +1395,10 @@ let selectedFiles   = [];
         aiCalls: actualAiCalls,
       }));
 
-      const btn = document.getElementById('processBtn');
-      if (outputs.length) {
-        btn.className = 'action-btn action-btn-download';
-        btn.textContent = window.ShopBGAiWorkflow.format("📥 Baixar ZIP ({size} MB)", { size: totalMB });
-        btn.disabled = false;
-        btn.onclick = downloadZip;
-      } else {
+      if (!outputs.length) {
         setProcessButtonReady();
+      } else {
+        setDownloadActions(outputs, aiWorkflow.getPlan().aiCount > 0);
       }
 
       if (currentUser && outputs.length > 0) {

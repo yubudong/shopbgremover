@@ -109,6 +109,36 @@ test('a retry polls the same processing task and reports a reused Worker result'
   assert.equal(await result.blob.text(), 'cached-result');
 });
 
+test('a task submitted by this request is counted once after queue polling completes', async () => {
+  let requests = 0;
+  const result = await fetchAiResult({
+    api: 'https://api.example.test',
+    deviceId: 'device-123',
+    taskId: 'new-queued-task',
+    dataUrl: 'data:image/jpeg;base64,queued',
+    failedText: 'failed',
+    fetchImpl: async () => {
+      requests += 1;
+      if (requests === 1) {
+        return Response.json(
+          { reason: 'task_processing', task_id: 'new-queued-task', started: true },
+          { status: 409 },
+        );
+      }
+      return new Response(new Blob(['new-result']), {
+        headers: { 'X-AI-Reused': 'true' },
+      });
+    },
+    wait: async () => {},
+    maxProcessingPolls: 2,
+    pollDelayMs: 0,
+  });
+
+  assert.equal(requests, 2);
+  assert.equal(result.reused, false);
+  assert.equal(await result.blob.text(), 'new-result');
+});
+
 test('an offline request fails fast and a manual retry keeps the same task identity', async () => {
   const bodies = [];
   let attempt = 0;

@@ -25,12 +25,13 @@ Tracked migrations applied afterward:
 | 7 | `0007_voucher_dispute_reversal.sql` | 2026-07-24 |
 | 8 | `0008_referral_risk_review.sql` | 2026-07-24 |
 | 9 | `0009_referral_reward_observation.sql` | 2026-07-24 |
+| 10 | `0010_durable_ai_provider_tasks.sql` | Not deployed |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes
 must:
 
-1. start with migration number `0010`;
+1. start with the next unused migration number;
 2. be tested against a copy of production data;
 3. include rollback or forward-repair notes;
 4. be applied with `npm run d1:migrate:remote`, which aborts unless a fresh

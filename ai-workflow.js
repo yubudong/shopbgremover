@@ -167,17 +167,19 @@
       }),
     };
     let processingPolls = 0;
+    let started = false;
 
     while (true) {
       const response = await fetchImpl(requestUrl, requestInit);
       if (response.ok) {
         return {
           blob: await response.blob(),
-          reused: response.headers.get('X-AI-Reused') === 'true',
+          reused: !started && response.headers.get('X-AI-Reused') === 'true',
         };
       }
 
       const detail = await response.json().catch(() => ({}));
+      if (detail.started === true) started = true;
       if (
         response.status === 409
         && detail.reason === 'task_processing'

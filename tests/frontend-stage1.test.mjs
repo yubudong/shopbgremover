@@ -72,7 +72,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5c-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5d-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
@@ -92,6 +92,9 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /data-summary="\{ai\}[^"]+\{total\}[^"]+\{noCharge\}/, file);
     assert.match(html, /const limit = currentUser \? 50 : 1/, file);
     assert.match(html, /slice\(0, Math\.max\(0, limit - selectedFiles\.length\)\)/, file);
+    assert.equal((html.match(/id="downloadBtn"/g) || []).length, 1, file);
+    assert.match(html, /function setDownloadActions\(outputs, keepProcessReady = false\)/, file);
+    assert.match(html, /setDownloadActions\(outputs, aiWorkflow\.getPlan\(\)\.aiCount > 0\)/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
   }
 });

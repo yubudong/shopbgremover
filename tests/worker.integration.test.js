@@ -16,6 +16,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM guest_ai_charges;
     DELETE FROM ai_tasks;
     DELETE FROM credit_ledger;
     DELETE FROM credit_grants;
@@ -153,9 +154,17 @@ function removeBackgroundRequest({
 }
 
 function installFalSuccessMock() {
+  let submitted = 0;
   const outboundFetch = vi.fn(async (input) => {
     const url = String(input);
-    if (url === 'https://fal.run/fal-ai/birefnet') {
+    if (url === 'https://queue.fal.run/fal-ai/birefnet') {
+      submitted += 1;
+      return Response.json({ request_id: `provider-request-${submitted}` });
+    }
+    if (url.endsWith('/status')) {
+      return Response.json({ status: 'COMPLETED' });
+    }
+    if (url.startsWith('https://queue.fal.run/fal-ai/birefnet/requests/')) {
       return Response.json({ image: { url: 'https://cdn.example.com/result.png' } });
     }
     if (url === 'https://cdn.example.com/result.png') {
@@ -272,6 +281,7 @@ describe('production schema baseline', () => {
       'credit_ledger',
       'email_otps',
       'free_usage',
+      'guest_ai_charges',
       'guest_ip_usage',
       'guest_usage',
       'orders',
@@ -294,9 +304,10 @@ describe('production schema baseline', () => {
     ]);
   });
 
-  it('contains the credit-bucket and payment idempotency columns', async () => {
-    const [credits, orders, voucherCards, referralCodes, reviews, holds] = await Promise.all([
+  it('contains the credit-bucket, provider recovery, and payment idempotency columns', async () => {
+    const [credits, tasks, orders, voucherCards, referralCodes, reviews, holds] = await Promise.all([
       env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
+      env.DB.prepare('PRAGMA table_info(ai_tasks)').all(),
       env.DB.prepare('PRAGMA table_info(orders)').all(),
       env.DB.prepare('PRAGMA table_info(voucher_cards)').all(),
       env.DB.prepare('PRAGMA table_info(referral_codes)').all(),
@@ -309,6 +320,10 @@ describe('production schema baseline', () => {
       'remaining_credits',
       'expires_at',
       'idempotency_key',
+    ]));
+    expect(tasks.results.map((row) => row.name)).toEqual(expect.arrayContaining([
+      'provider_request_id',
+      'provider_submitted_at',
     ]));
     expect(orders.results.map((row) => row.name)).toEqual(expect.arrayContaining([
       'base_credits',
@@ -578,7 +593,7 @@ describe('free quota and credit accounting', () => {
       guest_uses_applied: 3,
       issued_credits: 7,
     }));
-    expect(outboundFetch).toHaveBeenCalledTimes(6);
+    expect(outboundFetch).toHaveBeenCalledTimes(12);
   });
 
   it('enforces the anonymous lifetime quota at 3 by both device and IP', async () => {
@@ -596,7 +611,7 @@ describe('free quota and credit accounting', () => {
     }));
     expect(blocked.status).toBe(403);
     expect(await jsonResponse(blocked)).toMatchObject({ ok: false, reason: 'free_limit' });
-    expect(outboundFetch).toHaveBeenCalledTimes(6);
+    expect(outboundFetch).toHaveBeenCalledTimes(12);
 
     const [device, ip] = await Promise.all([
       env.DB.prepare('SELECT count FROM guest_usage').first(),
@@ -657,7 +672,7 @@ describe('free quota and credit accounting', () => {
     expect(second.status).toBe(200);
     expect(first.headers.get('X-AI-Reused')).toBe('false');
     expect(second.headers.get('X-AI-Reused')).toBe('true');
-    expect(outboundFetch).toHaveBeenCalledTimes(3);
+    expect(outboundFetch).toHaveBeenCalledTimes(5);
 
     const credits = await env.DB.prepare(
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
@@ -668,6 +683,133 @@ describe('free quota and credit accounting', () => {
        WHERE task_id = 'idempotent-ai-task'`
     ).first('count');
     expect(ledger).toBe(1);
+  });
+
+  it('resumes a durable provider request after interruption without submitting or charging twice', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
+    let statusChecks = 0;
+    let submissions = 0;
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url === 'https://queue.fal.run/fal-ai/birefnet') {
+        submissions += 1;
+        return Response.json({ request_id: 'provider-interrupted-request' });
+      }
+      if (url.endsWith('/status')) {
+        statusChecks += 1;
+        return Response.json({
+          status: statusChecks === 1 ? 'IN_PROGRESS' : 'COMPLETED',
+        });
+      }
+      if (url === 'https://queue.fal.run/fal-ai/birefnet/requests/provider-interrupted-request') {
+        return Response.json({ image: { url: 'https://cdn.example.com/interrupted.png' } });
+      }
+      if (url === 'https://cdn.example.com/interrupted.png') {
+        return new Response(new Uint8Array([137, 80, 78, 71]), {
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+      throw new Error(`Unexpected outbound request: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+    const request = () => removeBackgroundRequest({
+      cookie,
+      taskId: 'durable-interrupted-task',
+    });
+
+    const interrupted = await exports.default.fetch(request());
+    expect(interrupted.status).toBe(409);
+    expect(await jsonResponse(interrupted)).toMatchObject({
+      reason: 'task_processing',
+      started: true,
+    });
+    expect(await env.DB.prepare(
+      `SELECT status, provider_request_id FROM ai_tasks
+       WHERE task_id = 'durable-interrupted-task'`
+    ).first()).toEqual(expect.objectContaining({
+      status: 'processing',
+      provider_request_id: 'provider-interrupted-request',
+    }));
+
+    const recovered = await exports.default.fetch(request());
+    expect(recovered.status).toBe(200);
+    expect(recovered.headers.get('X-AI-Reused')).toBe('true');
+    expect(submissions).toBe(1);
+
+    const credits = await env.DB.prepare(
+      'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first();
+    expect(credits).toEqual(expect.objectContaining({ credits: 2, total_used: 1 }));
+    const ledger = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_ledger
+       WHERE task_id = 'durable-interrupted-task'`
+    ).first('count');
+    expect(ledger).toBe(1);
+  });
+
+  it('settles concurrent guest recovery requests only once', async () => {
+    let statusChecks = 0;
+    let resultCalls = 0;
+    let releaseResults;
+    const resultGate = new Promise((resolve) => {
+      releaseResults = resolve;
+    });
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url === 'https://queue.fal.run/fal-ai/birefnet') {
+        return Response.json({ request_id: 'provider-guest-concurrent' });
+      }
+      if (url.endsWith('/status')) {
+        statusChecks += 1;
+        return Response.json({
+          status: statusChecks === 1 ? 'IN_PROGRESS' : 'COMPLETED',
+        });
+      }
+      if (url === 'https://queue.fal.run/fal-ai/birefnet/requests/provider-guest-concurrent') {
+        resultCalls += 1;
+        if (resultCalls === 2) releaseResults();
+        await resultGate;
+        return Response.json({ image: { url: 'https://cdn.example.com/guest-concurrent.png' } });
+      }
+      if (url === 'https://cdn.example.com/guest-concurrent.png') {
+        return new Response(new Uint8Array([137, 80, 78, 71]), {
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+      throw new Error(`Unexpected outbound request: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+    const request = () => removeBackgroundRequest({
+      taskId: 'durable-guest-concurrent',
+      deviceId: 'durable-guest-device',
+      ip: '203.0.113.44',
+    });
+
+    const queued = await exports.default.fetch(request());
+    expect(queued.status).toBe(409);
+
+    const [first, second] = await Promise.all([
+      exports.default.fetch(request()),
+      exports.default.fetch(request()),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const [deviceUses, ipUses, taskCharges] = await Promise.all([
+      env.DB.prepare(
+        'SELECT count FROM guest_usage WHERE device_hash IS NOT NULL'
+      ).first('count'),
+      env.DB.prepare(
+        'SELECT count FROM guest_ip_usage WHERE ip_hash IS NOT NULL'
+      ).first('count'),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM guest_ai_charges
+         WHERE task_id = 'durable-guest-concurrent'`
+      ).first('count'),
+    ]);
+    expect(deviceUses).toBe(1);
+    expect(ipUses).toBe(1);
+    expect(taskCharges).toBe(1);
   });
 
   it('rejects reuse of a task id after the source input changes', async () => {
@@ -687,7 +829,7 @@ describe('free quota and credit accounting', () => {
     }));
     expect(conflict.status).toBe(409);
     expect(await jsonResponse(conflict)).toMatchObject({ reason: 'task_conflict' });
-    expect(outboundFetch).toHaveBeenCalledTimes(2);
+    expect(outboundFetch).toHaveBeenCalledTimes(4);
 
     const credits = await env.DB.prepare(
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
@@ -700,9 +842,15 @@ describe('free quota and credit accounting', () => {
     let falAttempts = 0;
     const outboundFetch = vi.fn(async (input) => {
       const url = String(input);
-      if (url === 'https://fal.run/fal-ai/birefnet') {
+      if (url === 'https://queue.fal.run/fal-ai/birefnet') {
         falAttempts += 1;
         if (falAttempts === 1) throw new TypeError('upstream connection reset');
+        return Response.json({ request_id: 'provider-retry-request' });
+      }
+      if (url.endsWith('/status')) {
+        return Response.json({ status: 'COMPLETED' });
+      }
+      if (url === 'https://queue.fal.run/fal-ai/birefnet/requests/provider-retry-request') {
         return Response.json({ image: { url: 'https://cdn.example.com/retry.png' } });
       }
       if (url === 'https://cdn.example.com/retry.png') {
@@ -719,14 +867,14 @@ describe('free quota and credit accounting', () => {
     });
 
     const interrupted = await exports.default.fetch(request());
-    expect(interrupted.status).toBe(500);
+    expect(interrupted.status).toBe(502);
     expect(interrupted.headers.get('X-AI-Reused')).toBeNull();
     expect(await env.DB.prepare(
       `SELECT status, error_code FROM ai_tasks
        WHERE task_id = 'upstream-interrupted-task'`
     ).first()).toEqual(expect.objectContaining({
       status: 'failed',
-      error_code: 'internal_error',
+      error_code: 'fal_submit_failed',
     }));
 
     const recovered = await exports.default.fetch(request());
@@ -753,8 +901,14 @@ describe('free quota and credit accounting', () => {
     });
     const outboundFetch = vi.fn(async (input) => {
       const url = String(input);
-      if (url === 'https://fal.run/fal-ai/birefnet') {
+      if (url === 'https://queue.fal.run/fal-ai/birefnet') {
         await falGate;
+        return Response.json({ request_id: 'provider-concurrent-request' });
+      }
+      if (url.endsWith('/status')) {
+        return Response.json({ status: 'COMPLETED' });
+      }
+      if (url === 'https://queue.fal.run/fal-ai/birefnet/requests/provider-concurrent-request') {
         return Response.json({ image: { url: 'https://cdn.example.com/result.png' } });
       }
       return new Response(new Uint8Array([137, 80, 78, 71]), {
@@ -784,7 +938,7 @@ describe('free quota and credit accounting', () => {
     }));
     expect(recovered.status).toBe(200);
     expect(recovered.headers.get('X-AI-Reused')).toBe('true');
-    expect(outboundFetch).toHaveBeenCalledTimes(3);
+    expect(outboundFetch).toHaveBeenCalledTimes(5);
 
     const credits = await env.DB.prepare(
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'

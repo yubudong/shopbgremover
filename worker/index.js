@@ -25,6 +25,7 @@ const REFERRAL_CODE_LENGTH = 8;
 const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 const REFERRAL_REWARD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const REFERRAL_OBSERVATION_SECONDS = 7 * 24 * 60 * 60;
+const FAL_QUEUE_ENDPOINT = 'https://queue.fal.run/fal-ai/birefnet';
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -424,7 +425,7 @@ async function reserveAiTask(env, {
   }
 
   const task = await env.DB.prepare(
-    `SELECT task_id, owner_key, input_hash, status, result_url
+    `SELECT task_id, owner_key, input_hash, status, result_url, provider_request_id
      FROM ai_tasks WHERE task_id = ?`
   ).bind(taskId).first();
 
@@ -435,7 +436,7 @@ async function reserveAiTask(env, {
     return { state: 'succeeded', resultUrl: task.result_url };
   }
   if (task.status === 'processing') {
-    return { state: 'processing' };
+    return { state: 'processing', providerRequestId: task.provider_request_id };
   }
 
   const retried = await env.DB.prepare(
@@ -444,16 +445,191 @@ async function reserveAiTask(env, {
      WHERE task_id = ? AND status = 'failed'`
   ).bind(taskId).run();
   return Number(retried.meta?.changes || 0) === 1
-    ? { state: 'retry' }
+    ? { state: 'retry', providerRequestId: task.provider_request_id }
     : { state: 'processing' };
 }
 
-async function failAiTask(env, taskId, errorCode) {
+async function failAiTask(env, taskId, errorCode, { clearProvider = false } = {}) {
   await env.DB.prepare(
     `UPDATE ai_tasks
-     SET status = 'failed', error_code = ?, updated_at = unixepoch()
+     SET status = 'failed',
+         error_code = ?,
+         provider_request_id = CASE WHEN ? THEN NULL ELSE provider_request_id END,
+         provider_submitted_at = CASE WHEN ? THEN NULL ELSE provider_submitted_at END,
+         updated_at = unixepoch()
      WHERE task_id = ? AND status = 'processing'`
-  ).bind(errorCode, taskId).run();
+  ).bind(errorCode, clearProvider ? 1 : 0, clearProvider ? 1 : 0, taskId).run();
+}
+
+function aiProviderError(message, {
+  reason = 'fal_failed',
+  status = 502,
+  detail,
+  keepProcessing = false,
+} = {}) {
+  const error = new Error(message);
+  error.reason = reason;
+  error.status = status;
+  error.detail = detail;
+  error.keepProcessing = keepProcessing;
+  return error;
+}
+
+async function submitFalTask(env, taskId, imageUrl) {
+  try {
+    const response = await fetch(FAL_QUEUE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${env.FAL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_url: imageUrl,
+        model: 'General Use (Heavy)',
+        operating_resolution: '1024x1024',
+        output_format: 'png',
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw aiProviderError('fal.ai queue submission failed', { detail });
+    }
+
+    const data = await response.json();
+    const providerRequestId = data?.request_id;
+    if (typeof providerRequestId !== 'string' || !providerRequestId) {
+      throw aiProviderError('fal.ai queue did not return a request id', {
+        reason: 'missing_provider_request_id',
+        detail: data,
+      });
+    }
+
+    const stored = await env.DB.prepare(
+      `UPDATE ai_tasks
+       SET provider_request_id = ?, provider_submitted_at = unixepoch(),
+           updated_at = unixepoch()
+       WHERE task_id = ? AND status = 'processing'
+         AND provider_request_id IS NULL`
+    ).bind(providerRequestId, taskId).run();
+    if (Number(stored.meta?.changes || 0) !== 1) {
+      const current = await env.DB.prepare(
+        'SELECT provider_request_id FROM ai_tasks WHERE task_id = ?'
+      ).bind(taskId).first('provider_request_id');
+      if (current) return current;
+      throw aiProviderError('Unable to persist fal.ai request id', {
+        reason: 'provider_request_not_persisted',
+      });
+    }
+    return providerRequestId;
+  } catch (error) {
+    await failAiTask(env, taskId, error.reason || 'fal_submit_failed', {
+      clearProvider: true,
+    });
+    throw error.reason
+      ? error
+      : aiProviderError('fal.ai queue submission failed', { detail: error.message });
+  }
+}
+
+async function fetchFalTaskResult(env, taskId, providerRequestId) {
+  const headers = { 'Authorization': `Key ${env.FAL_API_KEY}` };
+  let statusResponse;
+  try {
+    statusResponse = await fetch(
+      `${FAL_QUEUE_ENDPOINT}/requests/${encodeURIComponent(providerRequestId)}/status`,
+      { headers },
+    );
+  } catch (error) {
+    throw aiProviderError('Unable to check fal.ai task status', {
+      reason: 'provider_status_unavailable',
+      detail: error.message,
+      keepProcessing: true,
+    });
+  }
+  if (!statusResponse.ok) {
+    throw aiProviderError('Unable to check fal.ai task status', {
+      reason: 'provider_status_unavailable',
+      detail: await statusResponse.text(),
+      keepProcessing: true,
+    });
+  }
+
+  const statusData = await statusResponse.json();
+  if (statusData?.status === 'IN_QUEUE' || statusData?.status === 'IN_PROGRESS') {
+    return { state: 'processing' };
+  }
+  if (statusData?.status !== 'COMPLETED') {
+    throw aiProviderError('fal.ai returned an unknown task status', {
+      reason: 'provider_status_invalid',
+      detail: statusData,
+      keepProcessing: true,
+    });
+  }
+  if (statusData.error) {
+    await failAiTask(env, taskId, statusData.error_type || 'fal_failed', {
+      clearProvider: true,
+    });
+    throw aiProviderError('fal.ai task failed', {
+      reason: 'fal_failed',
+      detail: statusData.error,
+    });
+  }
+
+  let resultResponse;
+  try {
+    resultResponse = await fetch(
+      `${FAL_QUEUE_ENDPOINT}/requests/${encodeURIComponent(providerRequestId)}`,
+      { headers },
+    );
+  } catch (error) {
+    throw aiProviderError('Unable to retrieve fal.ai task result', {
+      reason: 'provider_result_unavailable',
+      detail: error.message,
+      keepProcessing: true,
+    });
+  }
+  if (!resultResponse.ok) {
+    throw aiProviderError('Unable to retrieve fal.ai task result', {
+      reason: 'provider_result_unavailable',
+      detail: await resultResponse.text(),
+      keepProcessing: true,
+    });
+  }
+
+  const resultData = await resultResponse.json();
+  const resultUrl = resultData?.image?.url;
+  if (!resultUrl) {
+    await failAiTask(env, taskId, 'missing_result', { clearProvider: true });
+    throw aiProviderError('fal.ai result did not include an image', {
+      reason: 'missing_result',
+      detail: resultData,
+    });
+  }
+
+  let imageResponse;
+  try {
+    imageResponse = await fetch(resultUrl);
+  } catch (error) {
+    throw aiProviderError('Unable to download fal.ai result image', {
+      reason: 'result_download_failed',
+      detail: error.message,
+      keepProcessing: true,
+    });
+  }
+  if (!imageResponse.ok) {
+    const retryable = imageResponse.status >= 500;
+    if (!retryable) {
+      await failAiTask(env, taskId, 'result_expired', { clearProvider: true });
+    }
+    throw aiProviderError('Unable to download fal.ai result image', {
+      reason: retryable ? 'result_download_failed' : 'result_expired',
+      detail: `HTTP ${imageResponse.status}`,
+      status: retryable ? 502 : 410,
+      keepProcessing: retryable,
+    });
+  }
+
+  return { state: 'ready', resultUrl, imageResponse };
 }
 
 async function chargeUserForTask(env, userId, taskId, resultUrl) {
@@ -533,6 +709,10 @@ async function chargeGuestForTask(env, guest, taskId, resultUrl) {
   try {
     await env.DB.batch([
       env.DB.prepare(
+        `INSERT INTO guest_ai_charges (task_id, device_hash, ip_hash)
+         VALUES (?, ?, ?)`
+      ).bind(taskId, guest.deviceHash, guest.ipHash),
+      env.DB.prepare(
         `INSERT INTO guest_usage (device_hash, last_ip_hash, count)
          VALUES (?, ?, 1)
          ON CONFLICT(device_hash) DO UPDATE SET
@@ -556,7 +736,10 @@ async function chargeGuestForTask(env, guest, taskId, resultUrl) {
     ]);
     return true;
   } catch {
-    return false;
+    const existing = await env.DB.prepare(
+      'SELECT task_id FROM guest_ai_charges WHERE task_id = ?'
+    ).bind(taskId).first();
+    return Boolean(existing);
   }
 }
 
@@ -1122,7 +1305,7 @@ async function releaseDueRewardHolds(env, limit = 50) {
 
 // ── Router ────────────────────────────────────────────────────
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
 
@@ -1645,7 +1828,7 @@ export default {
         if (reservation.state === 'conflict') {
           return json({ error: 'task_id belongs to another task', reason: 'task_conflict' }, 409, origin);
         }
-        if (reservation.state === 'processing') {
+        if (reservation.state === 'processing' && !reservation.providerRequestId) {
           return json({ error: 'Task is already processing', reason: 'task_processing', task_id: taskId }, 409, origin);
         }
         if (reservation.state === 'succeeded') {
@@ -1681,42 +1864,25 @@ export default {
           }
         }
 
-        // 直接调用 fal.ai，前端已压缩好
-        const falRes = await fetch('https://fal.run/fal-ai/birefnet', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Key ${env.FAL_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_url: image_url,
-            model: 'General Use (Heavy)',
-            operating_resolution: '1024x1024',
-            output_format: 'png',
-          }),
-        });
-
-        if (!falRes.ok) {
-          const txt = await falRes.text();
-          await failAiTask(env, taskId, 'fal_failed');
-          return json({ error: 'fal.ai 调用失败', detail: txt }, 502, origin);
+        let providerRequestId = reservation.providerRequestId;
+        const started = !providerRequestId;
+        if (!providerRequestId) {
+          const submission = submitFalTask(env, taskId, image_url);
+          ctx.waitUntil(submission.then(() => undefined, () => undefined));
+          providerRequestId = await submission;
         }
 
-        const falData = await falRes.json();
-        const resultUrl = falData?.image?.url;
-        if (!resultUrl) {
-          await failAiTask(env, taskId, 'missing_result');
-          return json({ error: '未获取到结果图片', detail: falData }, 500, origin);
+        const providerResult = await fetchFalTaskResult(env, taskId, providerRequestId);
+        if (providerResult.state === 'processing') {
+          return json({
+            error: 'Task is still processing',
+            reason: 'task_processing',
+            task_id: taskId,
+            started,
+          }, 409, origin);
         }
 
-        // 4. 下载结果图片
-        const imgRes = await fetch(resultUrl);
-        if (!imgRes.ok) {
-          await failAiTask(env, taskId, 'result_download_failed');
-          return json({ error: '下载结果图片失败', status: imgRes.status }, 500, origin);
-        }
-
-        // 成功获取结果后，通过 D1 事务批次只扣一次。
+        const { resultUrl, imageResponse } = providerResult;
         if (user) {
           const charged = await chargeUserForTask(env, user.sub, taskId, resultUrl);
           if (!charged) {
@@ -1728,19 +1894,25 @@ export default {
           return json({ error: 'Free limit reached.', reason: 'free_limit' }, 409, origin);
         }
 
-        // 6. 返回图片
-        return new Response(imgRes.body, {
+        return new Response(imageResponse.body, {
           headers: {
-            'Content-Type': 'image/png',
+            'Content-Type': imageResponse.headers.get('Content-Type') || 'image/png',
             'X-Task-ID': taskId,
-            'X-AI-Reused': 'false',
+            'X-AI-Reused': started ? 'false' : 'true',
             ...cors(origin),
           },
         });
 
       } catch (e) {
-        if (activeTaskId) await failAiTask(env, activeTaskId, 'internal_error');
-        return json({ error: '处理失败', message: e.message }, 500, origin);
+        if (activeTaskId && !e.keepProcessing) {
+          await failAiTask(env, activeTaskId, e.reason || 'internal_error');
+        }
+        return json({
+          error: '处理失败',
+          message: e.message,
+          ...(e.reason ? { reason: e.reason } : {}),
+          ...(e.detail ? { detail: e.detail } : {}),
+        }, e.status || 500, origin);
       }
     }
 

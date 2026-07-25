@@ -190,6 +190,8 @@ CREATE TABLE IF NOT EXISTS ai_tasks (
   status TEXT NOT NULL DEFAULT 'processing'
     CHECK (status IN ('processing', 'succeeded', 'failed')),
   result_url TEXT,
+  provider_request_id TEXT,
+  provider_submitted_at INTEGER,
   charge_ledger_id TEXT,
   error_code TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -201,6 +203,21 @@ CREATE TABLE IF NOT EXISTS ai_tasks (
 
 CREATE INDEX IF NOT EXISTS idx_ai_tasks_owner_created
 ON ai_tasks(owner_key, created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_tasks_provider_request
+ON ai_tasks(provider_request_id)
+WHERE provider_request_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS guest_ai_charges (
+  task_id TEXT PRIMARY KEY,
+  device_hash TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (task_id) REFERENCES ai_tasks(task_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guest_ai_charges_device_created
+ON guest_ai_charges(device_hash, created_at);
 
 CREATE TABLE IF NOT EXISTS guest_usage (
   device_hash TEXT PRIMARY KEY,
