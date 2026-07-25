@@ -78,7 +78,9 @@ function hasKnownNeighbour(index, known, width, height) {
 function fillPixel(index, output, known, width, height, sampleRadius) {
   const x = index % width;
   const y = Math.floor(index / width);
-  const totals = [0, 0, 0, 0];
+  const premultipliedTotals = [0, 0, 0];
+  let alphaTotal = 0;
+  let alphaWeight = 0;
   let totalWeight = 0;
 
   for (let dy = -sampleRadius; dy <= sampleRadius; dy += 1) {
@@ -93,20 +95,29 @@ function fillPixel(index, output, known, width, height, sampleRadius) {
       const distanceSquared = dx * dx + dy * dy;
       const weight = 1 / Math.max(1, distanceSquared);
       const sourceOffset = sampleIndex * 4;
-      totals[0] += output[sourceOffset] * weight;
-      totals[1] += output[sourceOffset + 1] * weight;
-      totals[2] += output[sourceOffset + 2] * weight;
-      totals[3] += output[sourceOffset + 3] * weight;
+      const alpha = output[sourceOffset + 3] / 255;
+      const visibleWeight = weight * alpha;
+      premultipliedTotals[0] += output[sourceOffset] * visibleWeight;
+      premultipliedTotals[1] += output[sourceOffset + 1] * visibleWeight;
+      premultipliedTotals[2] += output[sourceOffset + 2] * visibleWeight;
+      alphaTotal += output[sourceOffset + 3] * weight;
+      alphaWeight += visibleWeight;
       totalWeight += weight;
     }
   }
 
   if (totalWeight === 0) return false;
   const targetOffset = index * 4;
-  output[targetOffset] = Math.round(totals[0] / totalWeight);
-  output[targetOffset + 1] = Math.round(totals[1] / totalWeight);
-  output[targetOffset + 2] = Math.round(totals[2] / totalWeight);
-  output[targetOffset + 3] = Math.round(totals[3] / totalWeight);
+  if (alphaWeight > 0) {
+    output[targetOffset] = Math.round(premultipliedTotals[0] / alphaWeight);
+    output[targetOffset + 1] = Math.round(premultipliedTotals[1] / alphaWeight);
+    output[targetOffset + 2] = Math.round(premultipliedTotals[2] / alphaWeight);
+  } else {
+    output[targetOffset] = 0;
+    output[targetOffset + 1] = 0;
+    output[targetOffset + 2] = 0;
+  }
+  output[targetOffset + 3] = Math.round(alphaTotal / totalWeight);
   return true;
 }
 

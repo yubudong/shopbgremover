@@ -511,8 +511,11 @@
     link.href = URL.createObjectURL(edit.blob);
     const baseName = active.file.name.replace(/\.[^.]+$/, '') || 'product';
     link.download = `${baseName}-cleaned.png`;
+    link.style.display = 'none';
+    document.body.append(link);
     link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 30000);
   }
 
   maskCanvas.addEventListener('pointerdown', beginDrawing);

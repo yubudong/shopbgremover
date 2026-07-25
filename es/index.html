@@ -1547,11 +1547,11 @@ let selectedFiles   = [];
       card.appendChild(img);
       card.appendChild(badge);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
-        onApply: ({ previewUrl }) => {
+        onApply: ({ previewUrl, restored }) => {
           if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
           img.src = previewUrl;
-          badge.textContent = '✏️';
-          resetProcessActionAfterLocalEdit();
+          badge.textContent = restored ? '⏳' : '✏️';
+          resetProcessActionAfterLocalEdit(restored);
         },
       });
       grid.appendChild(card);
@@ -1573,7 +1573,7 @@ let selectedFiles   = [];
     document.getElementById('statusText').textContent = msg;
   }
 
-  function resetProcessActionAfterLocalEdit() {
+  function resetProcessActionAfterLocalEdit(restored = false) {
     processedResults = [];
     document.getElementById('progressTrack').style.display = 'none';
     document.getElementById('progressBar').style.width = '0%';
@@ -1582,7 +1582,9 @@ let selectedFiles   = [];
     btn.disabled = false;
     btn.className = 'action-btn action-btn-primary';
     btn.onclick = startProcessing;
-    setStatus('Limpieza local guardada. Lista para quitar el fondo con IA.');
+    setStatus(restored
+      ? 'Original restaurado. Listo para quitar el fondo con IA.'
+      : 'Limpieza local guardada. Lista para quitar el fondo con IA.');
   }
 
   // ── Free-use gate (anonymous) ─────────────────────────────

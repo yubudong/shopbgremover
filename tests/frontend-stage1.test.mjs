@@ -70,6 +70,8 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /decorateCard\(card, file, index/);
   assert.match(cleaner, /getSourceFile\(file\)/);
   assert.match(cleaner, /Only edit images you own or are authorized to modify/);
+  assert.match(cleaner, /document\.body\.append\(link\)/);
+  assert.match(cleaner, /link\.download = `\$\{baseName\}-cleaned\.png`/);
   assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
   assert.doesNotMatch(worker, /\bfetch\s*\(/);
   assert.doesNotMatch(core, /\bfetch\s*\(/);
@@ -82,7 +84,9 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     assert.match(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.getSourceFile\(selectedFiles\[i\]\)/, file);
-    assert.match(html, /resetProcessActionAfterLocalEdit\(\)/, file);
+    assert.match(html, /onApply: \(\{ previewUrl, restored \}\)/, file);
+    assert.match(html, /resetProcessActionAfterLocalEdit\(restored = false\)/, file);
+    assert.match(html, /badge\.textContent = restored \? '⏳' : '✏️'/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
   }
 });

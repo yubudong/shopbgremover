@@ -47,3 +47,47 @@ test('local inpaint rejects a mask that covers the entire source', () => {
     /leave some source pixels/,
   );
 });
+
+test('transparent source pixels do not leak hidden RGB into repaired edges', () => {
+  const input = solidImage(3, 3, [0, 0, 255, 0]);
+  input.set([240, 30, 20, 255], 3 * 4);
+  input.set([240, 30, 20, 255], 5 * 4);
+  const center = 4;
+  input.set([20, 240, 20, 255], center * 4);
+  const mask = new Uint8Array(9);
+  mask[center] = 1;
+
+  const output = inpaintRgba(input, 3, 3, mask, { expansion: 0, sampleRadius: 1 });
+  const repaired = Array.from(output.slice(center * 4, center * 4 + 4));
+  assert.deepEqual(repaired.slice(0, 3), [240, 30, 20]);
+  assert.ok(repaired[3] > 0 && repaired[3] < 255);
+});
+
+test('fully transparent repairs normalize hidden color channels to zero', () => {
+  const input = solidImage(3, 3, [90, 180, 240, 0]);
+  const center = 4;
+  input.set([255, 0, 0, 255], center * 4);
+  const mask = new Uint8Array(9);
+  mask[center] = 1;
+
+  const output = inpaintRgba(input, 3, 3, mask, { expansion: 0, sampleRadius: 1 });
+  assert.deepEqual(Array.from(output.slice(center * 4, center * 4 + 4)), [0, 0, 0, 0]);
+});
+
+test('768px work crop remains bounded for a small local selection', () => {
+  const width = 768;
+  const height = 768;
+  const input = solidImage(width, height, [210, 215, 220, 255]);
+  const mask = new Uint8Array(width * height);
+  for (let y = 352; y < 416; y += 1) {
+    for (let x = 352; x < 416; x += 1) mask[y * width + x] = 1;
+  }
+
+  const started = performance.now();
+  const output = inpaintRgba(input, width, height, mask, { expansion: 2, sampleRadius: 4 });
+  const elapsed = performance.now() - started;
+
+  assert.equal(output.length, input.length);
+  assert.deepEqual(Array.from(output.slice((384 * width + 384) * 4, (384 * width + 384) * 4 + 4)), [210, 215, 220, 255]);
+  assert.ok(elapsed < 2500, `expected 768px crop under 2500ms, received ${elapsed.toFixed(1)}ms`);
+});
