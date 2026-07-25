@@ -59,7 +59,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
   assert.match(workflow, /response\.headers\.get\('X-AI-Reused'\) === 'true'/);
   assert.match(workflow, /if \(!aiResult\.reused\) actualAiCalls \+= 1/);
   assert.match(workflow, /remaining < plan\.aiCount/);
-  assert.match(workflow, /hasTransparentPixel\(context\.getImageData/);
+  assert.match(workflow, /hasMeaningfulTransparency\(context\.getImageData/);
   assert.match(workflow, /job\.foregroundBlob && !job\.needsReprocess/);
   assert.match(workflow, /markCompositionChanged/);
   assert.doesNotMatch(workflow, /localStorage/);
@@ -72,7 +72,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5d-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5e-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);

@@ -7,7 +7,7 @@ const {
   buildSessionRecord,
   fetchAiResult,
   format,
-  hasTransparentPixel,
+  hasMeaningfulTransparency,
   isPng,
   planJobs,
   resetJobForSource,
@@ -195,9 +195,53 @@ test('processing-task polling is bounded and surfaces the retryable reason', asy
   assert.deepEqual(waits, [10, 10]);
 });
 
-test('transparent pixel detection and PNG recognition are conservative', () => {
-  assert.equal(hasTransparentPixel(new Uint8ClampedArray([1, 2, 3, 255])), false);
-  assert.equal(hasTransparentPixel(new Uint8ClampedArray([1, 2, 3, 249])), true);
+test('meaningful transparency ignores isolated alpha noise and thin semi-transparent edges', () => {
+  const makeAlphaData = (width, height, alphaForPixel = () => 255) => {
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const offset = (y * width + x) * 4;
+        data[offset] = 40;
+        data[offset + 1] = 90;
+        data[offset + 2] = 160;
+        data[offset + 3] = alphaForPixel(x, y);
+      }
+    }
+    return data;
+  };
+
+  const width = 256;
+  const height = 256;
+  assert.equal(hasMeaningfulTransparency(makeAlphaData(width, height)), false);
+  assert.equal(
+    hasMeaningfulTransparency(makeAlphaData(width, height, (x, y) => (
+      x === 128 && y === 128 ? 0 : 255
+    ))),
+    false,
+  );
+  assert.equal(
+    hasMeaningfulTransparency(makeAlphaData(width, height, (x, y) => (
+      x < 2 || y < 2 || x >= width - 2 || y >= height - 2 ? 180 : 255
+    ))),
+    false,
+  );
+  assert.equal(
+    hasMeaningfulTransparency(makeAlphaData(width, height, (x, y) => (
+      (x + y * width) % 512 === 0 ? 0 : 255
+    ))),
+    false,
+  );
+  assert.equal(
+    hasMeaningfulTransparency(makeAlphaData(width, height, (x) => (x < 64 ? 0 : 255))),
+    true,
+  );
+  assert.equal(
+    hasMeaningfulTransparency(makeAlphaData(width, height, () => 0)),
+    true,
+  );
+});
+
+test('PNG recognition accepts MIME type or case-insensitive extension', () => {
   assert.equal(isPng({ type: 'image/png', name: 'asset.bin' }), true);
   assert.equal(isPng({ type: '', name: 'asset.PNG' }), true);
   assert.equal(isPng({ type: 'image/jpeg', name: 'asset.jpg' }), false);

@@ -7,6 +7,9 @@
   const SESSION_MAX_BYTES = 150 * 1024 * 1024;
   const TASK_PROCESSING_MAX_POLLS = 8;
   const TASK_PROCESSING_POLL_DELAY_MS = 1000;
+  const TRANSPARENCY_ALPHA_THRESHOLD = 250;
+  const MIN_TRANSPARENCY_EQUIVALENT_PIXELS = 16;
+  const MIN_TRANSPARENCY_EQUIVALENT_RATIO = 0.02;
 
   function format(template, values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => (
@@ -14,9 +17,24 @@
     ));
   }
 
-  function hasTransparentPixel(data, threshold = 250) {
+  function hasMeaningfulTransparency(data, {
+    alphaThreshold = TRANSPARENCY_ALPHA_THRESHOLD,
+    minEquivalentPixels = MIN_TRANSPARENCY_EQUIVALENT_PIXELS,
+    minEquivalentRatio = MIN_TRANSPARENCY_EQUIVALENT_RATIO,
+  } = {}) {
+    const pixelCount = Math.floor(data.length / 4);
+    if (pixelCount === 0) return false;
+
+    const requiredEquivalentPixels = Math.min(
+      pixelCount,
+      Math.max(minEquivalentPixels, pixelCount * minEquivalentRatio),
+    );
+    let transparentEquivalentPixels = 0;
     for (let index = 3; index < data.length; index += 4) {
-      if (data[index] < threshold) return true;
+      const alpha = data[index];
+      if (alpha >= alphaThreshold) continue;
+      transparentEquivalentPixels += (255 - alpha) / 255;
+      if (transparentEquivalentPixels >= requiredEquivalentPixels) return true;
     }
     return false;
   }
@@ -406,7 +424,7 @@
         });
         context.clearRect(0, 0, width, height);
         context.drawImage(bitmap, 0, 0, width, height);
-        return hasTransparentPixel(context.getImageData(0, 0, width, height).data);
+        return hasMeaningfulTransparency(context.getImageData(0, 0, width, height).data);
       } finally {
         bitmap.close?.();
       }
@@ -756,7 +774,7 @@
   globalThis.ShopBGAiWorkflow = {
     create,
     format,
-    hasTransparentPixel,
+    hasMeaningfulTransparency,
     isPng,
     planJobs,
     resetJobForSource,
