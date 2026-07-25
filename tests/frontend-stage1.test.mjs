@@ -52,9 +52,12 @@ function extractFunction(source, signature) {
 
 test('all localized workspaces use stable per-image AI task identities', async () => {
   const workflow = await read('ai-workflow.js');
-  assert.match(workflow, /task_id: job\.taskId/);
+  assert.match(workflow, /task_id: taskId/);
   assert.match(workflow, /taskId: restored\?\.taskId \|\| DEFAULT_TASK_ID\(\)/);
   assert.match(workflow, /resetJobForSource\(job/);
+  assert.match(workflow, /detail\.reason === 'task_processing'/);
+  assert.match(workflow, /response\.headers\.get\('X-AI-Reused'\) === 'true'/);
+  assert.match(workflow, /if \(!aiResult\.reused\) actualAiCalls \+= 1/);
   assert.match(workflow, /remaining < plan\.aiCount/);
   assert.match(workflow, /hasTransparentPixel\(context\.getImageData/);
   assert.match(workflow, /job\.foregroundBlob && !job\.needsReprocess/);
@@ -69,7 +72,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5b-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5c-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);

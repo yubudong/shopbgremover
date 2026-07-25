@@ -39,7 +39,7 @@ function cors(origin) {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Device-ID',
-    'Access-Control-Expose-Headers': 'X-Task-ID',
+    'Access-Control-Expose-Headers': 'X-Task-ID, X-AI-Reused',
     'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin',
   };
@@ -1657,6 +1657,7 @@ export default {
             headers: {
               'Content-Type': existingImage.headers.get('Content-Type') || 'image/png',
               'X-Task-ID': taskId,
+              'X-AI-Reused': 'true',
               ...cors(origin),
             },
           });
@@ -1729,7 +1730,12 @@ export default {
 
         // 6. 返回图片
         return new Response(imgRes.body, {
-          headers: { 'Content-Type': 'image/png', 'X-Task-ID': taskId, ...cors(origin) },
+          headers: {
+            'Content-Type': 'image/png',
+            'X-Task-ID': taskId,
+            'X-AI-Reused': 'false',
+            ...cors(origin),
+          },
         });
 
       } catch (e) {

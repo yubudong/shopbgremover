@@ -643,7 +643,7 @@ describe('free quota and credit accounting', () => {
     expect(ledger).toBe(0);
   });
 
-  it('deducts once and reuses the result for the same AI task', async () => {
+  it('recovers a lost success response without another provider call or charge', async () => {
     const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
     const outboundFetch = installFalSuccessMock();
     const request = () => removeBackgroundRequest({
@@ -655,6 +655,8 @@ describe('free quota and credit accounting', () => {
     const second = await exports.default.fetch(request());
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
+    expect(first.headers.get('X-AI-Reused')).toBe('false');
+    expect(second.headers.get('X-AI-Reused')).toBe('true');
     expect(outboundFetch).toHaveBeenCalledTimes(3);
 
     const credits = await env.DB.prepare(
@@ -664,6 +666,81 @@ describe('free quota and credit accounting', () => {
     const ledger = await env.DB.prepare(
       `SELECT COUNT(*) AS count FROM credit_ledger
        WHERE task_id = 'idempotent-ai-task'`
+    ).first('count');
+    expect(ledger).toBe(1);
+  });
+
+  it('rejects reuse of a task id after the source input changes', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
+    const outboundFetch = installFalSuccessMock();
+    const first = await exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId: 'source-bound-task',
+      imageUrl: 'https://example.com/original.png',
+    }));
+    expect(first.status).toBe(200);
+
+    const conflict = await exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId: 'source-bound-task',
+      imageUrl: 'https://example.com/edited.png',
+    }));
+    expect(conflict.status).toBe(409);
+    expect(await jsonResponse(conflict)).toMatchObject({ reason: 'task_conflict' });
+    expect(outboundFetch).toHaveBeenCalledTimes(2);
+
+    const credits = await env.DB.prepare(
+      'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first();
+    expect(credits).toEqual(expect.objectContaining({ credits: 2, total_used: 1 }));
+  });
+
+  it('retries the same failed task after an upstream network interruption and charges only on success', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
+    let falAttempts = 0;
+    const outboundFetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url === 'https://fal.run/fal-ai/birefnet') {
+        falAttempts += 1;
+        if (falAttempts === 1) throw new TypeError('upstream connection reset');
+        return Response.json({ image: { url: 'https://cdn.example.com/retry.png' } });
+      }
+      if (url === 'https://cdn.example.com/retry.png') {
+        return new Response(new Uint8Array([137, 80, 78, 71]), {
+          headers: { 'Content-Type': 'image/png' },
+        });
+      }
+      throw new Error(`Unexpected outbound request: ${url}`);
+    });
+    vi.stubGlobal('fetch', outboundFetch);
+    const request = () => removeBackgroundRequest({
+      cookie,
+      taskId: 'upstream-interrupted-task',
+    });
+
+    const interrupted = await exports.default.fetch(request());
+    expect(interrupted.status).toBe(500);
+    expect(interrupted.headers.get('X-AI-Reused')).toBeNull();
+    expect(await env.DB.prepare(
+      `SELECT status, error_code FROM ai_tasks
+       WHERE task_id = 'upstream-interrupted-task'`
+    ).first()).toEqual(expect.objectContaining({
+      status: 'failed',
+      error_code: 'internal_error',
+    }));
+
+    const recovered = await exports.default.fetch(request());
+    expect(recovered.status).toBe(200);
+    expect(recovered.headers.get('X-AI-Reused')).toBe('false');
+    expect(falAttempts).toBe(2);
+
+    const credits = await env.DB.prepare(
+      'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
+    ).bind(userId).first();
+    expect(credits).toEqual(expect.objectContaining({ credits: 2, total_used: 1 }));
+    const ledger = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_ledger
+       WHERE task_id = 'upstream-interrupted-task'`
     ).first('count');
     expect(ledger).toBe(1);
   });
@@ -699,11 +776,25 @@ describe('free quota and credit accounting', () => {
     releaseFal();
     const first = await firstPromise;
     expect(first.status).toBe(200);
+    expect(first.headers.get('X-AI-Reused')).toBe('false');
+
+    const recovered = await exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId: 'concurrent-ai-task',
+    }));
+    expect(recovered.status).toBe(200);
+    expect(recovered.headers.get('X-AI-Reused')).toBe('true');
+    expect(outboundFetch).toHaveBeenCalledTimes(3);
 
     const credits = await env.DB.prepare(
       'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
     ).bind(userId).first();
     expect(credits).toEqual(expect.objectContaining({ credits: 1, total_used: 1 }));
+    const ledger = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM credit_ledger
+       WHERE task_id = 'concurrent-ai-task'`
+    ).first('count');
+    expect(ledger).toBe(1);
   });
 });
 

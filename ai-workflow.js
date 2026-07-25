@@ -5,6 +5,8 @@
   const SESSION_SCHEMA_VERSION = 1;
   const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
   const SESSION_MAX_BYTES = 150 * 1024 * 1024;
+  const TASK_PROCESSING_MAX_POLLS = 8;
+  const TASK_PROCESSING_POLL_DELAY_MS = 1000;
 
   function format(template, values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => (
@@ -138,6 +140,58 @@
       && Number(record.expiresAt || 0) > now
       && Number(record.byteSize || 0) <= SESSION_MAX_BYTES
     );
+  }
+
+  async function fetchAiResult({
+    api,
+    deviceId,
+    taskId,
+    dataUrl,
+    failedText,
+    fetchImpl = globalThis.fetch,
+    wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+    maxProcessingPolls = TASK_PROCESSING_MAX_POLLS,
+    pollDelayMs = TASK_PROCESSING_POLL_DELAY_MS,
+  }) {
+    const requestUrl = `${api}/api/remove-bg`;
+    const requestInit = {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-ID': deviceId,
+      },
+      body: JSON.stringify({
+        image_url: dataUrl,
+        task_id: taskId,
+      }),
+    };
+    let processingPolls = 0;
+
+    while (true) {
+      const response = await fetchImpl(requestUrl, requestInit);
+      if (response.ok) {
+        return {
+          blob: await response.blob(),
+          reused: response.headers.get('X-AI-Reused') === 'true',
+        };
+      }
+
+      const detail = await response.json().catch(() => ({}));
+      if (
+        response.status === 409
+        && detail.reason === 'task_processing'
+        && processingPolls < maxProcessingPolls
+      ) {
+        processingPolls += 1;
+        await wait(pollDelayMs);
+        continue;
+      }
+
+      const error = new Error(detail.message || detail.error || failedText);
+      error.reason = detail.reason;
+      throw error;
+    }
   }
 
   function requestResult(request) {
@@ -519,23 +573,13 @@
 
     async function requestAi(job, source) {
       const dataUrl = await options.compressToDataUrl(source);
-      const response = await fetch(`${options.api}/api/remove-bg`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-ID': options.deviceId,
-        },
-        body: JSON.stringify({
-          image_url: dataUrl,
-          task_id: job.taskId,
-        }),
+      return fetchAiResult({
+        api: options.api,
+        deviceId: options.deviceId,
+        taskId: job.taskId,
+        dataUrl,
+        failedText: text.failed,
       });
-      if (response.ok) return response.blob();
-      const detail = await response.json().catch(() => ({}));
-      const error = new Error(detail.message || detail.error || text.failed);
-      error.reason = detail.reason;
-      throw error;
     }
 
     async function process() {
@@ -574,8 +618,9 @@
             } else {
               job.status = 'processing';
               await persistSession();
-              foreground = await requestAi(job, source);
-              actualAiCalls += 1;
+              const aiResult = await requestAi(job, source);
+              foreground = aiResult.blob;
+              if (!aiResult.reused) actualAiCalls += 1;
               job.foregroundBlob = foreground;
               job.hadAiResult = true;
               job.needsReprocess = false;
@@ -713,6 +758,7 @@
     isPng,
     planJobs,
     resetJobForSource,
+    fetchAiResult,
     buildSessionRecord,
     sessionByteSize,
     storedJobState,
@@ -720,5 +766,7 @@
     SESSION_MAX_BYTES,
     SESSION_SCHEMA_VERSION,
     SESSION_TTL_MS,
+    TASK_PROCESSING_MAX_POLLS,
+    TASK_PROCESSING_POLL_DELAY_MS,
   };
 })();

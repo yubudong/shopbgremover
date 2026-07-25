@@ -5,6 +5,7 @@ await import('../ai-workflow.js');
 
 const {
   buildSessionRecord,
+  fetchAiResult,
   format,
   hasTransparentPixel,
   isPng,
@@ -63,6 +64,105 @@ test('source edits invalidate only that job and create a new stable task identit
   // the same task id and let the Worker reuse or retry the existing task.
   job.status = 'failed';
   assert.equal(job.taskId, 'task-new');
+});
+
+test('a retry polls the same processing task and reports a reused Worker result', async () => {
+  const requests = [];
+  const waits = [];
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, init });
+    if (requests.length === 1) {
+      return Response.json(
+        { reason: 'task_processing', task_id: 'stable-retry-task' },
+        { status: 409 },
+      );
+    }
+    return new Response(new Blob(['cached-result']), {
+      headers: {
+        'Content-Type': 'image/png',
+        'X-AI-Reused': 'true',
+      },
+    });
+  };
+
+  const result = await fetchAiResult({
+    api: 'https://api.example.test',
+    deviceId: 'device-123',
+    taskId: 'stable-retry-task',
+    dataUrl: 'data:image/jpeg;base64,abc',
+    failedText: 'failed',
+    fetchImpl,
+    wait: async (delay) => waits.push(delay),
+    maxProcessingPolls: 2,
+    pollDelayMs: 25,
+  });
+
+  assert.equal(requests.length, 2);
+  assert.deepEqual(waits, [25]);
+  assert.equal(requests[0].url, 'https://api.example.test/api/remove-bg');
+  assert.equal(requests[0].init.body, requests[1].init.body);
+  assert.deepEqual(JSON.parse(requests[1].init.body), {
+    image_url: 'data:image/jpeg;base64,abc',
+    task_id: 'stable-retry-task',
+  });
+  assert.equal(result.reused, true);
+  assert.equal(await result.blob.text(), 'cached-result');
+});
+
+test('an offline request fails fast and a manual retry keeps the same task identity', async () => {
+  const bodies = [];
+  let attempt = 0;
+  const fetchImpl = async (_url, init) => {
+    attempt += 1;
+    bodies.push(init.body);
+    if (attempt === 1) throw new TypeError('network disconnected');
+    return new Response(new Blob(['recovered']), {
+      headers: { 'X-AI-Reused': 'true' },
+    });
+  };
+  const request = () => fetchAiResult({
+    api: 'https://api.example.test',
+    deviceId: 'device-123',
+    taskId: 'offline-stable-task',
+    dataUrl: 'data:image/jpeg;base64,def',
+    failedText: 'failed',
+    fetchImpl,
+    wait: async () => {
+      throw new Error('offline failures must not spin automatically');
+    },
+  });
+
+  await assert.rejects(request(), /network disconnected/);
+  const recovered = await request();
+
+  assert.equal(attempt, 2);
+  assert.equal(bodies[0], bodies[1]);
+  assert.equal(JSON.parse(bodies[1]).task_id, 'offline-stable-task');
+  assert.equal(recovered.reused, true);
+  assert.equal(await recovered.blob.text(), 'recovered');
+});
+
+test('processing-task polling is bounded and surfaces the retryable reason', async () => {
+  const waits = [];
+  let requests = 0;
+  const attempt = fetchAiResult({
+    api: 'https://api.example.test',
+    deviceId: 'device-123',
+    taskId: 'long-running-task',
+    dataUrl: 'data:image/jpeg;base64,ghi',
+    failedText: 'failed',
+    fetchImpl: async () => {
+      requests += 1;
+      return Response.json({ reason: 'task_processing' }, { status: 409 });
+    },
+    wait: async (delay) => waits.push(delay),
+    maxProcessingPolls: 2,
+    pollDelayMs: 10,
+  });
+
+  await assert.rejects(attempt, (error) => error.reason === 'task_processing');
+  assert.equal(requests, 3);
+  assert.deepEqual(waits, [10, 10]);
 });
 
 test('transparent pixel detection and PNG recognition are conservative', () => {
