@@ -82,8 +82,8 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css"/, file);
-    assert.match(html, /src="\/local-cleaner\.js"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-discoverability"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-discoverability"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
