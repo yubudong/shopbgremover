@@ -67,7 +67,7 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   const worker = await read('local-cleaner-worker.js');
   const core = await read('local-inpaint-core.mjs');
 
-  assert.match(cleaner, /new Worker\('\/local-cleaner-worker\.js', \{ type: 'module' \}\)/);
+  assert.match(cleaner, /new Worker\('\/local-cleaner-worker\.js\?v=20260725-preview-v3', \{ type: 'module' \}\)/);
   assert.match(cleaner, /decorateCard\(card, file, index/);
   assert.match(cleaner, /getSourceFile\(file\)/);
   assert.match(cleaner, /Only edit images you own or are authorized to modify/);
@@ -78,9 +78,11 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /shortcutButton\.disabled = cardButtons\.length === 0/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
   assert.match(cleaner, /event\.ctrlKey && !event\.metaKey/);
+  assert.match(cleaner, /const compositeMaskValues = dilateCompositeMask\(mask, workWidth, workHeight, 2\)/);
+  assert.match(cleaner, /compositeMaskValues\[index\] \? 255 : 0/);
   assert.match(cleaner, /repairedAreaContext\.globalCompositeOperation = 'destination-in'/);
   assert.match(worker, /import \{ dilateMask, inpaintRgba \}/);
-  assert.match(worker, /maskBuffer: expandedMask\.buffer/);
+  assert.doesNotMatch(worker, /maskBuffer: expandedMask\.buffer/);
   assert.match(worker, /sampleRadius: 6/);
   assert.match(worker, /smoothingPasses: 8/);
   assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
@@ -90,8 +92,8 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-workspace-v2"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-workspace-v2"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-preview-v3"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-preview-v3"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
@@ -106,8 +108,25 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     assert.match(html, /onApply: \(\{ previewUrl, restored \}\)/, file);
     assert.match(html, /resetProcessActionAfterLocalEdit\(restored = false\)/, file);
     assert.match(html, /badge\.textContent = restored \? '⏳' : '✏️'/, file);
+    assert.equal((html.match(/id="workspacePreview"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="workspacePreviewImage"/g) || []).length, 1, file);
+    assert.match(html, /function showWorkspacePreview\(index\)/, file);
+    assert.match(html, /function updateWorkspacePreview\(index, imageUrl\)/, file);
+    assert.match(html, /updateWorkspacePreview\(i, previewUrl\)/, file);
+    assert.match(html, /updateWorkspacePreview\(i, objUrl\)/, file);
+    assert.match(html, /card\.addEventListener\('click'/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 1, file);
   }
+});
+
+test('workspace preview and columns share a responsive aligned layout', async () => {
+  const css = await read('local-cleaner.css');
+  assert.match(css, /\.workspace\{align-items:stretch\}/);
+  assert.match(css, /\.canvas-area\{display:flex;flex-direction:column\}/);
+  assert.match(css, /\.settings-panel\{align-self:stretch\}/);
+  assert.match(css, /\.workspace-preview\.visible\{display:block\}/);
+  assert.match(css, /\.workspace-preview-stage\{/);
+  assert.match(css, /object-fit:contain/);
 });
 
 test('ZIP download is local-only and never invokes the AI endpoint', async () => {

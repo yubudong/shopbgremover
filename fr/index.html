@@ -273,7 +273,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260725-workspace-v2">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260725-preview-v3">
 </head>
 <body>
 
@@ -334,6 +334,14 @@
           <span class="fmt-chip">Jusqu'à 50 fichiers</span>
         </div>
         <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp">
+        <div class="workspace-preview" id="workspacePreview" aria-live="polite">
+          <div class="workspace-preview-head">
+            <div><strong>Aperçu du résultat</strong><span id="workspacePreviewName"></span></div>
+            <button type="button" id="workspacePreviewClose" aria-label="Fermer l’aperçu">×</button>
+          </div>
+          <div class="workspace-preview-stage"><img id="workspacePreviewImage" alt="Aperçu de l’image traitée"></div>
+          <p class="workspace-preview-help">Cliquez sur une autre vignette pour changer l’aperçu.</p>
+        </div>
       </div>
       <div class="image-grid" id="imageGrid"></div>
 
@@ -940,6 +948,40 @@ let selectedFiles   = [];
 
   const uploadArea = document.getElementById('uploadArea');
   const fileInput  = document.getElementById('fileInput');
+  const workspacePreview = document.getElementById('workspacePreview');
+  const workspacePreviewImage = document.getElementById('workspacePreviewImage');
+  const workspacePreviewName = document.getElementById('workspacePreviewName');
+  let activePreviewIndex = null;
+
+  function showWorkspacePreview(index) {
+    const card = document.getElementById(`card-${index}`);
+    const image = card?.querySelector('img');
+    if (!image?.src) return;
+    activePreviewIndex = index;
+    workspacePreviewImage.src = image.src;
+    workspacePreviewName.textContent = selectedFiles[index]?.name || '';
+    workspacePreview.classList.add('visible');
+    uploadArea.classList.add('has-preview');
+    document.querySelectorAll('.image-card').forEach(item => item.classList.remove('preview-active'));
+    card.classList.add('preview-active');
+  }
+
+  function updateWorkspacePreview(index, imageUrl) {
+    if (activePreviewIndex === index) workspacePreviewImage.src = imageUrl;
+  }
+
+  function hideWorkspacePreview() {
+    activePreviewIndex = null;
+    workspacePreview.classList.remove('visible');
+    uploadArea.classList.remove('has-preview');
+    document.querySelectorAll('.image-card').forEach(item => item.classList.remove('preview-active'));
+  }
+
+  workspacePreview.addEventListener('click', event => event.stopPropagation());
+  document.getElementById('workspacePreviewClose').addEventListener('click', event => {
+    event.stopPropagation();
+    hideWorkspacePreview();
+  });
 
   uploadArea.addEventListener('click',     () => fileInput.click());
   uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
@@ -998,9 +1040,22 @@ let selectedFiles   = [];
         onApply: ({ previewUrl, restored }) => {
           if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
           img.src = previewUrl;
+          updateWorkspacePreview(i, previewUrl);
           badge.textContent = restored ? '⏳' : '✏️';
           resetProcessActionAfterLocalEdit(restored);
         },
+      });
+      img.tabIndex = 0;
+      img.setAttribute('role', 'button');
+      img.setAttribute('aria-label', `Aperçu ${file.name}`);
+      card.addEventListener('click', event => {
+        if (!event.target.closest('.local-clean-card-btn')) showWorkspacePreview(i);
+      });
+      img.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          showWorkspacePreview(i);
+        }
       });
       grid.appendChild(card);
     });
@@ -1155,6 +1210,7 @@ let selectedFiles   = [];
             const objUrl = URL.createObjectURL(processedBlob);
             setTimeout(() => {
               card.querySelector('img').src = objUrl;
+              updateWorkspacePreview(i, objUrl);
               card.classList.remove('flipping');
               if (badge) badge.textContent = '✅';
             }, 300);
@@ -1245,6 +1301,6 @@ let selectedFiles   = [];
 
   loadUser();
 </script>
-<script src="/local-cleaner.js?v=20260725-workspace-v2"></script>
+<script src="/local-cleaner.js?v=20260725-preview-v3"></script>
 </body>
 </html>

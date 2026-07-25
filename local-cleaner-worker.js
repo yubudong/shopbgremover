@@ -14,8 +14,7 @@ self.addEventListener('message', (event) => {
     self.postMessage({
       id,
       rgbaBuffer: result.buffer,
-      maskBuffer: expandedMask.buffer,
-    }, [result.buffer, expandedMask.buffer]);
+    }, [result.buffer]);
   } catch (error) {
     self.postMessage({
       id,

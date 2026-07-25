@@ -203,16 +203,13 @@
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker('/local-cleaner-worker.js', { type: 'module' });
+    worker = new Worker('/local-cleaner-worker.js?v=20260725-preview-v3', { type: 'module' });
     worker.addEventListener('message', (event) => {
       const job = pendingWorkerJobs.get(event.data.id);
       if (!job) return;
       pendingWorkerJobs.delete(event.data.id);
       if (event.data.error) job.reject(new Error(event.data.error));
-      else job.resolve({
-        rgba: new Uint8ClampedArray(event.data.rgbaBuffer),
-        mask: new Uint8Array(event.data.maskBuffer),
-      });
+      else job.resolve(new Uint8ClampedArray(event.data.rgbaBuffer));
     });
     worker.addEventListener('error', () => {
       for (const job of pendingWorkerJobs.values()) job.reject(new Error(copy.failed));
@@ -235,6 +232,39 @@
         maskBuffer: mask.buffer,
       }, [imageData.data.buffer, mask.buffer]);
     });
+  }
+
+  function dilateCompositeMask(mask, width, height, radius = 2) {
+    if (radius <= 0) return mask.slice();
+    const horizontal = new Uint8Array(mask.length);
+    const output = new Uint8Array(mask.length);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        let selected = 0;
+        for (let offset = -radius; offset <= radius; offset += 1) {
+          const sampleX = x + offset;
+          if (sampleX >= 0 && sampleX < width && mask[y * width + sampleX]) {
+            selected = 1;
+            break;
+          }
+        }
+        horizontal[y * width + x] = selected;
+      }
+    }
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        let selected = 0;
+        for (let offset = -radius; offset <= radius; offset += 1) {
+          const sampleY = y + offset;
+          if (sampleY >= 0 && sampleY < height && horizontal[sampleY * width + x]) {
+            selected = 1;
+            break;
+          }
+        }
+        output[y * width + x] = selected;
+      }
+    }
+    return output;
   }
 
   async function bitmapFrom(blob) {
@@ -493,20 +523,22 @@
       const maskPixels = maskWorkContext.getImageData(0, 0, workWidth, workHeight).data;
       const mask = new Uint8Array(workWidth * workHeight);
       for (let index = 0; index < mask.length; index += 1) mask[index] = maskPixels[index * 4] > 127 ? 1 : 0;
+      const compositeMaskValues = dilateCompositeMask(mask, workWidth, workHeight, 2);
+      if (!compositeMaskValues.some(Boolean)) throw new Error(copy.noSelection);
 
       const result = await runInpaint(imageData, mask);
-      workContext.putImageData(new ImageData(result.rgba, workWidth, workHeight), 0, 0);
+      workContext.putImageData(new ImageData(result, workWidth, workHeight), 0, 0);
 
       const compositeMask = document.createElement('canvas');
       compositeMask.width = workWidth;
       compositeMask.height = workHeight;
       const compositeMaskContext = compositeMask.getContext('2d');
       const compositeMaskPixels = compositeMaskContext.createImageData(workWidth, workHeight);
-      for (let index = 0; index < result.mask.length; index += 1) {
+      for (let index = 0; index < compositeMaskValues.length; index += 1) {
         compositeMaskPixels.data[index * 4] = 255;
         compositeMaskPixels.data[index * 4 + 1] = 255;
         compositeMaskPixels.data[index * 4 + 2] = 255;
-        compositeMaskPixels.data[index * 4 + 3] = result.mask[index] ? 255 : 0;
+        compositeMaskPixels.data[index * 4 + 3] = compositeMaskValues[index] ? 255 : 0;
       }
       compositeMaskContext.putImageData(compositeMaskPixels, 0, 0);
 
