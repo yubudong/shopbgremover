@@ -630,7 +630,7 @@ test('localized referral centers fully translate static and dynamic states', asy
     const html = await read(file);
     assert.match(html, new RegExp(`<html lang="${language}">`), file);
     assert.match(html, new RegExp(`<h1>${heading}</h1>`), file);
-    assert.match(html, /href="\/referrals-localized\.css\?v=20260727-account-nav-v1"/, file);
+    assert.match(html, /href="\/referrals-localized\.css\?v=20260727-account-nav-v2"/, file);
     assert.match(html, /src="\/referrals-localized\.js\?v=20260727-account-nav-v1"/, file);
     assert.match(html, /hreflang="en"/, file);
     assert.match(html, /hreflang="de"/, file);
