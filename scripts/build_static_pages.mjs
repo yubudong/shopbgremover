@@ -38,6 +38,8 @@ const rootFiles = [
   'shopify-background-remover.html',
   'sitemap.xml',
   'terms.html',
+  'workspace-ui.css',
+  'workspace-ui.js',
 ];
 
 const publicAssets = [

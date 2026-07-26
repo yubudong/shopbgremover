@@ -490,6 +490,8 @@ test('Pages build contains only the canonical static site', async () => {
     'local-cleaner.js',
     'local-cleaner-worker.js',
     'local-inpaint-core.mjs',
+    'workspace-ui.css',
+    'workspace-ui.js',
     'admin.html',
     'admin-vouchers.html',
     'admin-referrals.html',
@@ -514,6 +516,32 @@ test('Pages build contains only the canonical static site', async () => {
   await assert.rejects(readFile(path.join(output, 'worker', 'index.js')));
   await assert.rejects(readFile(path.join(output, 'test-paypal.html')));
   await assert.rejects(readFile(path.join(output, 'public', 'index.html')));
+});
+
+test('localized workspaces share the compact progressive UI without network behavior', async () => {
+  const styles = await read('workspace-ui.css');
+  const script = await read('workspace-ui.js');
+
+  for (const file of indexFiles) {
+    const html = await read(file);
+    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-workspace-ui-v1"/, file);
+    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-workspace-ui-v1"/, file);
+  }
+
+  assert.match(styles, /\.canvas-area \.tool-features\{flex:none\}/);
+  assert.match(styles, /grid-template-columns:minmax\(0,1fr\) 370px/);
+  assert.match(styles, /max-height:calc\(100vh - 88px\)/);
+  assert.match(styles, /\.workspace-has-images \.tool-features\{display:none\}/);
+  assert.match(styles, /\.workspace-section\.collapsed \.workspace-section-body\{display:none\}/);
+  assert.match(styles, /@media\(max-width:1100px\)/);
+  assert.match(styles, /@media\(max-width:520px\)/);
+  assert.match(script, /new MutationObserver\(update\)/);
+  assert.match(script, /group\.querySelector\('\.background-mode-grid'\)/);
+  assert.match(script, /group\.querySelector\('\.size-grid'\)/);
+  for (const copy of ['Choose images', 'Bilder auswählen', 'Elegir imágenes', 'Choisir des images', 'Escolher imagens', '选择图片']) {
+    assert.ok(script.includes(copy), copy);
+  }
+  assert.doesNotMatch(script, /\bfetch\s*\(|XMLHttpRequest|\/api\//);
 });
 
 test('pricing links to the server-backed Xianyu voucher redemption page', async () => {
