@@ -3627,10 +3627,14 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 独立浏览器身份已退出推荐人账号，重新访问推荐链接并打开邮箱登录弹窗
 - 邮箱登录阻塞与账号核对：
   - 用户提供的 ProtonMail 测试地址在生产库中已于 2026-03-31 创建，当前为 55 积分、`total_used 0`、无完成充值、无推荐关系；它仍符合卡密首次充值时绑定推荐人的业务条件，但不符合原授权中的“全新账号”，继续使用前需要用户重新确认
+  - 用户随后明确授权继续使用该“已有但从未充值、从未绑定推荐”的 ProtonMail 账号；争议冲正后必须回到原有 55 积分
   - 页面和一次受控接口重试均未成功发送验证码；Resend 返回 403 `The shopbgremover.com domain is not verified`
   - Worker 已配置 `RESEND_API_KEY` 和 `RESEND_FROM` secret；Resend 账号当前只验证了 `ecomsellerkit.com`，尚未添加 `shopbgremover.com`
   - 两次发送尝试只更新同一条 `email_otps` 记录，邮件均未交付、验证码尝试次数仍为 0；不得通过读取生产 D1 中的验证码绕过邮箱所有权验证
   - 失败后只读复核确认测试卡仍为 `reserved`、无兑换账号，推荐关系仍为 0，推荐人仍为 `1185` 积分、`total_used 207`
+  - 用户授权新增并验证 `shopbgremover.com` 及只新增 Resend DNS 记录后，Resend 页面显示当前套餐仅含 1 个域名且名额已被 `ecomsellerkit.com` 使用；新增第二域名要求升级到 `$20/月`
+  - Resend 的新建团队入口同样明确标记为付费功能；未点击升级、未购买、未创建团队、未新增域名、未改 DNS
+  - 可行的无付费降级方案是把生产 `RESEND_FROM` 改为现有已验证域名下的地址，但会改变生产 Worker secret、Worker 版本和用户看到的发件域名，执行前需要独立确认
 - 当前状态：🟡 测试卡生成子阶段已完成，真实推荐闭环被生产邮件域名未验证和测试邮箱并非全新账号共同阻塞；卡片保持 `reserved`，未兑换、未发积分、未产生推荐关系
 - 是否部署：无需部署；当前 Pages 和 Worker 版本均未变化
-- 下一步：由用户确认是否允许在 Resend 新增并验证 `shopbgremover.com`、在 Cloudflare DNS 添加 Resend 要求的记录；同时确认继续使用这个“已有但从未充值/绑定推荐”的 ProtonMail 账号，或提供真正全新的邮箱。完成邮箱验证后再继续兑换、审核和争议冲正
+- 下一步：由用户决定是授权 `$20/月` Resend 升级后验证品牌域名，还是授权把生产 `RESEND_FROM` 改为 `ShopBG Remover <login@ecomsellerkit.com>` 的无付费降级方案。邮件可交付后再继续兑换、审核和争议冲正
