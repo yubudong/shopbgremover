@@ -72,8 +72,9 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5f-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage6a-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage6a-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage6a-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -84,8 +85,8 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /id="aiSessionClear"/, file);
     assert.match(html, /data-session-restored=/, file);
     assert.match(html, /getSessionOwner: \(\) => currentUser\?\.id/, file);
-    assert.match(html, /getCompositionState: \(\) => \(\{ bgMode, customHex, outputSize, renameMode \}\)/, file);
-    assert.match(html, /restoreFiles: \(items, composition\)/, file);
+    assert.match(html, /getCompositionState: \(\) => \(\{ \.\.\.backgroundComposer\.getState\(\), outputSize, renameMode \}\)/, file);
+    assert.match(html, /restoreFiles: async \(items, composition\)/, file);
     assert.match(html, /handleFiles\(files, \{ restoredItems = \[\] \} = \{\}\)/, file);
     assert.match(html, /initialSource: restoredItem\?\.sourceBlob \|\| null/, file);
     assert.match(html, /window\.addEventListener\('load'[\s\S]*aiWorkflow\.restoreSession\(\)/, file);
@@ -95,6 +96,12 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/id="downloadBtn"/g) || []).length, 1, file);
     assert.match(html, /function setDownloadActions\(outputs, keepProcessReady = false\)/, file);
     assert.match(html, /setDownloadActions\(outputs, aiWorkflow\.getPlan\(\)\.aiCount > 0\)/, file);
+    assert.equal((html.match(/id="bgImage"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundImageInput"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundFit"/g) || []).length, 1, file);
+    assert.match(html, /accept="\.jpg,\.jpeg,\.png,\.webp,image\/jpeg,image\/png,image\/webp"/, file);
+    assert.match(html, /validateComposition: \(\{ jobs \}\) => backgroundComposer\.validateJobs\(jobs\)/, file);
+    assert.match(html, /return backgroundComposer\.compose\(inputBlob, outputSize\)/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
   }
 });
@@ -178,6 +185,16 @@ test('ZIP download is local-only and never invokes the AI endpoint', async () =>
   }
 });
 
+test('uploaded background validation and composition stay browser-local', async () => {
+  const composer = await read('background-composer.js');
+  assert.match(composer, /MAX_BACKGROUND_BYTES = 20 \* 1024 \* 1024/);
+  assert.match(composer, /new Set\(\['image\/jpeg', 'image\/png', 'image\/webp'\]\)/);
+  assert.match(composer, /getImagePlacement/);
+  assert.match(composer, /context\.drawImage\(\s*background/);
+  assert.doesNotMatch(composer, /\bfetch\s*\(/);
+  assert.doesNotMatch(composer, /\/api\/|https?:\/\//);
+});
+
 test('localized pricing exposes only the three confirmed USD packs', async () => {
   for (const file of pricingFiles) {
     const html = await read(file);
@@ -246,6 +263,7 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
     'admin-referrals.html',
     'ai-workflow.css',
     'ai-workflow.js',
+    'background-composer.js',
     'test-paypal.html',
     'shopify-background-remover.html',
     'amazon-ebay-product-images.html',
@@ -277,6 +295,7 @@ test('Pages build contains only the canonical static site', async () => {
     'credits.html',
     'credits-center.css',
     'credits-center.js',
+    'background-composer.js',
     'redeem.html',
     'referrals.html',
     'referrals-localized.css',

@@ -130,14 +130,15 @@
     };
   }
 
-  function sessionByteSize(items) {
-    return items.reduce((total, item) => (
+  function sessionByteSize(items, composition = {}) {
+    const itemBytes = items.reduce((total, item) => (
       total
       + Number(item.file?.size || 0)
       + Number(item.sourceBlob?.size || 0)
       + Number(item.job?.foregroundBlob?.size || 0)
       + Number(item.job?.outputBlob?.size || 0)
     ), 0);
+    return itemBytes + Number(composition.backgroundImageBlob?.size || 0);
   }
 
   function buildSessionRecord({
@@ -164,7 +165,7 @@
       schemaVersion: SESSION_SCHEMA_VERSION,
       updatedAt: now,
       expiresAt: now + SESSION_TTL_MS,
-      byteSize: sessionByteSize(items),
+      byteSize: sessionByteSize(items, composition),
       composition: composition || {},
       items,
     };
@@ -579,6 +580,14 @@
     }
 
     async function preflight(plan) {
+      const compositionError = options.validateComposition?.({
+        jobs: jobs.filter(Boolean),
+        plan,
+      });
+      if (compositionError) {
+        options.setStatus(compositionError);
+        return false;
+      }
       if (plan.aiCount > 0) {
         let creditData;
         try {

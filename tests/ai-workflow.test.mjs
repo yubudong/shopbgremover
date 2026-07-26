@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 await import('../ai-workflow.js');
+await import('../background-composer.js');
 
 const {
   applyTransparencyResult,
@@ -20,6 +21,56 @@ const {
   SESSION_TTL_MS,
   TRANSPARENCY_DETECTOR_VERSION,
 } = globalThis.ShopBGAiWorkflow;
+const {
+  getImagePlacement,
+  validateBackgroundFile,
+  MAX_BACKGROUND_BYTES,
+} = globalThis.ShopBGBackgroundComposer;
+
+test('uploaded background files accept only JPG, PNG, or WebP up to 20 MB', () => {
+  const png = new Blob(['png'], { type: 'image/png' });
+  Object.defineProperty(png, 'name', { value: 'background.png' });
+  assert.equal(validateBackgroundFile(png), null);
+
+  const webpWithoutMime = new Blob(['webp']);
+  Object.defineProperty(webpWithoutMime, 'name', { value: 'background.webp' });
+  assert.equal(validateBackgroundFile(webpWithoutMime), null);
+
+  const svg = new Blob(['svg'], { type: 'image/svg+xml' });
+  Object.defineProperty(svg, 'name', { value: 'background.svg' });
+  assert.equal(validateBackgroundFile(svg), 'type');
+
+  const disguisedSvg = new Blob(['svg'], { type: 'image/svg+xml' });
+  Object.defineProperty(disguisedSvg, 'name', { value: 'background.png' });
+  assert.equal(validateBackgroundFile(disguisedSvg), 'type');
+
+  const oversized = new Blob([new Uint8Array(MAX_BACKGROUND_BYTES + 1)], {
+    type: 'image/jpeg',
+  });
+  Object.defineProperty(oversized, 'name', { value: 'large.jpg' });
+  assert.equal(validateBackgroundFile(oversized), 'size');
+});
+
+test('background fit defaults to centered cover and supports contain and stretch', () => {
+  assert.deepEqual(getImagePlacement(1600, 900, 1000, 1000), {
+    x: -388.8888888888889,
+    y: 0,
+    width: 1777.7777777777778,
+    height: 1000,
+  });
+  assert.deepEqual(getImagePlacement(1600, 900, 1000, 1000, 'contain'), {
+    x: 0,
+    y: 218.75,
+    width: 1000,
+    height: 562.5,
+  });
+  assert.deepEqual(getImagePlacement(1600, 900, 1000, 1000, 'stretch'), {
+    x: 0,
+    y: 0,
+    width: 1000,
+    height: 1000,
+  });
+});
 
 test('AI plan charges only uncached opaque jobs that explicitly request AI', () => {
   const jobs = [
@@ -423,5 +474,7 @@ test('refresh recovery size includes every persisted image blob', () => {
       foregroundBlob: { size: 30 },
       outputBlob: { size: 40 },
     },
-  }]), 100);
+  }], {
+    backgroundImageBlob: { size: 50 },
+  }), 150);
 });

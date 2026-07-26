@@ -12,6 +12,7 @@ const rootFiles = [
   'admin-referrals.html',
   'ai-workflow.css',
   'ai-workflow.js',
+  'background-composer.js',
   'amazon-ebay-product-images.html',
   'contact.html',
   'credits.html',

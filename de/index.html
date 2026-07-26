@@ -52,7 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260725-ai-stage5f-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6a-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6a-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -275,7 +276,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260725-ai-stage5b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6a-v1">
 </head>
 <body>
 
@@ -438,7 +439,7 @@
 
       <div class="setting-group">
         <span class="setting-label">Hintergrund</span>
-        <div class="bg-row">
+        <div class="bg-row background-mode-grid">
           <button class="bg-btn active" id="bgWhite" onclick="setBg('white')">
             ⬜ Weiß<br><span style="font-size:10px;opacity:0.6">#FFFFFF</span>
           </button>
@@ -448,11 +449,39 @@
           <button class="bg-btn" id="bgCustom" onclick="setBg('custom')">
             🎨 Benutzerdefiniert<br><span style="font-size:10px;opacity:0.6">HEX</span>
           </button>
+          <button class="bg-btn" id="bgImage" onclick="setBg('image')">
+            🖼 Hochladen<br><span style="font-size:10px;opacity:0.6">JPG · PNG · WebP</span>
+          </button>
         </div>
         <div class="color-row" id="colorRow" style="display:none">
           <input type="color" id="customColorPicker" value="#F0F0F0" oninput="syncColor('picker')">
           <input type="text" id="customColorHex" value="#F0F0F0" maxlength="7" placeholder="#FFFFFF" oninput="syncColor('hex')">
           <span class="color-label">HEX-Farbe</span>
+        </div>
+        <div class="background-image-panel" id="backgroundImagePanel" hidden
+          data-type-error="Wähle ein Hintergrundbild als JPG, PNG oder WebP."
+          data-size-error="Das Hintergrundbild darf höchstens 20 MB groß sein."
+          data-decode-error="Dieses Hintergrundbild konnte im Browser nicht geöffnet werden."
+          data-missing-error="Lade vor der Verarbeitung ein gültiges Hintergrundbild hoch."
+          data-needs-foreground="{count} Bild(er) haben kein transparentes Motiv. Aktiviere dafür KI oder lade transparente PNG-Dateien hoch."
+          data-ready="Hintergrund „{name}“ ist bereit. Verarbeite die Bilder, um ihn lokal anzuwenden."
+          data-removed="Hochgeladener Hintergrund entfernt. Weißer Hintergrund wiederhergestellt."
+          data-restored-name="Wiederhergestellter Hintergrund"
+          data-empty-name="Hochgeladener Hintergrund">
+          <input id="backgroundImageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
+          <div class="background-image-head">
+            <span class="background-image-name" id="backgroundImageName"></span>
+            <button class="background-image-remove" id="backgroundImageRemove" type="button">Entfernen</button>
+          </div>
+          <div class="background-fit-row">
+            <label for="backgroundFit">Anpassung</label>
+            <select id="backgroundFit">
+              <option value="cover">Füllen &amp; zuschneiden</option>
+              <option value="contain">Vollständig anzeigen</option>
+              <option value="stretch">Strecken</option>
+            </select>
+          </div>
+          <small class="background-local-note">Nur bis zu 24 Stunden in diesem Browser gespeichert · max. 20 MB</small>
         </div>
       </div>
 
@@ -787,26 +816,18 @@
 let selectedFiles   = [];
   let processedResults = [];
   let aiWorkflow = null;
+  let backgroundComposer = null;
   let currentUser     = null;
-  let bgMode          = 'white';
-  let customHex       = '#F0F0F0';
   let outputSize      = 'original';
   let renameMode      = 'original';
 
-  function restoreCompositionState(settings = {}) {
-    const validBackgrounds = new Set(['white', 'transparent', 'custom']);
+  async function restoreCompositionState(settings = {}) {
     const validSizes = new Set(['2048', '1000', '500', 'original']);
     const validRenameModes = new Set(['original', 'sequence', 'date']);
-    if (validBackgrounds.has(settings.bgMode)) bgMode = settings.bgMode;
-    if (/^#[0-9A-Fa-f]{6}$/.test(settings.customHex || '')) customHex = settings.customHex;
+    await backgroundComposer.restore(settings);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
 
-    ['bgWhite','bgTransparent','bgCustom'].forEach(id => document.getElementById(id).classList.remove('active'));
-    document.getElementById({ white: 'bgWhite', transparent: 'bgTransparent', custom: 'bgCustom' }[bgMode]).classList.add('active');
-    document.getElementById('colorRow').style.display = bgMode === 'custom' ? 'flex' : 'none';
-    document.getElementById('customColorPicker').value = customHex;
-    document.getElementById('customColorHex').value = customHex.toUpperCase();
     document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
     document.querySelectorAll('.rename-opt').forEach((option, index) => {
       option.classList.toggle('active', ['original', 'sequence', 'date'][index] === renameMode);
@@ -814,28 +835,11 @@ let selectedFiles   = [];
   }
 
   function setBg(mode) {
-    bgMode = mode;
-    ['bgWhite','bgTransparent','bgCustom'].forEach(id => document.getElementById(id).classList.remove('active'));
-    const map = { white: 'bgWhite', transparent: 'bgTransparent', custom: 'bgCustom' };
-    document.getElementById(map[mode]).classList.add('active');
-    document.getElementById('colorRow').style.display = mode === 'custom' ? 'flex' : 'none';
-    aiWorkflow?.markCompositionChanged();
+    backgroundComposer.setMode(mode);
 }
 
   function syncColor(from) {
-    const picker = document.getElementById('customColorPicker');
-    const hex    = document.getElementById('customColorHex');
-    if (from === 'picker') {
-      hex.value = picker.value.toUpperCase();
-      customHex = picker.value;
-    } else {
-      const val = hex.value.trim();
-      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-        picker.value = val;
-        customHex = val;
-      }
-    }
-    aiWorkflow?.markCompositionChanged();
+    backgroundComposer.syncColor(from);
 }
 
   function setSize(el, val) {
@@ -1199,38 +1203,7 @@ let selectedFiles   = [];
   }
 
   async function applyBackground(inputBlob) {
-    return new Promise(resolve => {
-      const url = URL.createObjectURL(inputBlob);
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        const ctx    = canvas.getContext('2d');
-        let canvasW, canvasH, drawW, drawH, drawX, drawY;
-        if (outputSize === 'original') {
-          canvasW = img.naturalWidth;
-          canvasH = img.naturalHeight;
-          drawW = canvasW; drawH = canvasH; drawX = 0; drawY = 0;
-        } else {
-          const sz = parseInt(outputSize);
-          canvasW  = sz; canvasH = sz;
-          const scale = Math.min(sz / img.naturalWidth, sz / img.naturalHeight) * 0.9;
-          drawW = Math.round(img.naturalWidth  * scale);
-          drawH = Math.round(img.naturalHeight * scale);
-          drawX = Math.round((sz - drawW) / 2);
-          drawY = Math.round((sz - drawH) / 2);
-        }
-        canvas.width  = canvasW;
-        canvas.height = canvasH;
-        if (bgMode !== 'transparent') {
-          ctx.fillStyle = bgMode === 'white' ? '#FFFFFF' : customHex;
-          ctx.fillRect(0, 0, canvasW, canvasH);
-        }
-        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-        canvas.toBlob(resolve, 'image/png');
-      };
-      img.src = url;
-    });
+    return backgroundComposer.compose(inputBlob, outputSize);
   }
 
   function getFileName(originalName, seqIndex) {
@@ -1328,20 +1301,26 @@ let selectedFiles   = [];
     }
   });
 
+  backgroundComposer = window.ShopBGBackgroundComposer.create({
+    onChanged: () => aiWorkflow?.markCompositionChanged(),
+    onStatus: setStatus,
+  });
+
   aiWorkflow = window.ShopBGAiWorkflow.create({
     api: API,
     deviceId: DEVICE_ID,
     getFiles: () => selectedFiles,
     getCurrentUser: () => currentUser,
     getSessionOwner: () => currentUser?.id ? `user:${currentUser.id}` : `device:${DEVICE_ID}`,
-    getCompositionState: () => ({ bgMode, customHex, outputSize, renameMode }),
-    restoreFiles: (items, composition) => {
-      restoreCompositionState(composition);
+    getCompositionState: () => ({ ...backgroundComposer.getState(), outputSize, renameMode }),
+    restoreFiles: async (items, composition) => {
+      await restoreCompositionState(composition);
       handleFiles(items.map(item => item.file), { restoredItems: items });
     },
     getSourceFile: (file) => window.ShopBGLocalCleaner?.getSourceFile(file) || file,
     compressToDataUrl,
     applyBackground,
+    validateComposition: ({ jobs }) => backgroundComposer.validateJobs(jobs),
     getFileName,
     setStatus,
     showRegisterModal,
@@ -1408,7 +1387,10 @@ let selectedFiles   = [];
           headers: { 'Content-Type': 'application/json', 'X-Device-ID': DEVICE_ID },
           body: JSON.stringify({
             file_count: outputs.length,
-            settings: { bgMode, ai_calls: actualAiCalls },
+            settings: {
+              bgMode: backgroundComposer.getState().bgMode,
+              ai_calls: actualAiCalls,
+            },
           }),
         });
         loadUser();
