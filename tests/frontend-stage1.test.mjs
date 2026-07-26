@@ -72,7 +72,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5e-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260725-ai-stage5f-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260725-ai-stage5b-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);

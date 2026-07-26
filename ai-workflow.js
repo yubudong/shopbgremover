@@ -10,6 +10,7 @@
   const TRANSPARENCY_ALPHA_THRESHOLD = 250;
   const MIN_TRANSPARENCY_EQUIVALENT_PIXELS = 16;
   const MIN_TRANSPARENCY_EQUIVALENT_RATIO = 0.02;
+  const TRANSPARENCY_DETECTOR_VERSION = 2;
 
   function format(template, values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => (
@@ -41,6 +42,22 @@
 
   function isPng(file) {
     return file?.type === 'image/png' || /\.png$/i.test(file?.name || '');
+  }
+
+  function applyTransparencyResult(job, transparent) {
+    const upgradedOpaqueResult = (
+      job.transparencyDetectorVersion !== TRANSPARENCY_DETECTOR_VERSION
+      && job.transparent === true
+      && transparent === false
+    );
+    job.transparent = transparent;
+    job.transparencyDetectorVersion = TRANSPARENCY_DETECTOR_VERSION;
+    if (transparent) {
+      job.aiRequested = false;
+    } else if (upgradedOpaqueResult) {
+      job.aiRequested = true;
+    }
+    return job;
   }
 
   function planJobs(jobs) {
@@ -81,8 +98,12 @@
 
   function resetJobForSource(job, taskId = DEFAULT_TASK_ID()) {
     const hadAiResult = Boolean(job.hadAiResult || job.foregroundBlob);
+    const wasAutoTransparent = job.transparent === true;
     job.sourceVersion += 1;
     job.taskId = taskId;
+    job.transparent = null;
+    job.transparencyDetectorVersion = 0;
+    if (wasAutoTransparent) job.aiRequested = true;
     job.foregroundBlob = null;
     job.outputBlob = null;
     job.outputName = null;
@@ -98,6 +119,7 @@
       sourceVersion: Number(job.sourceVersion || 0),
       aiRequested: Boolean(job.aiRequested),
       transparent: typeof job.transparent === 'boolean' ? job.transparent : null,
+      transparencyDetectorVersion: Number(job.transparencyDetectorVersion || 0),
       foregroundBlob: job.foregroundBlob || null,
       outputBlob: job.outputBlob || null,
       outputName: job.outputName || null,
@@ -432,18 +454,18 @@
 
     async function refreshTransparency(job, source) {
       const detectionToken = Symbol('transparency');
+      const hadStoredTransparency = typeof job.transparent === 'boolean';
       job.detectionToken = detectionToken;
       job.status = 'checking';
       syncCard(job);
       try {
         const transparent = await detectTransparency(source);
         if (job.detectionToken !== detectionToken) return;
-        job.transparent = transparent;
-        if (transparent) job.aiRequested = false;
+        applyTransparencyResult(job, transparent);
         job.status = 'ready';
       } catch {
         if (job.detectionToken !== detectionToken) return;
-        job.transparent = false;
+        if (!hadStoredTransparency) applyTransparencyResult(job, false);
         job.status = 'ready';
       }
       sync({ notify: true });
@@ -491,6 +513,9 @@
         sourceVersion: Number(restored?.sourceVersion || 0),
         aiRequested: restored ? Boolean(restored.aiRequested) : globalToggle.checked,
         transparent: typeof restored?.transparent === 'boolean' ? restored.transparent : null,
+        transparencyDetectorVersion: restored
+          ? Number(restored.transparencyDetectorVersion || 0)
+          : TRANSPARENCY_DETECTOR_VERSION,
         foregroundBlob: restored?.foregroundBlob || null,
         outputBlob: restored?.outputBlob || null,
         outputName: restored?.outputName || null,
@@ -507,7 +532,10 @@
       jobs[index] = job;
       createCardControl(job, card);
       sync({ notify: true });
-      if (typeof job.transparent === 'boolean') {
+      if (
+        typeof job.transparent === 'boolean'
+        && job.transparencyDetectorVersion === TRANSPARENCY_DETECTOR_VERSION
+      ) {
         syncCard(job);
         schedulePersist();
       } else {
@@ -773,6 +801,7 @@
 
   globalThis.ShopBGAiWorkflow = {
     create,
+    applyTransparencyResult,
     format,
     hasMeaningfulTransparency,
     isPng,
@@ -788,5 +817,6 @@
     SESSION_TTL_MS,
     TASK_PROCESSING_MAX_POLLS,
     TASK_PROCESSING_POLL_DELAY_MS,
+    TRANSPARENCY_DETECTOR_VERSION,
   };
 })();

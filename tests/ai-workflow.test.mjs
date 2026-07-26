@@ -4,6 +4,7 @@ import test from 'node:test';
 await import('../ai-workflow.js');
 
 const {
+  applyTransparencyResult,
   buildSessionRecord,
   fetchAiResult,
   format,
@@ -17,6 +18,7 @@ const {
   SESSION_MAX_BYTES,
   SESSION_SCHEMA_VERSION,
   SESSION_TTL_MS,
+  TRANSPARENCY_DETECTOR_VERSION,
 } = globalThis.ShopBGAiWorkflow;
 
 test('AI plan charges only uncached opaque jobs that explicitly request AI', () => {
@@ -64,6 +66,24 @@ test('source edits invalidate only that job and create a new stable task identit
   // the same task id and let the Worker reuse or retry the existing task.
   job.status = 'failed';
   assert.equal(job.taskId, 'task-new');
+});
+
+test('source edits reset transparency detection and restore the default AI choice', () => {
+  const job = {
+    sourceVersion: 1,
+    taskId: 'transparent-old',
+    aiRequested: false,
+    transparent: true,
+    transparencyDetectorVersion: TRANSPARENCY_DETECTOR_VERSION,
+    foregroundBlob: null,
+    outputBlob: null,
+    status: 'ready',
+  };
+
+  resetJobForSource(job, 'transparent-edited');
+  assert.equal(job.transparent, null);
+  assert.equal(job.transparencyDetectorVersion, 0);
+  assert.equal(job.aiRequested, true);
 });
 
 test('a retry polls the same processing task and reports a reused Worker result', async () => {
@@ -241,6 +261,41 @@ test('meaningful transparency ignores isolated alpha noise and thin semi-transpa
   );
 });
 
+test('old restored transparency decisions are upgraded without clearing valid state', () => {
+  const oldNoise = {
+    aiRequested: false,
+    transparent: true,
+    transparencyDetectorVersion: 0,
+    foregroundBlob: null,
+    outputBlob: null,
+  };
+  applyTransparencyResult(oldNoise, false);
+  assert.equal(oldNoise.transparent, false);
+  assert.equal(oldNoise.aiRequested, true);
+  assert.equal(oldNoise.transparencyDetectorVersion, TRANSPARENCY_DETECTOR_VERSION);
+
+  const oldCutout = {
+    aiRequested: false,
+    transparent: true,
+    transparencyDetectorVersion: 0,
+    foregroundBlob: null,
+    outputBlob: { preserved: true },
+  };
+  const preservedOutput = oldCutout.outputBlob;
+  applyTransparencyResult(oldCutout, true);
+  assert.equal(oldCutout.transparent, true);
+  assert.equal(oldCutout.aiRequested, false);
+  assert.equal(oldCutout.outputBlob, preservedOutput);
+
+  const manualSkip = {
+    aiRequested: false,
+    transparent: false,
+    transparencyDetectorVersion: 0,
+  };
+  applyTransparencyResult(manualSkip, false);
+  assert.equal(manualSkip.aiRequested, false);
+});
+
 test('PNG recognition accepts MIME type or case-insensitive extension', () => {
   assert.equal(isPng({ type: 'image/png', name: 'asset.bin' }), true);
   assert.equal(isPng({ type: '', name: 'asset.PNG' }), true);
@@ -267,6 +322,7 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
     sourceVersion: 2,
     aiRequested: true,
     transparent: false,
+    transparencyDetectorVersion: TRANSPARENCY_DETECTOR_VERSION,
     foregroundBlob: foreground,
     outputBlob: output,
     outputName: 'product-clean.png',
@@ -296,6 +352,10 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
   assert.equal(record.items[0].file, original);
   assert.equal(record.items[0].sourceBlob, edited);
   assert.equal(record.items[0].job.taskId, 'stable-task');
+  assert.equal(
+    record.items[0].job.transparencyDetectorVersion,
+    TRANSPARENCY_DETECTOR_VERSION,
+  );
   assert.equal(record.items[0].job.foregroundBlob, foreground);
   assert.equal(record.items[0].job.outputBlob, output);
   assert.deepEqual(record.composition, {
