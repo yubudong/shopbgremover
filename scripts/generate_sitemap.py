@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成 sitemap.xml — 35 URL（7 页面 × 5 语种）+ hreflang alternates。
+"""生成 sitemap.xml — 42 URL（7 页面 × 6 语种）+ hreflang alternates。
 URL 用无 .html 格式（跟线上 CF Pages 308 后的 canonical 一致）。"""
 
 from pathlib import Path
@@ -16,6 +16,7 @@ LANGS = [
     ("en", ""),
     ("es", "/es"),
     ("pt-BR", "/pt-br"),
+    ("zh-CN", "/zh-cn"),
     ("de", "/de"),
     ("fr", "/fr"),
 ]

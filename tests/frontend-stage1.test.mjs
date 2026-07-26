@@ -5,11 +5,20 @@ import path from 'node:path';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/'];
+const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/', 'zh-cn/'];
 const indexFiles = locales.map((locale) => `${locale}index.html`);
 const pricingFiles = locales.map((locale) => `${locale}pricing.html`);
 const termsFiles = locales.map((locale) => `${locale}terms.html`);
-const localizedReferralFiles = ['de/', 'es/', 'fr/', 'pt-br/'].map(
+const publicSeoFiles = locales.flatMap((locale) => [
+  'index.html',
+  'pricing.html',
+  'shopify-background-remover.html',
+  'amazon-ebay-product-images.html',
+  'contact.html',
+  'privacy.html',
+  'terms.html',
+].map((file) => `${locale}${file}`));
+const localizedReferralFiles = ['de/', 'es/', 'fr/', 'pt-br/', 'zh-cn/'].map(
   (locale) => `${locale}referrals.html`,
 );
 const paypalClientId =
@@ -101,7 +110,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/id="productOrganizerPanel"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productOrganizerOpen"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productOrganizerSummary"/g) || []).length, 1, file);
-    assert.match(html, /data-dialog-subtitle="[^"]+(?:browser|Browser|navegador|navigateur)[^"]*"/i, file);
+    assert.match(html, /data-dialog-subtitle="[^"]+(?:browser|Browser|navegador|navigateur|浏览器)[^"]*"/i, file);
     assert.match(html, /data-root-preview=/, file);
     assert.match(html, /restoreFiles: async \(items, composition\)/, file);
     assert.match(html, /handleFiles\(files, \{ restoredItems = \[\] \} = \{\}\)/, file);
@@ -173,10 +182,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /data-tiktok-disabled="[^"]*WebP[^"]*"/i, file);
     assert.match(html, /data-tiktok-disabled="[^"]*TikTok Shop[^"]*"/i, file);
     assert.match(html, /data-shopee-note="[^"]+Shopee[^"]+1024 × 1024[^"]+2 (?:MB|Mo)[^"]*"/i, file);
-    assert.match(html, /data-shopee-note="[^"]+(?:market|Markt|mercado|marché)[^"]*"/i, file);
+    assert.match(html, /data-shopee-note="[^"]+(?:market|Markt|mercado|marché|市场)[^"]*"/i, file);
     assert.match(html, /data-shopee-disabled="[^"]*WebP[^"]*"/i, file);
     assert.match(html, /data-shopee-too-large="[^"]+2 (?:MB|Mo)[^"]+(?:JPEG)[^"]*"/i, file);
-    assert.match(html, /data-jpeg-note="[^"]+(?:white|weiß|blanco|blanc|branco)[^"]*"/i, file);
+    assert.match(html, /data-jpeg-note="[^"]+(?:white|weiß|blanco|blanc|branco|白色)[^"]*"/i, file);
     assert.match(html, /accept="\.jpg,\.jpeg,\.png,\.webp,image\/jpeg,image\/png,image\/webp"/, file);
     assert.match(html, /validateComposition: \(\{ jobs \}\) => backgroundComposer\.validateJobs\(jobs\)/, file);
     assert.match(html, /backgroundComposer\?\.decorateCard\(card, i, file\.name\)/, file);
@@ -260,7 +269,7 @@ test('marketplace guides use verified current image limits without compliance gu
     const html = await read(file);
     assert.match(html, /2048×2048/, file);
     assert.match(html, /5000×5000/, file);
-    assert.match(html, /25 (?:megapixels|Megapixel|megapíxeles|mégapixels)/i, file);
+    assert.match(html, /25(?: (?:megapixels|Megapixel|megapíxeles|mégapixels)|00 万像素)/i, file);
     assert.match(html, /(?:20 MB|20 Mo)/, file);
     assert.doesNotMatch(html, /800×800|4472×4472|80–90/, file);
   }
@@ -364,7 +373,7 @@ test('localized privacy pages disclose browser-only 24-hour workspace recovery',
   for (const file of privacyFiles) {
     const html = await read(file);
     assert.match(html, /IndexedDB/i, file);
-    assert.match(html, /24 (?:hours|Stunden|horas|heures)/i, file);
+    assert.match(html, /24 (?:hours|Stunden|horas|heures|小时)/i, file);
     assert.match(html, /localStorage/, file);
     assert.doesNotMatch(
       html,
@@ -417,6 +426,45 @@ test('changed HTML files contain syntactically valid inline JavaScript', async (
   }
 });
 
+test('Simplified Chinese locale covers the public site and six-language SEO graph', async () => {
+  const chineseFiles = [
+    'zh-cn/index.html',
+    'zh-cn/pricing.html',
+    'zh-cn/shopify-background-remover.html',
+    'zh-cn/amazon-ebay-product-images.html',
+    'zh-cn/contact.html',
+    'zh-cn/privacy.html',
+    'zh-cn/terms.html',
+    'zh-cn/referrals.html',
+  ];
+  for (const file of chineseFiles) {
+    const html = await read(file);
+    assert.match(html, /<html lang="zh-CN">/, file);
+    assert.match(html, /[\u3400-\u9fff]/, file);
+    assert.match(html, /hreflang="zh-CN"/, file);
+    assert.match(html, /href="\/zh-cn(?:\/|\/[^"]*)"/, file);
+  }
+
+  const chineseHome = await read('zh-cn/index.html');
+  assert.match(chineseHome, /AI 去背景/);
+  assert.match(chineseHome, /href="\/credits\.html\?lang=zh-cn"/);
+  assert.match(chineseHome, /Shopify 2048、Amazon 1600、eBay 1600/);
+  assert.doesNotMatch(chineseHome, /Amazon 1000|eBay 500/);
+
+  for (const file of [
+    ...publicSeoFiles,
+    ...localizedReferralFiles,
+  ]) {
+    assert.match(await read(file), /hreflang="zh-CN"/, file);
+  }
+
+  const sitemap = await read('sitemap.xml');
+  assert.equal((sitemap.match(/<loc>/g) || []).length, 42);
+  assert.equal((sitemap.match(/hreflang="zh-CN"/g) || []).length, 42);
+  assert.match(sitemap, /<loc>https:\/\/www\.shopbgremover\.com\/zh-cn\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.shopbgremover\.com\/zh-cn\/terms<\/loc>/);
+});
+
 test('Pages build contains only the canonical static site', async () => {
   await execFileAsync(process.execPath, [
     path.join(root, 'scripts', 'build_static_pages.mjs'),
@@ -450,6 +498,8 @@ test('Pages build contains only the canonical static site', async () => {
     'fr/referrals.html',
     'pt-br/index.html',
     'pt-br/referrals.html',
+    'zh-cn/index.html',
+    'zh-cn/referrals.html',
     'Logo256.png',
     'photo/cosmetic.jpg',
   ];
@@ -475,7 +525,7 @@ test('pricing links to the server-backed Xianyu voucher redemption page', async 
 });
 
 test('credit center is visible from every localized workspace and pricing page', async () => {
-  const languageParams = ['en', 'de', 'es', 'fr', 'pt-br'];
+  const languageParams = ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn'];
   for (let index = 0; index < indexFiles.length; index += 1) {
     const home = await read(indexFiles[index]);
     const pricing = await read(pricingFiles[index]);
@@ -551,6 +601,7 @@ test('localized referral centers fully translate static and dynamic states', asy
     ['es/referrals.html', 'es', 'Centro de referidos', 'período de observación de 7 días', 'es-ES'],
     ['fr/referrals.html', 'fr', 'Centre de parrainage', 'période d’observation de 7 jours', 'fr-FR'],
     ['pt-br/referrals.html', 'pt-BR', 'Central de indicações', 'período de observação de 7 dias', 'pt-BR'],
+    ['zh-cn/referrals.html', 'zh-CN', '推荐中心', '7 天观察期', 'zh-CN'],
   ];
   const sharedScript = await read('referrals-localized.js');
 
@@ -562,7 +613,6 @@ test('localized referral centers fully translate static and dynamic states', asy
   assert.match(sharedScript, /relationshipStatuses/);
   assert.match(sharedScript, /riskStatuses/);
   assert.doesNotMatch(sharedScript, /\.innerHTML\s*=/);
-  assert.doesNotMatch(sharedScript, /[\u3400-\u9fff]/);
 
   for (const [file, language, heading, observationCopy, locale] of expectations) {
     const html = await read(file);
@@ -575,7 +625,7 @@ test('localized referral centers fully translate static and dynamic states', asy
     assert.match(html, /hreflang="es"/, file);
     assert.match(html, /hreflang="fr"/, file);
     assert.match(html, /hreflang="pt-BR"/, file);
-    assert.doesNotMatch(html, /[\u3400-\u9fff]/, file);
+    assert.match(html, /hreflang="zh-CN"/, file);
     assert.ok(sharedScript.includes(observationCopy), file);
     assert.ok(sharedScript.includes(`locale: '${locale}'`), file);
   }

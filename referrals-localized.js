@@ -4,6 +4,29 @@
   const API = 'https://api.shopbgremover.com';
   const language = document.documentElement.lang;
   const translations = {
+    'zh-CN': {
+      locale: 'zh-CN',
+      copied: '已复制',
+      copy: '复制链接',
+      loadError: '无法加载推荐数据。',
+      eligible: '你的推荐奖励资格已生效。',
+      ineligible: '完成首次真实积分购买后，推荐奖励资格才会生效。',
+      reviewPolicy: '部分卡密推荐正在人工审核；审核通过后仍需满足 7 天观察期，购买积分不受影响。',
+      pendingPolicy: (time) => `推荐奖励有 7 天观察期，下一批预计于 ${time} 转为可用。`,
+      defaultPolicy: '推荐奖励有 7 天观察期；观察期内发生退款、争议或拒付会取消奖励。',
+      nextExpiry: (time, expired) => `最近一批可用奖励将在 ${time} 到期；未使用而过期的积分：${expired}。`,
+      noExpiry: (expired) => `当前没有即将到期的可用奖励；未使用而过期的积分：${expired}。`,
+      reasons: {
+        referral_first_purchase: '首充推荐奖励（15%）',
+        referral_repeat_purchase: '后续充值推荐奖励（10%）',
+        ai_background_removal: 'AI 去背景',
+        paypal_refund_referral: 'PayPal 退款冲正',
+        voucher_dispute_referral: '卡密争议冲正',
+      },
+      rewardStatuses: { available: '可用', used: '已使用', expired: '已过期', reversed: '已冲正', reversal: '冲正流水' },
+      relationshipStatuses: { bound: '已绑定', qualified: '已符合条件', rejected: '已拒绝', reversed: '已撤销' },
+      riskStatuses: { normal: '正常', review: '审核中', rejected: '已拒绝' },
+    },
     de: {
       locale: 'de-DE',
       copied: 'Kopiert',

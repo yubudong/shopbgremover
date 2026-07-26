@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 给英文 .html 加 i18n 元素（幂等，可重复跑）：
-  1) head 加 hreflang × 5 + x-default（如缺 canonical，一并补）
+  1) head 加 hreflang × 6 + x-default（如缺 canonical，一并补）
   2) <style> 末尾插 lang-switcher CSS
   3) nav 里 Sign-in 按钮前插 lang switcher dropdown
   4) </body> 前插 script，footer-copy 前插 footer-langs
@@ -23,6 +23,7 @@ LANGS = [
     ("en",    "English",     "EN",     ""),
     ("es",    "Español",     "ES",     "/es"),
     ("pt-BR", "Português",   "PT-BR",  "/pt-br"),
+    ("zh-CN", "简体中文",     "简中",    "/zh-cn"),
     ("de",    "Deutsch",     "DE",     "/de"),
     ("fr",    "Français",    "FR",     "/fr"),
 ]

@@ -57,7 +57,7 @@ for (const file of rootFiles) {
   await cp(path.join(root, file), path.join(output, file));
 }
 
-for (const locale of ['de', 'es', 'fr', 'pt-br']) {
+for (const locale of ['de', 'es', 'fr', 'pt-br', 'zh-cn']) {
   await cp(path.join(root, locale), path.join(output, locale), {
     recursive: true,
   });

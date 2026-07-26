@@ -1,0 +1,700 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const sourceDir = path.join(root, 'pt-br');
+const outputDir = path.join(root, 'zh-cn');
+
+const commonPairs = [
+  ['© 2026 ShopBG Remover. Feito para vendedores de e-commerce em todo o mundo.', '© 2026 ShopBG Remover。为全球电商卖家打造。'],
+  ['ShopBG Remover – Remover Fundo de Imagens em Lote com IA para E-commerce', 'ShopBG Remover – 电商产品图 AI 批量去背景'],
+  ['Remoção de fundo em lote com IA para vendedores de e-commerce no Shopify, Amazon e eBay.', '面向 Shopify、Amazon 和 eBay 电商卖家的 AI 批量去背景工具。'],
+  ['Remova o fundo de 50 imagens de produtos em minutos. Feito para vendedores Shopify, Amazon e eBay. Sem designer necessário.', '几分钟内为 50 张产品图去除背景，适用于 Shopify、Amazon 和 eBay 卖家，无需设计经验。'],
+  ['Política de privacidade', '隐私政策'],
+  ['Política de Privacidade', '隐私政策'],
+  ['Termos de serviço', '服务条款'],
+  ['Termos de Serviço', '服务条款'],
+  ['Guia Amazon e eBay', 'Amazon 与 eBay 指南'],
+  ['Guia Shopify', 'Shopify 指南'],
+  ['Amazon e eBay', 'Amazon 与 eBay'],
+  ['Como funciona', '使用方法'],
+  ['Preços', '价格'],
+  ['Contato', '联系我们'],
+  ['Entrar', '登录'],
+  ['Mudar idioma', '切换语言'],
+  ['(operado por shopbgremover)', '（由 shopbgremover 运营）'],
+  ['Legal', '法律'],
+  ['— créditos', '— 积分'],
+];
+
+const indexPairs = [
+  ['⚡ Seus créditos estão acabando — compre um pacote único quando precisar.', '⚡ 积分余额不多了——需要时可购买一次性积分包。'],
+  ['Comprar créditos →', '购买积分 →'],
+  ['Abrir central de créditos', '打开积分中心'],
+  ['— créditos', '— 积分'],
+  ['＋ Recarregar', '＋ 充值'],
+  ['Remova o fundo dos seus produtos para <em>Shopify, Amazon e eBay</em>', '为 <em>Shopify、Amazon 和 eBay</em> 产品图去除背景'],
+  ['Remova localmente pequenos objetos ou sinais parecidos com marca-d’água grátis e depois retire o fundo com IA. Entre para processar até 50 imagens por lote.', '先在本地免费去除小物体或类似水印的痕迹，再按需使用 AI 去背景。登录后每批最多处理 50 张图片。'],
+  ['Solte aqui as fotos dos seus produtos', '将产品图片拖到这里'],
+  ['ou clique para escolher arquivos', '或点击选择文件'],
+  ['Até 50 arquivos', '最多 50 个文件'],
+  ['Prévia do resultado', '结果预览'],
+  ['Fechar prévia', '关闭预览'],
+  ['Prévia da imagem processada', '处理后图片预览'],
+  ['Clique em outra miniatura abaixo para trocar a prévia.', '点击下方其他缩略图可切换预览。'],
+  ['Limpeza local de objetos', '本地去除物体'],
+  ['Marque pequenos objetos e sinais de marca-d’água gratuitamente', '免费标记并去除小物体或类似水印的痕迹'],
+  ['Lote + download em ZIP', '批量处理并下载 ZIP'],
+  ['Até 50 imagens empacotadas em um único ZIP', '最多 50 张图片打包为一个 ZIP'],
+  ['Tamanhos prontos para cada plataforma', '电商平台推荐尺寸'],
+  ['Shopify 2048, Amazon 1000, eBay 500', 'Shopify 2048、Amazon 1600、eBay 1600'],
+  ['Comece grátis', '免费开始'],
+  ['Teste na hora, sem cadastro', '无需注册即可试用'],
+  ['⚙ Opções de processamento', '⚙ 处理选项'],
+  ['Remover objetos / marcas-d’água', '去除物体 / 类似水印痕迹'],
+  ['Local · Grátis', '本地 · 免费'],
+  ['Pinte ou enquadre uma área pequena. A imagem permanece neste navegador e nenhum crédito é usado.', '涂抹或框选一小块区域。图片保留在当前浏览器中，不消耗积分。'],
+  ['Envie uma imagem para começar', '上传图片后开始'],
+  ['Envie imagens para calcular o uso de créditos de IA.', '上传图片以估算 AI 积分用量。'],
+  ['Remover fundo com IA', 'AI 去背景'],
+  ['O processamento concluído com IA custa 1 crédito por imagem. Limpeza local, ajustes de fundo e exportação continuam grátis.', '每张图片仅在 AI 去背景成功后扣除 1 积分。本地修复、背景调整和导出仍然免费。'],
+  ['Salvo somente neste navegador por 24 horas.', '仅在当前浏览器中保存 24 小时。'],
+  ['Limpar espaço salvo', '清除已保存的工作区'],
+  ['Nenhuma pasta de produto atribuída.', '尚未分配产品文件夹。'],
+  ['Pastas de produto no ZIP', 'ZIP 中的产品文件夹'],
+  ['Agrupe opcionalmente várias imagens com o mesmo ID de produto ou SKU. Isso altera apenas os caminhos do ZIP e não usa créditos de IA.', '可按相同产品 ID 或 SKU 对多张图片分组。只会改变 ZIP 内的路径，不消耗 AI 积分。'],
+  ['Atribuir pastas de produto', '分配产品文件夹'],
+  ['Fundo', '背景'],
+  ['⬜ Branco', '⬜ 白色'],
+  ['▪ Transparente', '▪ 透明'],
+  ['🎨 Personalizado', '🎨 自定义'],
+  ['🖼 Enviar', '🖼 上传'],
+  ['>Remover</button>', '>移除</button>'],
+  ['Cor HEX', 'HEX 颜色'],
+  ['Ajuste', '适配方式'],
+  ['Preencher e cortar', '填满并裁切'],
+  ['Mostrar completa', '完整显示'],
+  ['Esticar', '拉伸'],
+  ['Tamanho', '大小'],
+  ['Horizontal', '水平位置'],
+  ['Vertical', '垂直位置'],
+  ['Desfoque', '模糊'],
+  ['Centralizar fundo', '背景居中'],
+  ['Armazenado apenas neste navegador por até 24 horas · máximo de 20 MB', '仅在当前浏览器中保存最多 24 小时 · 最大 20 MB'],
+  ['Produto', '商品'],
+  ['Centralizar', '居中'],
+  ['Alinhar embaixo', '底部对齐'],
+  ['Sombra suave do produto', '商品柔和阴影'],
+  ['Tamanho de saída', '输出尺寸'],
+  ['Manter tamanho', '保持原尺寸'],
+  ['Original', '原始尺寸'],
+  ['Formato de saída', '输出格式'],
+  ['Qualidade', '质量'],
+  ['Saída sem perdas com transparência.', '无损透明输出。'],
+  ['Nome dos arquivos', '文件命名'],
+  ['Manter nome original', '保留原文件名'],
+  ['Número sequencial', '按序号命名'],
+  ['Data + sequência', '日期 + 序号'],
+  ['Histórico recente', '最近记录'],
+  ['Resultados reais', '真实效果'],
+  ['Veja a diferença em segundos', '几秒即可看到差异'],
+  ['Fotos reais de produtos processadas pelo ShopBG Remover — sem edição manual.', '由 ShopBG Remover 处理的真实产品图，无需手工抠图。'],
+  ['Antes', '处理前'],
+  ['Depois', '处理后'],
+  ['Moda e roupas', '服装'],
+  ['Comida e bebida', '食品饮料'],
+  ['Beleza e cosméticos', '美妆'],
+  ['Três passos. Zero habilidade de design.', '三个步骤，无需设计经验。'],
+  ['Envie as fotos dos seus produtos', '上传产品图片'],
+  ['Arraste e solte até 50 imagens JPG, PNG ou WebP de uma vez. Sem se preocupar com o tamanho.', '一次拖放最多 50 张 JPG、PNG 或 WebP 图片。'],
+  ['Escolha suas opções de saída', '选择输出设置'],
+  ['Escolha fundo branco ou transparente, selecione um preset de tamanho e defina um modelo de nome.', '选择白色或透明背景、平台尺寸预设和文件命名方式。'],
+  ['Baixe seu arquivo ZIP', '下载 ZIP 文件'],
+  ['A IA processa cada imagem habilitada (3–8 s cada). Baixe o resultado em um único ZIP sem outra chamada de IA.', 'AI 会处理每张已启用的图片（每张约 3–8 秒）。随后下载单个 ZIP，不会再次调用 AI。'],
+  ['Por que ShopBG Remover', '为什么选择 ShopBG Remover'],
+  ['Feito para vendedores de e-commerce sérios', '专为电商卖家的实际工作流打造'],
+  ['Recuperação somente no navegador', '仅浏览器本地恢复'],
+  ['Seu espaço de trabalho é salvo localmente neste navegador por até 24 horas. As imagens só saem do navegador quando você ativa a remoção de fundo por IA.', '工作区会在当前浏览器中本地保存最多 24 小时。只有启用 AI 去背景时，相关图片才会离开浏览器。'],
+  ['5× mais por menos', '更高性价比'],
+  ["Até 5× mais imagens que remove.bg pela metade do preço. Sem marca d'água, sem limite de resolução nos planos pagos.", '以更低成本处理更多图片。付费结果无水印，并按当前产品规则导出。'],
+  ['Pronto para marketplace', '适配电商平台'],
+  ['Saídas no tamanho exato para Shopify (2048), Amazon (1000) e eBay (500). Suba, processe, baixe.', '提供 Shopify（2048）、Amazon（1600）和 eBay（1600）推荐尺寸。上传、处理、下载即可。'],
+  ['Pronto', '就绪'],
+  ['Remover fundo', '去除背景'],
+  ['Baixar ZIP', '下载 ZIP'],
+  ['Ganhe até 10 remoções grátis vitalícias', '获得最多 10 次终身免费 AI 去背景'],
+  ['Crie uma conta grátis para obter até', '注册免费账户，可获得最多'],
+  ['10 remoções com IA vitalícias', '10 次终身免费 AI 去背景'],
+  ['. Seu uso como visitante já conta nesse total.', '。游客阶段的使用次数会计入该总额。'],
+  ['Até 10 remoções com IA vitalícias', '最多 10 次终身免费 AI 去背景'],
+  ['Processe até 50 imagens por lote', '每批最多处理 50 张图片'],
+  ['Histórico de 90 dias e re-download', '90 天历史记录与再次下载'],
+  ['Cadastrar grátis →', '免费注册 →'],
+  ['Talvez depois', '以后再说'],
+  ['Créditos esgotados', '积分已用完'],
+  ['Compre um', '需要时购买一个'],
+  ['100 créditos por $3.49', '100 积分，价格 $3.49'],
+  ['quando precisar. Créditos comprados nunca expiram e não há assinatura.', '。购买的积分永久有效，无需订阅。'],
+  ['100 créditos pagos permanentes', '100 个永久付费积分'],
+  ['50 imagens por lote', '每批 50 张图片'],
+  ['Cores de fundo personalizadas', '自定义背景颜色'],
+  ['Comprar 100 créditos — $3.49 →', '购买 100 积分 — $3.49 →'],
+  ['Agora não', '暂不购买'],
+  ['Entrar no ShopBG', '登录 ShopBG'],
+  ['Continue com Google ou digite seu email para receber um código de login.', '使用 Google 登录，或输入邮箱接收登录验证码。'],
+  ['Continuar com Google', '使用 Google 继续'],
+  ['OU', '或'],
+  ['Enviar código →', '发送验证码 →'],
+  ['Verificar e entrar', '验证并登录'],
+  ['← Usar outro email', '← 使用其他邮箱'],
+  ['Reenviar código em', '重新发送验证码还需'],
+  ['Reenviar código', '重新发送验证码'],
+  ['⚡ Créditos acabando', '⚡ 积分余额不足'],
+  ['pacote único de créditos', '一次性积分包'],
+  ['. Créditos pagos nunca expiram.', '。付费积分永久有效。'],
+  ['{ai} de {total} precisam de IA · estimativa {ai} créditos · {noCharge} sem custo', '{ai} / {total} 张需要 AI · 预计 {ai} 积分 · {noCharge} 张免费'],
+  ['Verificando transparência…', '正在检查透明度…'],
+  ['PNG transparente · IA ignorada', '透明 PNG · 跳过 AI'],
+  ['IA desativada · sem crédito', 'AI 已关闭 · 不扣积分'],
+  ['Resultado de IA salvo · sem novo crédito', '已保存 AI 结果 · 不再扣积分'],
+  ['Editada após IA · 1 novo crédito', 'AI 后已编辑 · 成功后再扣 1 积分'],
+  ['IA ativada · 1 crédito após sucesso', 'AI 已启用 · 成功后扣 1 积分'],
+  ['Falha · nova tentativa mantém a mesma tarefa', '失败 · 重试沿用同一任务'],
+  ['Este lote contém {total} imagens. {ai} precisam de remoção de fundo com IA e podem usar até {ai} créditos após o processamento bem-sucedido. {noCharge} não usarão créditos de IA. Continuar?', '本批次共 {total} 张图片，其中 {ai} 张需要 AI 去背景，成功后最多消耗 {ai} 积分；另有 {noCharge} 张不消耗 AI 积分。是否继续？'],
+  ['{count} imagem(ns) já processada(s) foram alteradas. Processá-las novamente pode usar {count} crédito(s) adicional(is). Continuar?', '已有 {count} 张处理过的图片发生修改。重新处理成功后可能额外消耗 {count} 积分。是否继续？'],
+  ['Este lote precisa de {needed} créditos, mas apenas {remaining} estão disponíveis.', '本批次需要 {needed} 积分，当前只有 {remaining} 积分可用。'],
+  ['Não foi possível verificar os créditos disponíveis. Nenhuma solicitação de IA foi enviada.', '无法核对可用积分，未发送任何 AI 请求。'],
+  ['Processando {current} / {total}: {name}', '正在处理 {current} / {total}：{name}'],
+  ['✅ Concluído! {ok} prontas{errorsText} · {aiCalls} chamada(s) de IA', '✅ 已完成！{ok} 张就绪{errorsText} · {aiCalls} 次 AI 调用'],
+  [' · {errors} com falha', ' · {errors} 张失败'],
+  ['{count} imagem(ns) restaurada(s) deste navegador.', '已从当前浏览器恢复 {count} 张图片。'],
+  ['Este espaço de trabalho é grande demais para recuperação após atualizar. O trabalho atual continua disponível.', '当前工作区过大，无法在刷新后恢复；本次工作仍可继续。'],
+  ['Não foi possível salvar a recuperação após atualizar neste navegador. O trabalho atual continua disponível.', '无法在当前浏览器中保存刷新恢复数据；本次工作仍可继续。'],
+  ['Não foi possível restaurar o espaço salvo. Nenhuma imagem foi enviada.', '无法恢复已保存的工作区，未上传任何图片。'],
+  ['Limpar o espaço de trabalho salvo neste navegador? Esta ação não pode ser desfeita.', '要清除当前浏览器中保存的工作区吗？此操作无法撤销。'],
+  ['Ativar IA para todas as imagens não transparentes', '为所有非透明图片启用 AI'],
+  ['{count} de {total} imagem(ns) atribuída(s) a pastas de produto.', '已将 {total} 张中的 {count} 张分配到产品文件夹。'],
+  ['Organizar ZIP por produto / SKU', '按产品 / SKU 整理 ZIP'],
+  ['Imagens com o mesmo SKU ficam na mesma pasta do ZIP. Tudo permanece no navegador e nenhuma imagem é reprocessada.', '相同 SKU 的图片会进入 ZIP 中的同一文件夹。全部操作都在浏览器中完成，不会重新处理图片。'],
+  ['ID do produto ou SKU opcional', '可选产品 ID 或 SKU'],
+  ['ID do produto ou SKU para {name}', '{name} 的产品 ID 或 SKU'],
+  ['Raiz do ZIP (sem pasta)', 'ZIP 根目录（不使用文件夹）'],
+  ['Fechar organizador de produtos', '关闭产品整理器'],
+  ['Limpar todas as pastas', '清除全部文件夹'],
+  ['Concluído', '完成'],
+  ['Pastas de produto salvas localmente. Baixe o ZIP para aplicá-las.', '产品文件夹已保存到本地，下载 ZIP 后即可使用。'],
+  ['Pastas de produto limpas. Os arquivos ficarão na raiz do ZIP.', '产品文件夹已清除，文件将位于 ZIP 根目录。'],
+  ['Escolha uma imagem de fundo JPG, PNG ou WebP.', '请选择 JPG、PNG 或 WebP 背景图片。'],
+  ['A imagem de fundo deve ter no máximo 20 MB.', '背景图片不能超过 20 MB。'],
+  ['Não foi possível abrir esta imagem de fundo no navegador.', '浏览器无法打开这张背景图片。'],
+  ['Envie uma imagem de fundo válida antes de processar.', '处理前请先上传有效的背景图片。'],
+  ['{count} imagem(ns) não têm um produto transparente. Ative a IA para elas ou envie arquivos PNG transparentes.', '有 {count} 张图片没有透明商品前景。请为它们启用 AI，或上传透明 PNG。'],
+  ['O fundo “{name}” está pronto. Processe as imagens para aplicá-lo localmente.', '背景“{name}”已就绪。处理图片即可在本地应用。'],
+  ['Fundo enviado removido. O fundo branco foi restaurado.', '已移除上传背景，并恢复白色背景。'],
+  ['Fundo restaurado', '已恢复的背景'],
+  ['Fundo enviado', '上传的背景'],
+  ['Embaixo', '底部'],
+  ['Personalizar', '自定义'],
+  ['Personalizada', '已自定义'],
+  ['Personalizar {name}', '自定义 {name}'],
+  ['Personalizar uma imagem', '单独自定义图片'],
+  ['Estas configurações substituem os padrões do lote somente para esta imagem.', '这些设置仅覆盖当前图片的批次默认设置。'],
+  ['Fechar', '关闭'],
+  ['Branco', '白色'],
+  ['Transparente', '透明'],
+  ['Cor personalizada', '自定义颜色'],
+  ['Imagem enviada', '已上传图片'],
+  ['Escolher imagem', '选择图片'],
+  ['Nenhuma imagem selecionada', '尚未选择图片'],
+  ['Ajuste do fundo', '背景适配'],
+  ['Mostrar inteira', '完整显示'],
+  ['Tamanho do fundo', '背景大小'],
+  ['Fundo horizontal', '背景水平位置'],
+  ['Fundo vertical', '背景垂直位置'],
+  ['Desfoque do fundo', '背景模糊'],
+  ['Usar configurações do lote', '使用批次设置'],
+  ['Aplicar a esta imagem', '应用到当前图片'],
+  ['Escolha primeiro uma imagem de fundo.', '请先选择背景图片。'],
+  ['Configurações desta imagem aplicadas localmente.', '当前图片的设置已在本地应用。'],
+  ['Esta imagem voltou a usar as configurações do lote.', '当前图片已恢复使用批次设置。'],
+  ['Esta imagem tem configurações próprias.', '当前图片使用独立设置。'],
+  ['O ponto de partida são as configurações atuais do lote.', '初始值来自当前批次设置。'],
+  ['JPEG não aceita transparência. Fundos transparentes são exportados em branco.', 'JPEG 不支持透明背景，透明区域将以白色导出。'],
+  ['Arquivos menores com suporte a transparência.', '支持透明背景，文件通常更小。'],
+  ['A Shopify recomenda imagens quadradas de 2048 × 2048; PNG, JPEG e WebP são aceitos. A saída deve ter menos de 20 MB.', 'Shopify 建议使用 2048 × 2048 方形图片，接受 PNG、JPEG 和 WebP；输出文件必须小于 20 MB。'],
+  ['Esta saída da Shopify não tem menos de 20 MB. Escolha JPEG ou reduza a qualidade JPEG/WebP e tente novamente.', 'Shopify 输出未小于 20 MB。请选择 JPEG，或降低 JPEG/WebP 质量后重试。'],
+  ['Amazon: 1600 × 1600 é a predefinição recomendada para boa qualidade de zoom. JPEG é preferido e PNG é aceito. Para imagens PRINCIPAIS, escolha branco puro, mantenha o produto em pelo menos 85% do quadro e não adicione texto, logotipo nem marca-d’água. Confira as regras da categoria antes de enviar.', 'Amazon：1600 × 1600 是推荐预设，有利于缩放查看。首选 JPEG，也接受 PNG。MAIN 主图应使用纯白背景，商品至少占画面 85%，不得添加文字、Logo 或水印；上传前请核对对应类目规则。'],
+  ['WebP não está entre os formatos de imagem de produto verificados para a Amazon. Escolha JPEG ou PNG.', '已核验的 Amazon 产品图格式不包括 WebP，请选择 JPEG 或 PNG。'],
+  ['O eBay recomenda 1600 × 1600 (mínimo de 500 px), aceita PNG, JPEG e WebP e permite até 12 MB por imagem. Use um fundo neutro ou branco e não adicione gráficos nem marcas-d’água.', 'eBay 建议 1600 × 1600（最低 500 px），接受 PNG、JPEG 和 WebP，单图最大 12 MB。建议使用中性或白色背景，不要添加图形或水印。'],
+  ['Esta saída do eBay ultrapassa 12 MB. Escolha JPEG ou reduza a qualidade JPEG/WebP e tente novamente.', 'eBay 输出超过 12 MB。请选择 JPEG，或降低 JPEG/WebP 质量后重试。'],
+  ['A TikTok Shop aceita apenas PNG ou JPEG (máximo de 10 MB por imagem).', 'TikTok Shop 仅接受 PNG 或 JPEG（单图最大 10 MB）。'],
+  ['WebP não é aceito pelas regras de imagem de produto da TikTok Shop.', 'TikTok Shop 产品图规则不接受 WebP。'],
+  ['Recomendação da Shopee: 1024 × 1024, PNG ou JPEG, até 2 MB. Use uma imagem principal com fundo branco simples e mantenha o produto em mais da metade do quadro. Os requisitos podem variar por mercado.', 'Shopee 建议：1024 × 1024、PNG 或 JPEG、最大 2 MB。主图建议使用简洁白色背景，商品占画面一半以上；不同市场要求可能不同。'],
+  ['WebP não está entre os formatos de imagem de produto verificados para a Shopee.', '已核验的 Shopee 产品图格式不包括 WebP。'],
+  ['Esta saída da Shopee ultrapassa 2 MB. Escolha JPEG ou reduza a qualidade JPEG e tente novamente.', 'Shopee 输出超过 2 MB。请选择 JPEG 或降低 JPEG 质量后重试。'],
+  ['Foto de moda antes – fundo colorido', '服装图片处理前——彩色背景'],
+  ['Foto de moda depois – fundo branco limpo', '服装图片处理后——干净白底'],
+  ['Foto de alimento antes – fundo de tábua de madeira', '食品图片处理前——木板背景'],
+  ['Foto de alimento depois – fundo branco limpo', '食品图片处理后——干净白底'],
+  ['Cosméticos antes – fundo rosa', '化妆品处理前——粉色背景'],
+  ['Cosméticos depois – fundo branco limpo', '化妆品处理后——干净白底'],
+  ['Digite seu email.', '请输入邮箱。'],
+  ['Enviando…', '正在发送…'],
+  ['Falha ao enviar código. Tente novamente.', '验证码发送失败，请重试。'],
+  ['Código enviado para ${email}', '验证码已发送至 ${email}'],
+  ['Digite o código de 6 dígitos.', '请输入 6 位验证码。'],
+  ['Verificando…', '正在验证…'],
+  ['Verificação falhou. Tente novamente.', '验证失败，请重试。'],
+  ['Novo código enviado para ${otpEmail}', '新验证码已发送至 ${otpEmail}'],
+  ['Falha ao reenviar.', '重新发送失败。'],
+  ['Sair', '退出登录'],
+  ['${c} créditos', '${c} 积分'],
+  ['${h.file_count} imagens', '${h.file_count} 张图片'],
+  ['O limite de 50 imagens por lote foi atingido.', '已达到每批 50 张图片的上限。'],
+  ['Entre na sua conta para adicionar mais de uma imagem.', '请登录后添加多张图片。'],
+  ['${selectedFiles.length} ${selectedFiles.length > 1 ? \'imagens selecionadas\' : \'imagem selecionada\'}', '${selectedFiles.length} 张图片已选择'],
+  ['Clique para adicionar mais ou arraste novos arquivos', '点击继续添加，或拖入新文件'],
+  ['Prévia ${file.name}', '预览 ${file.name}'],
+  ['${additions.length} ${additions.length > 1 ? \'imagens adicionadas\' : \'imagem adicionada\'} · ${selectedFiles.length} prontas', '已添加 ${additions.length} 张 · 共 ${selectedFiles.length} 张就绪'],
+  ['Processar imagens', '处理图片'],
+  ['Original restaurado. Apenas esta imagem precisa ser preparada novamente.', '已恢复原图，仅需重新处理当前图片。'],
+  ['Limpeza local salva. Apenas esta imagem precisa ser preparada novamente.', '本地修复已保存，仅需重新处理当前图片。'],
+  ['Compactando…', '正在打包…'],
+  ['📥 Baixar ZIP ({size} MB)', '📥 下载 ZIP（{size} MB）'],
+  ['Processando…', '正在处理…'],
+];
+
+const pricingPairs = [
+  ['Preços – ShopBG Remover | Remoção de Fundo com IA para E-commerce', '价格 – ShopBG Remover | 电商产品图 AI 去背景'],
+  ['Créditos de IA de compra única para fotos de produtos: 100 créditos por $3,49, 300 por $8,99 ou 1000 por $23,99. Créditos comprados não expiram.', '面向产品图 AI 去背景的一次性积分包：100 积分 $3.49、300 积分 $8.99、1000 积分 $23.99。购买的积分永久有效。'],
+  ['Preços ShopBG Remover – Remoção de fundo a partir de $0.025/imagem', 'ShopBG Remover 价格 – AI 去背景每张低至 $0.024'],
+  ['5× mais imagens que remove.bg pela metade do preço. Nível grátis incluso. Planos para vendedores de todos os tamanhos.', '提供免费额度和一次性积分包，适合不同规模的电商卖家。'],
+  ['⚡ Créditos de compra única · sem assinatura', '⚡ 一次性积分 · 无需订阅'],
+  ['Créditos que <em>nunca expiram</em>', '<em>永久有效</em>的付费积分'],
+  ['Comece com uma cota grátis vitalícia e compre apenas os créditos necessários. Uma remoção de fundo com IA concluída custa um crédito.', '先使用终身免费额度，只在需要时购买积分。每张图片仅在 AI 去背景成功后扣除 1 积分。'],
+  ['Meus créditos e histórico', '我的积分与记录'],
+  ['Resgatar voucher do Xianyu', '兑换闲鱼卡密'],
+  ['Teste toda a qualidade da IA', '体验完整 AI 质量'],
+  ['Grátis', '免费'],
+  ['Começar grátis', '免费开始'],
+  ['3 remoções no total sem cadastro', '无需注册，共 3 次 AI 去背景'],
+  ['Até 10 remoções no total após o cadastro', '注册后终身累计最多 10 次'],
+  ['Modo visitante: uma imagem por vez', '游客模式：每次处理 1 张'],
+  ['O uso como visitante conta dentro das 10', '游客使用次数计入这 10 次'],
+  ['100 créditos', '100 积分'],
+  ['300 créditos', '300 积分'],
+  ['1000 créditos', '1000 积分'],
+  ['Créditos comprados nunca expiram', '购买的积分永久有效'],
+  ['one-time', '一次性'],
+  ['$0,035 / imagem', '每张 $0.035'],
+  ['$0,030 / imagem', '每张 $0.030'],
+  ['$0,024 / imagem', '每张 $0.024'],
+  ['Só uma remoção bem-sucedida custa 1 crédito', '仅成功的 AI 去背景扣除 1 积分'],
+  ['Edição local e exportação são grátis', '本地编辑与导出免费'],
+  ['Processamento em lote e download ZIP', '批量处理与 ZIP 下载'],
+  ['Mais popular', '最受欢迎'],
+  ['Cobrança simples e transparente', '简单透明的计费方式'],
+  ['Não existem planos mensais ou anuais. Os créditos comprados ficam disponíveis para sempre. Pacotes não usados podem ser reembolsados em até 7 dias somente se nenhum crédito do pacote tiver sido usado.', '没有月付或年付订阅。购买的积分永久有效。未使用的 PayPal 积分包可在 7 天内申请退款，但前提是该积分包没有使用过任何积分。'],
+  ['Comprou um voucher no Xianyu? Resgate aqui.', '已在闲鱼购买卡密？在这里兑换。'],
+  ['Não foi possível carregar o PayPal. Atualize a página e tente novamente.', 'PayPal 加载失败，请刷新页面后重试。'],
+  ['Entre para comprar créditos.', '请登录后购买积分。'],
+  ['Não foi possível criar o pedido.', '无法创建订单。'],
+  ['Não foi possível criar o pedido. Tente novamente.', '无法创建订单，请重试。'],
+  ['Pagamento não concluído.', '付款未完成。'],
+  ['Não foi possível concluir o pagamento.', '无法完成付款。'],
+  ['O pagamento não foi concluído. Contate o suporte se o PayPal fez a cobrança.', '付款未完成。如果 PayPal 已扣款，请联系支持。'],
+  ['O PayPal encontrou um erro. Tente novamente ou contate o suporte.', 'PayPal 出现错误，请重试或联系支持。'],
+  ['* É necessário entrar para concluir a compra', '* 请先登录再完成购买'],
+  ['`${data.credits?.credits ?? 0} créditos`', '`${data.credits?.credits ?? 0} 积分`'],
+  ["auth.textContent = 'Sair'", "auth.textContent = '退出登录'"],
+];
+
+const shopifyPairs = [
+  ['Remover Fundo de Imagens de Produtos Shopify – Ferramenta IA em Lote | ShopBG Remover', 'Shopify 产品图去背景 – AI 批量处理工具 | ShopBG Remover'],
+  ['Remover Fundo de Imagens de Produtos Shopify – Ferramenta IA em Lote', 'Shopify 产品图去背景 – AI 批量处理工具'],
+  ['Remova o fundo das suas fotos de produtos Shopify em lote. IA que gera imagens 2048×2048 com fundo branco prontas para enviar. Sem precisar de designer.', '批量去除 Shopify 产品图背景，生成可上传的 2048×2048 白底图片，无需设计经验。'],
+  ['ShopBG Remover para Shopify', 'ShopBG Remover Shopify 工具'],
+  ['Ferramenta de IA para remover o fundo de imagens de produtos Shopify em lote. Gera arquivos JPG/PNG 2048×2048 com fundo branco prontos para upload.', '用于批量去除 Shopify 产品图背景的 AI 工具，可生成 2048×2048 白底 JPG/PNG 文件。'],
+  ['🟣 Feito para vendedores Shopify', '🟣 专为 Shopify 卖家打造'],
+  ['Remova o fundo dos seus produtos<br><em>para sua loja Shopify</em>', '为 Shopify 店铺<br><em>去除产品图背景</em>'],
+  ['Processamento em lote com IA que gera imagens 2048×2048 com fundo branco, prontas para Shopify. Envie 50 fotos de uma vez — pronto em minutos, não em horas.', '使用 AI 批量生成 2048×2048 白底产品图。一次上传 50 张，几分钟即可完成。'],
+  ['Processamento em lote com IA que gera imagens 2048×2048 com fundo branco, prontas para Shopify.', '使用 AI 批量生成 2048×2048 白底产品图。'],
+  ['Envie 50 fotos de uma vez — pronto em minutos, não em horas.', '一次上传 50 张，几分钟即可完成。'],
+  ['Testar grátis — sem cadastro →', '免费试用——无需注册 →'],
+  ['Ver preços', '查看价格'],
+  ['Tamanho pronto para Shopify', 'Shopify 推荐尺寸'],
+  ['50 imagens', '50 张图片'],
+  ['Por lote', '每批'],
+  ['3 grátis', '免费 3 次'],
+  ['Imagens no total, sem cadastro', '无需注册的累计次数'],
+  ['Saída 2048×2048 px', '输出 2048×2048 px'],
+  ['Fundo branco puro (RGB 255,255,255)', '纯白背景（RGB 255,255,255）'],
+  ['Compatível com JPG e PNG', '支持 JPG 和 PNG'],
+  ['Otimizado para o CDN da Shopify', '适合 Shopify CDN'],
+  ['Diretrizes de imagens da Shopify', 'Shopify 图片指南'],
+  ['O que a Shopify exige para suas fotos de produto', 'Shopify 产品图应注意什么'],
+  ['A Shopify recomenda padrões específicos para maximizar conversões e fazer sua loja parecer profissional em todos os dispositivos.', 'Shopify 提供产品媒体建议，帮助图片在不同设备和店铺主题中保持一致。'],
+  ['Tamanho e resolução', '尺寸与分辨率'],
+  ['Fundo', '背景'],
+  ['2048×2048 px recomendado (quadrado)', '建议 2048×2048 px（方形）'],
+  ['Até 5000×5000 px ou 25 megapixels', '最高 5000×5000 px 或 2500 万像素'],
+  ['O arquivo deve ter menos de 20 MB', '文件必须小于 20 MB'],
+  ['Proporções consistentes para grades de produtos', '产品网格中保持一致的宽高比'],
+  ['Escolha fundo branco, transparente ou da marca', '可选择白色、透明或品牌背景'],
+  ['Mantenha a mesma proporção na grade de produtos', '产品网格中保持相同宽高比'],
+  ['Confira o resultado no tema atual', '在当前店铺主题中检查效果'],
+  ['A Shopify não exige proporção fixa do produto', 'Shopify 不要求固定的商品占图比例'],
+  ['Formato de arquivo', '文件格式'],
+  ['JPG (ideal para fundos brancos)', 'JPG（适合白色背景）'],
+  ['PNG (se precisar de transparência)', 'PNG（需要透明背景时）'],
+  ['WebP compatível', '支持 WebP'],
+  ['GIF para visualizações animadas', 'GIF 可用于动画展示'],
+  ['De fotos cruas a prontas para Shopify em 3 passos', '三步把原始图片变成 Shopify 产品图'],
+  ['Envie as fotos dos seus produtos', '上传产品图片'],
+  ['Arraste e solte até 50 imagens de uma vez. JPG, PNG ou WebP — qualquer fundo, qualquer tipo de produto.', '一次拖放最多 50 张 JPG、PNG 或 WebP 图片，适用于不同背景和商品类型。'],
+  ['A IA remove o fundo', 'AI 去除背景'],
+  ['Nossa IA detecta o produto instantaneamente e remove o fundo com bordas limpas e nítidas — até em roupas, joias e formas complexas.', 'AI 自动识别商品并去除背景，可处理服装、珠宝等复杂轮廓；实际效果取决于原图。'],
+  ['Baixe o ZIP pronto para Shopify', '下载适用于 Shopify 的 ZIP'],
+  ['Receba todas as imagens em JPG 2048×2048 com fundo branco em um único ZIP. Faça upload direto nos seus produtos Shopify.', '将 2048×2048 白底 JPG 图片打包为一个 ZIP，再上传到 Shopify 商品。'],
+  ['Perguntas frequentes', '常见问题'],
+  ['Dúvidas comuns de vendedores Shopify', 'Shopify 卖家常见问题'],
+  ['A predefinição da Shopify garante aprovação?', 'Shopify 预设能保证通过审核吗？'],
+  ['Não. A predefinição usa o tamanho quadrado 2048×2048 recomendado pela Shopify, formatos PNG, JPEG e WebP aceitos e o limite de 20 MB. Confira o resultado final no seu tema antes de publicar.', '不能。预设采用 Shopify 建议的 2048×2048 方形尺寸、支持 PNG/JPEG/WebP，并检查小于 20 MB；发布前仍需在店铺主题中核对最终效果。'],
+  ['Posso processar todas as minhas fotos de uma vez?', '可以一次处理全部图片吗？'],
+  ['Sim. Você pode enviar até 50 imagens por lote. Todas são processadas em paralelo e entregues em um único ZIP, pronto para upload em massa na Shopify.', '可以。每批最多上传 50 张图片，处理后会打包为一个 ZIP，便于批量上传。'],
+  ['Funciona para roupas, joias e calçados?', '适用于服装、珠宝和鞋类吗？'],
+  ['Com certeza. A IA lida com formas complexas como roupas em manequins, joias com detalhes finos, calçados e acessórios — todas categorias comuns em lojas Shopify.', '可以尝试。AI 能处理模特服装、精细珠宝、鞋类和配饰等复杂轮廓，但效果会随图片复杂度变化。'],
+  ['Tem teste grátis?', '有免费试用吗？'],
+  ['Sim — 3 imagens grátis no total, sem precisar de conta. Faça login para desbloquear mais créditos e processamento em lote.', '有。无需账户可累计免费处理 3 张；登录后可获得更多免费额度并使用批量处理。'],
+  ['Pronto para melhorar as fotos da sua loja Shopify?', '准备好优化 Shopify 产品图了吗？'],
+  ['Junte-se a milhares de vendedores Shopify que economizam horas em edição de imagens toda semana.', '批量处理图片，减少重复的手工编辑工作。'],
+  ['Comece grátis — sem cadastro', '免费开始——无需注册'],
+];
+
+const marketplacePairs = [
+  ['Remover Fundo de Imagens de Produtos Amazon e eBay – Ferramenta IA em Lote | ShopBG Remover', 'Amazon 与 eBay 产品图去背景 – AI 批量处理工具 | ShopBG Remover'],
+  ['Remover Fundo de Imagens de Produtos Amazon e eBay – Ferramenta IA em Lote', 'Amazon 与 eBay 产品图去背景 – AI 批量处理工具'],
+  ['Remova fundos de imagens Amazon e eBay em lote com predefinições 1600×1600 e orientações verificadas.', '使用 1600×1600 预设和已核验指南，批量处理 Amazon 与 eBay 产品图背景。'],
+  ['ShopBG Remover para Amazon e eBay', 'ShopBG Remover Amazon 与 eBay 工具'],
+  ['Processamento em lote de imagens Amazon e eBay com predefinições 1600×1600 e orientações verificadas.', '使用 1600×1600 预设和已核验指南批量处理 Amazon 与 eBay 产品图。'],
+  ['🟠 Vendedores Amazon', '🟠 Amazon 卖家'],
+  ['🔴 Vendedores eBay', '🔴 eBay 卖家'],
+  ['Fundo dos produtos removido.<br><em>Pronto para o marketplace na hora.</em>', '去除产品图背景，<br><em>快速准备平台图片。</em>'],
+  ['Use orientações verificadas de tamanho, formato, fundo e limites de arquivo para Amazon e eBay. Processe 50 fotos de produtos de uma vez, sem precisar de Photoshop.', '参考已核验的 Amazon 与 eBay 尺寸、格式、背景和文件限制，一次处理最多 50 张产品图，无需 Photoshop。'],
+  ['Use orientações verificadas de tamanho, formato, fundo e limites de arquivo para Amazon e eBay.', '参考已核验的 Amazon 与 eBay 尺寸、格式、背景和文件限制。'],
+  ['Processe 50 fotos de produtos de uma vez, sem precisar de Photoshop.', '一次处理最多 50 张产品图，无需 Photoshop。'],
+  ['Testar grátis — sem cadastro →', '免费试用——无需注册 →'],
+  ['Ver preços', '查看价格'],
+  ['Branco puro (RGB 255,255,255)', '纯白（RGB 255,255,255）'],
+  ['50 imagens', '50 张图片'],
+  ['Por lote', '每批'],
+  ['&lt; 5 min', '&lt; 5 分钟'],
+  ['Para processar um lote inteiro', '处理一整批图片'],
+  ['🟠 Requisitos da Amazon', '🟠 Amazon 要求'],
+  ['🔴 Requisitos do eBay', '🔴 eBay 要求'],
+  ['Políticas de imagem dos marketplaces', '电商平台图片政策'],
+  ['Orientações verificadas para Amazon e eBay', '已核验的 Amazon 与 eBay 指南'],
+  ['As predefinições ajudam com tamanho, formato e controles de peso disponíveis, mas não garantem aprovação. Confira as regras da categoria antes de enviar.', '预设可帮助控制尺寸、格式和已知文件大小，但不能保证审核通过。上传前请核对对应类目规则。'],
+  ['Política de Imagem PRINCIPAL da Amazon', 'Amazon MAIN 主图政策'],
+  ['Fundo branco puro — RGB (255, 255, 255)', '纯白背景——RGB（255, 255, 255）'],
+  ['O produto ocupa pelo menos 85% da área da imagem', '商品至少占图片面积的 85%'],
+  ["Sem texto, logos ou marcas d'água", '不得添加文字、Logo 或水印'],
+  ['1600 px ou mais no lado longo é ideal para zoom', '长边达到 1600 px 或以上可获得较好的缩放体验'],
+  ['Mínimo de 1000 px no lado longo para ativar zoom', '启用缩放功能的长边下限为 1000 px'],
+  ['Máximo 10 000 px no lado mais comprido', '最长边上限为 10,000 px'],
+  ['Formato JPEG, PNG, GIF ou TIFF', '格式支持 JPEG、PNG、GIF 或 TIFF'],
+  ['Anúncios com fundos não brancos podem ser suprimidos dos resultados de busca.', '非白底主图可能影响商品在搜索结果中的展示。'],
+  ['Padrões de Imagem de Anúncio do eBay', 'eBay 刊登图片标准'],
+  ['1600×1600 px recomendado; mínimo de 500 px', '建议 1600×1600 px；最低 500 px'],
+  ['Fundo branco ou neutro preferido', '建议使用白色或中性背景'],
+  ["Sem bordas, marcas d'água ou texto sobreposto", '不得添加边框、水印或叠加文字'],
+  ['Produto claramente visível e bem iluminado', '商品应清晰可见且光线充足'],
+  ['Até 24 fotos por anúncio', '每个刊登最多 24 张图片'],
+  ['JPEG, PNG, GIF, TIFF, BMP, WebP, HEIC ou AVIF', 'JPEG、PNG、GIF、TIFF、BMP、WebP、HEIC 或 AVIF'],
+  ['Máximo de 12 MB por imagem', '单图最大 12 MB'],
+  ['Imagens com fundo branco limpo geram consistentemente maiores taxas de cliques no eBay.', '简洁白底有助于商品清晰展示，但实际点击率取决于多种因素。'],
+  ['Imagens em conformidade em 3 passos', '三步准备平台产品图'],
+  ['Envie as fotos dos seus produtos', '上传产品图片'],
+  ['Selecione até 50 imagens de uma vez. Funciona com qualquer fundo original — estúdio, ambiente externo, prateleira bagunçada ou qualquer cor.', '一次选择最多 50 张图片，支持影棚、户外、货架或彩色等不同原始背景。'],
+  ['A IA remove o fundo', 'AI 去除背景'],
+  ['Nosso modelo recorta o produto com precisão, lidando com detalhes finos como cabelo, vidro transparente e correntes de joias.', '模型会尝试保留头发、透明玻璃和珠宝链条等细节，实际效果取决于图片复杂度。'],
+  ['Baixe e envie para Amazon/eBay', '下载并上传到 Amazon/eBay'],
+  ['Receba todas as imagens em JPG com fundo branco puro no tamanho da plataforma escolhida, em ZIP e prontas para upload.', '按所选平台尺寸生成纯白背景 JPG，并打包为 ZIP 供上传。'],
+  ['Comparação de plataformas', '平台对比'],
+  ['Especificações de saída por marketplace', '各平台输出规格'],
+  ['Especificação', '规格'],
+  ['Tamanho de saída', '输出尺寸'],
+  ['Predefinição 1600×1600 px', '1600×1600 px 预设'],
+  ['Fundo', '背景'],
+  ['Branco puro RGB(255,255,255)', '纯白 RGB(255,255,255)'],
+  ['Branco / neutro', '白色 / 中性'],
+  ['Branco', '白色'],
+  ['Formato', '格式'],
+  ['Compatível com ShopBG', 'ShopBG 支持'],
+  ['✓ Sim', '✓ 是'],
+  ['Perguntas frequentes', '常见问题'],
+  ['Perguntas de vendedores Amazon e eBay', 'Amazon 与 eBay 卖家常见问题'],
+  ['Isso evita que meu anúncio da Amazon seja suprimido?', '这能避免 Amazon 商品被限制展示吗？'],
+  ['Não. A predefinição da Amazon ajuda com tamanho e formato, e você pode escolher fundo branco, mas o aplicativo não verifica todas as regras de conteúdo, enquadramento ou categoria. Confira a imagem PRINCIPAL antes de enviar.', '不能。Amazon 预设可帮助设置尺寸、格式和白色背景，但不会检查全部内容、构图或类目规则。上传前请核对 MAIN 主图。'],
+  ['Posso processar um catálogo Amazon inteiro de uma vez?', '可以一次处理整个 Amazon 商品目录吗？'],
+  ['Sim — envie até 50 imagens por lote. Para catálogos grandes, você pode rodar vários lotes. Todas as imagens são entregues em um único ZIP com nomes correspondentes aos originais.', '可以，每批最多 50 张；大型目录可分批处理。结果会按原文件名规则打包到 ZIP。'],
+  ['Funciona para fotos de produtos FBA tiradas em casa?', '适用于在家拍摄的 FBA 产品图吗？'],
+  ['Sim. Muitos vendedores FBA fotografam produtos sobre mesa, chão ou com fundo colorido. O ShopBG Remover substitui qualquer fundo por um fundo branco em conformidade em segundos.', '可以尝试。ShopBG Remover 可把桌面、地面或彩色背景替换为白色背景；发布前仍需检查边缘和平台规则。'],
+  ['E o requisito de múltiplas imagens do eBay?', 'eBay 多图片要求怎么办？'],
+  ['O eBay permite até 24 imagens por anúncio. Você pode processar em lote todos os ângulos e variações de uma vez, obtendo um conjunto completo de imagens com fundo branco limpo para cada anúncio de uma só vez.', 'eBay 每个刊登最多可使用 24 张图片。可批量处理不同角度和变体，为每个刊登准备一组统一背景的图片。'],
+  ['Comece a vender mais com imagens de produto melhores', '用更清晰的产品图准备商品刊登'],
+  ['Aplique predefinições de marketplace em lote e confira depois as regras atuais de cada categoria.', '批量应用平台预设，然后核对当前类目规则。'],
+  ['Testar grátis — 3 imagens, sem cadastro', '免费试用——3 张图片，无需注册'],
+];
+
+const contactPairs = [
+  ['Contato – ShopBG Remover', '联系我们 – ShopBG Remover'],
+  ['Entre em contato com a equipe do ShopBG Remover. Respondemos em 1–2 dias úteis sobre créditos, pagamentos ou suporte.', '联系 ShopBG Remover 团队。我们通常会在 1–2 个工作日内回复积分、付款或使用问题。'],
+  ['Fale conosco', '联系我们'],
+  ['Tem uma dúvida sobre seus créditos, um problema de pagamento ou só quer dar oi? Estamos aqui para ajudar.', '对积分、付款或使用方式有疑问？欢迎联系我们。'],
+  ['Suporte por e-mail', '邮件支持'],
+  ['Mande um e-mail para', '发送邮件至'],
+  ['✉️ &nbsp;Enviar e-mail', '✉️ &nbsp;发送邮件'],
+  ['Normalmente respondemos em 1–2 dias úteis.', '我们通常会在 1–2 个工作日内回复。'],
+  ['💡 Confira primeiro o FAQ de preços', '💡 建议先查看价格页常见问题'],
+  ['Respostas a perguntas comuns sobre créditos, reembolsos e planos estão na <a href="/zh-cn/pricing">página de Preços</a> — você pode encontrar sua resposta mais rápido lá.', '关于积分、退款和计费方式的常见问题可在<a href="/zh-cn/pricing">价格页面</a>查看，也许能更快找到答案。'],
+  ['Suporte ShopBG Remover', 'ShopBG Remover 支持'],
+];
+
+const privacyPairs = [
+  ['Política de privacidade – ShopBG Remover', '隐私政策 – ShopBG Remover'],
+  ['Política de privacidade do ShopBG Remover: dados mínimos, processamento por IA e recuperação local opcional por 24 horas.', 'ShopBG Remover 隐私政策：最少数据收集、AI 处理，以及可选的 24 小时浏览器本地恢复。'],
+  ['Última atualização: 25 de julho de 2026', '最后更新：2026 年 7 月 25 日'],
+  ['Coletamos só o necessário para operar o serviço e não vendemos seus dados. A recuperação opcional mantém seu espaço de trabalho somente neste navegador por até 24 horas.', '我们只收集运行服务所需的信息，不会出售你的数据。可选的工作区恢复数据仅在当前浏览器中保存最多 24 小时。'],
+  ['1. Quem somos', '1. 关于我们'],
+  ['ShopBG Remover é uma ferramenta de remoção de fundo com IA para vendedores de e-commerce, operada sob a marca <strong>shopbgremover</strong>. Você pode entrar em contato em <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.', 'ShopBG Remover 是面向电商卖家的 AI 去背景工具，以 <strong>shopbgremover</strong> 品牌运营。你可以通过 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a> 联系我们。'],
+  ['2. Informações que coletamos', '2. 我们收集的信息'],
+  ['Coletamos o mínimo de informação necessária para fornecer o serviço:', '我们只收集提供服务所需的最少信息：'],
+  ['<strong>Informações de conta:</strong> Seu e-mail e nome de usuário ao entrar via Google OAuth ou código por e-mail.', '<strong>账户信息：</strong>通过 Google OAuth 或邮箱验证码登录时使用的邮箱和用户名。'],
+  ['<strong>Dados de uso:</strong> Número de imagens processadas, timestamps e saldo de créditos — para gerenciar sua conta e aplicar limites de plano.', '<strong>使用数据：</strong>处理图片数量、时间戳和积分余额，用于管理账户和执行额度限制。'],
+  ['<strong>Informações de pagamento:</strong> ID do pedido, plano comprado e valor do pagamento. <em>Não</em> armazenamos seu número de cartão ou credenciais completas do PayPal — pagamentos são tratados totalmente pelo PayPal.', '<strong>付款信息：</strong>订单 ID、购买的积分包和付款金额。我们<em>不会</em>保存银行卡号或完整 PayPal 凭据，付款由 PayPal 处理。'],
+  ['<strong>Dados técnicos:</strong> Tipo de navegador, endereço IP e logs de acesso coletados automaticamente pela Cloudflare para segurança e desempenho.', '<strong>技术数据：</strong>Cloudflare 为安全和性能目的自动收集的浏览器类型、IP 地址和访问日志。'],
+  ['3. Suas imagens', '3. 你的图片'],
+  ['Suas imagens são enviadas para nossa API somente quando você ativa a remoção de fundo por IA. <strong>As imagens não são armazenadas em nossos servidores após o processamento.</strong> Para recuperar o trabalho após atualizar, o navegador pode guardar por até 24 horas a imagem original, a edição local, o recorte de IA, a saída, o estado da tarefa e as configurações de composição no IndexedDB. Você pode limpar o espaço salvo na página de processamento.', '只有在你启用 AI 去背景时，图片才会发送到我们的 API。<strong>处理完成后，图片不会保存在我们的服务器上。</strong>为支持刷新恢复，浏览器可能在 IndexedDB 中保存原图、本地编辑、AI 前景、输出、任务状态和合成设置，最长 24 小时。你可以在工作区中清除这些数据。'],
+  ['4. Como usamos suas informações', '4. 我们如何使用信息'],
+  ['Para autenticá-lo e gerenciar sua conta', '用于身份验证和账户管理'],
+  ['Para rastrear uso de créditos e processar pagamentos', '用于记录积分使用和处理付款'],
+  ['Para enviar códigos de verificação por e-mail (usando Resend)', '用于通过 Resend 发送邮箱验证码'],
+  ['Para responder a consultas de suporte', '用于回复支持请求'],
+  ['Para detectar e prevenir abusos', '用于检测和防止滥用'],
+  ['Não usamos seus dados para publicidade e não os vendemos ou compartilhamos com terceiros para marketing.', '我们不会将你的数据用于广告，也不会为营销目的出售或共享给第三方。'],
+  ['5. Serviços de terceiros', '5. 第三方服务'],
+  ['Usamos os seguintes serviços de terceiros para operar o ShopBG Remover:', '我们使用以下第三方服务运行 ShopBG Remover：'],
+  ['— hospedagem, CDN, DNS e proteção DDoS', '— 托管、CDN、DNS 和 DDoS 防护'],
+  ['— método opcional de login; regido pela Política de Privacidade do Google', '— 可选登录方式，受 Google 隐私政策约束'],
+  ['— processamento de pagamentos; regido pela Política de Privacidade do PayPal', '— 付款处理，受 PayPal 隐私政策约束'],
+  ['— envio de e-mails transacionais (códigos OTP)', '— 发送交易类邮件（OTP 验证码）'],
+  ['6. Cookies e armazenamento local', '6. Cookie 与本地存储'],
+  ['Usamos um cookie de sessão (<code>session</code>) para manter você logado. Ele é definido em <code>.shopbgremover.com</code> e expira em 30 dias. O <code>localStorage</code> guarda um identificador aleatório do dispositivo, enquanto o <code>IndexedDB</code> armazena os dados opcionais de recuperação por até 24 horas. Esses dados são separados por conta ou dispositivo, expiram automaticamente e podem ser apagados no espaço de trabalho. Não usamos cookies de publicidade de terceiros.', '我们使用会话 Cookie（<code>session</code>）保持登录状态，该 Cookie 设置在 <code>.shopbgremover.com</code>，30 天后过期。<code>localStorage</code> 保存随机设备标识，<code>IndexedDB</code> 保存最多 24 小时的可选恢复数据。这些数据按账户或设备隔离，会自动过期，也可在工作区中清除。我们不使用第三方广告 Cookie。'],
+  ['7. Retenção de dados', '7. 数据保留'],
+  ['Retemos sua conta e registros de uso enquanto sua conta estiver ativa. Você pode solicitar a exclusão de sua conta e dados associados a qualquer momento enviando um e-mail para <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Processaremos solicitações de exclusão em 30 dias.', '账户有效期间，我们会保留账户和使用记录。你可以随时发送邮件至 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a> 申请删除账户及相关数据，我们会在 30 天内处理。'],
+  ['8. Seus direitos', '8. 你的权利'],
+  ['Dependendo da sua localização, você pode ter direitos sob GDPR, CCPA, LGPD ou outras leis aplicáveis, incluindo o direito de acessar, corrigir ou excluir seus dados pessoais. Para exercer esses direitos, contate-nos em <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.', '根据所在地区，你可能享有 GDPR、CCPA、LGPD 或其他适用法律规定的权利，包括访问、更正或删除个人数据。请通过 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a> 联系我们行使这些权利。'],
+  ['9. Privacidade infantil', '9. 未成年人隐私'],
+  ['O ShopBG Remover não é direcionado a menores de 13 anos. Não coletamos intencionalmente informações pessoais de crianças.', 'ShopBG Remover 不面向 13 岁以下未成年人，我们不会故意收集儿童个人信息。'],
+  ['10. Mudanças nesta política', '10. 政策变更'],
+  ['Podemos atualizar esta política periodicamente. A data de "Última atualização" no topo desta página refletirá quaisquer mudanças. O uso continuado do serviço após mudanças constitui aceitação da política atualizada.', '我们可能会不时更新本政策，页面顶部的“最后更新”日期会反映相关变更。变更后继续使用服务即表示接受更新后的政策。'],
+  ['11. Contato', '11. 联系我们'],
+  ['Para dúvidas ou solicitações sobre privacidade, escreva para <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.', '如有隐私相关问题或请求，请发送邮件至 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>。'],
+];
+
+const termsPairs = [
+  ['Termos de serviço – ShopBG Remover', '服务条款 – ShopBG Remover'],
+  ['Termos de serviço do ShopBG Remover. Escritos em linguagem clara e justa para você e para nós.', 'ShopBG Remover 服务条款，说明服务、积分、付款、退款和使用责任。'],
+  ['Última atualização: 31 de março de 2026', '最后更新：2026 年 3 月 31 日'],
+  ['Ao usar o ShopBG Remover, você concorda com estes termos. Por favor leia — estão escritos em linguagem clara e foram pensados para serem justos com você e conosco.', '使用 ShopBG Remover 即表示你同意这些条款。请阅读以下内容。'],
+  ['1. O serviço', '1. 服务内容'],
+  ['O ShopBG Remover oferece remoção de fundo com IA para imagens de produtos, projetado para vendedores de e-commerce em plataformas como Shopify, Amazon e eBay. O serviço opera sob a marca <strong>shopbgremover</strong>.', 'ShopBG Remover 为 Shopify、Amazon 和 eBay 等平台的电商卖家提供产品图 AI 去背景服务，并以 <strong>shopbgremover</strong> 品牌运营。'],
+  ['2. Elegibilidade', '2. 使用资格'],
+  ['Você precisa ter pelo menos 18 anos para usar este serviço. Ao criar uma conta, você confirma que atende a este requisito.', '你必须年满 18 周岁才能使用本服务。创建账户即表示你确认符合这一要求。'],
+  ['3. Sua conta', '3. 你的账户'],
+  ['Você é responsável por manter suas credenciais de conta seguras. Pode entrar via Google OAuth ou código por e-mail. Você é responsável por toda atividade que ocorrer sob sua conta.', '你有责任妥善保管账户凭据。你可以通过 Google OAuth 或邮箱验证码登录，并对账户下发生的活动负责。'],
+  ['4. Créditos e cobrança', '4. 积分与计费'],
+  ['<strong>Cota grátis:</strong> Visitantes podem concluir 3 remoções com IA no total, uma imagem por vez. Usuários cadastrados recebem até 10 remoções grátis vitalícias no total, incluindo o uso anterior como visitante. Créditos grátis cadastrados expiram após 30 dias.', '<strong>免费额度：</strong>游客累计可完成 3 次 AI 去背景，每次处理 1 张。注册用户终身累计最多可获得 10 次免费额度，其中包含此前的游客使用次数。注册免费积分 30 天后过期。'],
+  ['<strong>Créditos comprados:</strong> Somente em compra única: 100 créditos por $3,49, 300 por $8,99 ou 1000 por $23,99. Créditos comprados nunca expiram.', '<strong>购买积分：</strong>仅提供一次性积分包：100 积分 $3.49、300 积分 $8.99、1000 积分 $23.99。购买的积分永久有效。'],
+  ['<strong>Cobrança:</strong> Um crédito só é debitado após uma remoção de fundo com IA bem-sucedida. Edição local, troca de fundo, downloads, novas exportações e criação de ZIP são grátis.', '<strong>扣费：</strong>每张图片仅在 AI 去背景成功后扣除 1 积分。本地编辑、更换背景、下载、重新导出和创建 ZIP 均免费。'],
+  ['5. Pagamentos e reembolsos', '5. 付款与退款'],
+  ['Os pagamentos são processados pelo PayPal em USD. Os cartões vendidos pelo Xianyu são pagos em CNY. Não existem assinaturas mensais ou anuais. Ao comprar, você autoriza a cobrança única mostrada no checkout.', 'PayPal 付款以美元（USD）处理，闲鱼卡密以人民币（CNY）支付。服务不提供月付或年付订阅。购买即表示你授权支付结账页面显示的一次性费用。'],
+  ['<strong>Política de reembolso:</strong> Reembolsamos um pacote PayPal não usado em até 7 dias somente se nenhum crédito do pacote tiver sido utilizado. Um cartão já resgatado não é reembolsável. O vendedor só pode reembolsar um cartão não usado depois de anulá-lo. Contate <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>. Não oferecemos reembolso parcial de pacotes parcialmente usados. Reembolsos, reversões ou contestações removem os créditos emitidos pela compra afetada.', '<strong>退款政策：</strong>未使用的 PayPal 积分包可在购买后 7 天内申请退款，但前提是该积分包没有使用过任何积分。已兑换卡密不支持退款；卖家只能在作废未使用卡密后退款。请联系 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>。部分使用的积分包不提供部分退款。退款、撤销或争议会扣回相关购买所发放的积分。'],
+  ['6. Uso aceitável', '6. 可接受使用'],
+  ['Você concorda em não:', '你同意不会：'],
+  ['Enviar imagens com conteúdo ilegal, incluindo CSAM ou conteúdo que viole direitos de terceiros', '上传违法内容，包括儿童性虐待材料（CSAM）或侵犯第三方权利的内容'],
+  ['Tentar fazer engenharia reversa, scraping ou abusar da API', '尝试逆向工程、抓取或滥用 API'],
+  ['Usar ferramentas automatizadas para contornar limites de taxa ou requisitos de créditos', '使用自动化工具绕过速率限制或积分要求'],
+  ['Revender ou redistribuir o serviço sem nossa permissão por escrito', '未经书面许可转售或重新分发服务'],
+  ['Reservamos o direito de suspender ou encerrar contas que violem estes termos.', '我们保留暂停或终止违反本条款账户的权利。'],
+  ['7. Suas imagens e propriedade intelectual', '7. 图片与知识产权'],
+  ['Você mantém propriedade total de todas as imagens enviadas e dos resultados processados que baixa. Ao enviar imagens, você nos concede uma licença temporária e limitada para processá-las unicamente com o propósito de entregar o serviço. Não reivindicamos direitos sobre suas imagens.', '你保留上传图片和下载结果的全部所有权。上传图片即表示你授予我们临时、有限的许可，仅为提供服务而处理这些图片。我们不主张对你的图片享有权利。'],
+  ['Você declara que é proprietário ou tem o direito de usar as imagens que envia, e que elas não infringem direitos de propriedade intelectual de terceiros.', '你声明自己拥有或有权使用所上传的图片，且这些图片不侵犯第三方知识产权。'],
+  ['8. Disponibilidade do serviço', '8. 服务可用性'],
+  ['Buscamos oferecer um serviço confiável mas não garantimos 100 % de disponibilidade. Podemos realizar manutenção, atualizações ou mudanças no serviço a qualquer momento. Não somos responsáveis por perdas resultantes de interrupções do serviço.', '我们会努力提供可靠服务，但不保证 100% 可用。我们可能随时进行维护、升级或调整，不对服务中断造成的损失承担责任。'],
+  ['9. Limitação de responsabilidade', '9. 责任限制'],
+  ['Até o máximo permitido por lei, o ShopBG Remover não será responsável por danos indiretos, incidentais, especiais ou consequenciais decorrentes do uso do serviço — incluindo perda de lucros, dados ou oportunidades de negócio.', '在法律允许的最大范围内，ShopBG Remover 不对使用服务产生的间接、偶发、特殊或后果性损害负责，包括利润、数据或商业机会损失。'],
+  ['Nossa responsabilidade total por qualquer reivindicação decorrente destes termos não excederá o valor pago a nós nos 30 dias anteriores à reivindicação.', '我们对与本条款相关的任何索赔承担的总责任，不超过索赔前 30 天内你向我们支付的金额。'],
+  ['10. Isenção de garantias', '10. 免责声明'],
+  ['O serviço é fornecido "como está" e "conforme disponível" sem garantias de qualquer tipo, expressas ou implícitas, incluindo precisão dos resultados de processamento de IA. A qualidade da remoção de fundo por IA pode variar conforme a complexidade da imagem.', '服务按“现状”和“可用状态”提供，不作任何明示或默示保证，包括 AI 处理结果的准确性。AI 去背景质量可能随图片复杂度变化。'],
+  ['11. Mudanças nos termos', '11. 条款变更'],
+  ['Podemos atualizar estes termos a qualquer momento. A data de "Última atualização" no topo reflete a versão mais recente. O uso continuado do serviço após mudanças constitui aceitação dos termos atualizados.', '我们可能随时更新这些条款，页面顶部的“最后更新”日期代表最新版本。变更后继续使用服务即表示接受更新后的条款。'],
+  ['12. Lei aplicável', '12. 适用法律'],
+  ['Estes termos são regidos pela lei aplicável. Quaisquer disputas serão resolvidas primeiro por negociação de boa-fé. Se tiver uma preocupação, por favor entre em contato antes de iniciar qualquer ação formal.', '本条款受适用法律管辖。任何争议应先通过善意协商解决；如有疑问，请在采取正式行动前联系我们。'],
+  ['13. Contato', '13. 联系我们'],
+  ['Dúvidas sobre estes termos? Escreva para <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>.', '如对本条款有疑问，请发送邮件至 <a href="mailto:yubudong2023@gmail.com">yubudong2023@gmail.com</a>。'],
+];
+
+const referralPairs = [
+  ['Central de indicações · ShopBG Remover', '推荐中心 · ShopBG Remover'],
+  ['Programa de indicações', '推荐计划'],
+  ['Central de indicações', '推荐中心'],
+  ['Compartilhe seu link pessoal. Depois da sua primeira compra real de créditos, vocês dois poderão receber créditos extras em compras qualificadas.', '分享你的专属链接。推荐人在完成首次真实充值后，符合条件的购买可为双方带来额外积分。'],
+  ['Carregando dados de indicações…', '正在加载推荐数据…'],
+  ['Meu código de indicação', '我的推荐码'],
+  ['Copiar link', '复制链接'],
+  ['Indicados cadastrados', '已邀请注册'],
+  ['Indicados com compra', '已完成充值'],
+  ['Em análise de risco', '风险审核中'],
+  ['Créditos de recompensa', '奖励积分'],
+  ['Disponíveis', '当前可用'],
+  ['Pendentes', '待生效'],
+  ['Total concedido', '累计发放'],
+  ['Total revertido', '累计冲正'],
+  ['Histórico de recompensas', '奖励流水'],
+  ['Mostra os 50 lançamentos mais recentes de concessão, uso e reversão de recompensas.', '显示最近 50 条推荐奖励发放、使用和冲正记录。'],
+  ['Data', '时间'],
+  ['Alteração', '变化'],
+  ['Motivo', '原因'],
+  ['Conta indicada', '被推荐账号'],
+  ['Validade', '有效期'],
+  ['Status', '状态'],
+  ['Ainda não há lançamentos de recompensa.', '暂无推荐奖励流水。'],
+  ['Usuários indicados', '邀请明细'],
+  ['As contas aparecem com o e-mail mascarado. Compartilhar um endereço IP não causa bloqueio por si só.', '账号只显示脱敏邮箱；仅共享同一 IP 不会导致封禁。'],
+  ['Conta', '账号'],
+  ['Vinculação', '绑定时间'],
+  ['Primeira compra', '首充时间'],
+  ['Status da relação', '关系状态'],
+  ['Status de risco', '风险状态'],
+  ['Ainda não há indicações.', '暂无邀请记录。'],
+  ['Entrar para visualizar', '登录后查看'],
+  ['A primeira compra qualificada recompensa 15% dos créditos-base; as compras seguintes recompensam 10%.', '首笔有效充值奖励基础积分的 15%，后续充值奖励 10%。'],
+  ['Na primeira compra de 300 ou 1000 créditos-base, a pessoa indicada recebe 30 créditos adicionais.', '被推荐用户首次购买 300 或 1000 基础积分时，额外获得 30 积分。'],
+  ['As recompensas por indicação expiram em 90 dias e não podem ser sacadas nem transferidas.', '推荐奖励积分 90 天后过期，不可提现或转让。'],
+  ['Reembolsos, estornos, a mesma conta de pagamento ou indicações anormais não geram recompensa válida.', '退款、拒付、同一付款账户或异常邀请不会产生有效奖励。'],
+];
+
+function applyPairs(source, pairs) {
+  let output = source;
+  const ordered = [...commonPairs, ...pairs].sort((a, b) => b[0].length - a[0].length);
+  for (const [from, to] of ordered) output = output.replaceAll(from, to);
+  return output;
+}
+
+function addChineseAlternativeLines(source, slug) {
+  const lines = source.split('\n');
+  const result = [];
+  for (let line of lines) {
+    if (line.includes('hreflang="pt-BR"')) {
+      line = line.replaceAll('/zh-cn', '/pt-br')
+        .replace(' class="active"', '')
+        .replace(' aria-current="page"', '');
+      result.push(line);
+      if (line.includes('<link rel="alternate"')) {
+        result.push(line
+          .replace('hreflang="pt-BR"', 'hreflang="zh-CN"')
+          .replaceAll('/pt-br', '/zh-cn'));
+      } else if (line.includes('role="menuitem"')) {
+        const indent = line.match(/^\s*/)?.[0] || '';
+        result.push(`${indent}<li role="none"><a role="menuitem" href="/zh-cn/${slug}" hreflang="zh-CN" class="active">简体中文 <span class="lang-code">简中</span></a></li>`);
+      } else if (line.includes('<a ')) {
+        const indent = line.match(/^\s*/)?.[0] || '';
+        const suffix = slug ? `/${slug}` : '/';
+        if (line.includes('class="languages"') || line.includes('lang="pt-BR"')) {
+          result.push(`${indent}<a href="/zh-cn${suffix}" hreflang="zh-CN" lang="zh-CN" aria-current="page">简中</a>`);
+        } else {
+          result.push(`${indent}<a href="/zh-cn${suffix}" hreflang="zh-CN" class="active">简体中文</a>`);
+        }
+      }
+      continue;
+    }
+    result.push(line);
+  }
+  return result.join('\n');
+}
+
+async function localizeFile(file, slug, pairs) {
+  let source = await readFile(path.join(sourceDir, file), 'utf8');
+  source = source
+    .split('\n')
+    .filter((line) => !line.includes('hreflang="zh-CN"'))
+    .join('\n')
+    .replaceAll('/pt-br', '/zh-cn')
+    .replaceAll('?lang=pt-br', '?lang=zh-cn');
+  source = addChineseAlternativeLines(source, slug);
+  source = source
+    .replace('<html lang="pt-BR">', '<html lang="zh-CN">')
+    .replaceAll('content="pt_BR"', 'content="zh_CN"')
+    .replaceAll('locale=pt_BR', 'locale=zh_CN')
+    .replace('"inLanguage": "pt-BR"', '"inLanguage": "zh-CN"')
+    .replace("locale: 'pt-BR'", "locale: 'zh-CN'")
+    .replace('🌐 PT-BR', '🌐 简中');
+  source = applyPairs(source, pairs);
+  await writeFile(path.join(outputDir, file), source, 'utf8');
+}
+
+async function addChineseAlternatives(file, slug) {
+  const target = path.join(root, file);
+  const source = await readFile(target, 'utf8');
+  if (source.includes('hreflang="zh-CN"')) return;
+  const suffix = slug ? `/${slug}` : '/';
+  const output = source.split('\n').flatMap((line) => {
+    if (!line.includes('hreflang="pt-BR"')) return [line];
+    let chinese = line
+      .replaceAll('/pt-br', '/zh-cn')
+      .replaceAll('pt-BR', 'zh-CN')
+      .replace(' class="active"', '')
+      .replace(' aria-current="page"', '')
+      .replace('Português <span class="lang-code">PT-BR</span>', '简体中文 <span class="lang-code">简中</span>')
+      .replace('>Português</a>', '>简体中文</a>')
+      .replace('>PT</a>', '>简中</a>');
+    if (chinese.includes('href="/zh-cn"') && !chinese.includes(`href="/zh-cn${suffix}"`)) {
+      chinese = chinese.replace(/href="\/zh-cn[^"]*"/, `href="/zh-cn${suffix}"`);
+    }
+    return [line, chinese];
+  }).join('\n');
+  await writeFile(target, output, 'utf8');
+}
+
+await mkdir(outputDir, { recursive: true });
+await localizeFile('index.html', '', indexPairs);
+await localizeFile('pricing.html', 'pricing', pricingPairs);
+await localizeFile('shopify-background-remover.html', 'shopify-background-remover', shopifyPairs);
+await localizeFile('amazon-ebay-product-images.html', 'amazon-ebay-product-images', marketplacePairs);
+await localizeFile('contact.html', 'contact', contactPairs);
+await localizeFile('privacy.html', 'privacy', privacyPairs);
+await localizeFile('terms.html', 'terms', termsPairs);
+await localizeFile('referrals.html', 'referrals', referralPairs);
+
+const publicPages = [
+  ['index.html', ''],
+  ['pricing.html', 'pricing'],
+  ['shopify-background-remover.html', 'shopify-background-remover'],
+  ['amazon-ebay-product-images.html', 'amazon-ebay-product-images'],
+  ['contact.html', 'contact'],
+  ['privacy.html', 'privacy'],
+  ['terms.html', 'terms'],
+];
+for (const locale of ['', 'de', 'es', 'fr', 'pt-br']) {
+  for (const [file, slug] of publicPages) {
+    await addChineseAlternatives(locale ? `${locale}/${file}` : file, slug);
+  }
+}
+for (const locale of ['de', 'es', 'fr', 'pt-br']) {
+  await addChineseAlternatives(`${locale}/referrals.html`, 'referrals');
+}
+
+console.log('Generated 8 Simplified Chinese pages and linked all existing localized pages.');

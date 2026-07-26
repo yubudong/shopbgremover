@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""生成 11 个法务页翻译文件（es/contact 已手写，跳过）+ sitemap.xml + _routes.json
+"""生成既有非中文法务页（es/contact 已手写，跳过）。
+简体中文页面由 generate_zh_cn_locale.mjs 维护；本脚本仍会把中文加入语言链接。
 每次跑都是幂等的（覆盖现有文件）。"""
 
 import json
@@ -14,12 +15,13 @@ LANGS = [
     ("en",    "en",    "English",   "EN",    "Change language",   "Sign in",        "credits"),
     ("es",    "es_MX", "Español",   "ES",    "Cambiar idioma",    "Iniciar sesión", "créditos"),
     ("pt-BR", "pt_BR", "Português", "PT-BR", "Mudar idioma",      "Entrar",         "créditos"),
+    ("zh-CN", "zh_CN", "简体中文",   "简中",   "切换语言",          "登录",            "积分"),
     ("de",    "de_DE", "Deutsch",   "DE",    "Sprache ändern",    "Anmelden",       "Credits"),
     ("fr",    "fr_FR", "Français",  "FR",    "Changer de langue", "Se connecter",   "crédits"),
 ]
 
 # url prefix per lang code
-PREFIX = {"en": "", "es": "/es", "pt-BR": "/pt-br", "de": "/de", "fr": "/fr"}
+PREFIX = {"en": "", "es": "/es", "pt-BR": "/pt-br", "zh-CN": "/zh-cn", "de": "/de", "fr": "/fr"}
 
 # ─── 每个语种的 nav/footer link 文案 ───
 NAV = {
@@ -367,8 +369,8 @@ def render_legal(lang_code, og_locale, label_short, change_lang_aria, sign_in_te
 if __name__ == "__main__":
     count = 0
     for code, og_locale, label_full, label_short, change_lang_aria, sign_in_text, credits_word in LANGS:
-        if code == "en":
-            continue  # 跳过英文
+        if code in ("en", "zh-CN"):
+            continue  # 英文是源文件；简体中文由 generate_zh_cn_locale.mjs 维护
 
         dir_path = ROOT / code.lower().replace("pt-br", "pt-br").replace("BR", "br")
         # PREFIX 映射在 LANG 配置里是 pt-BR；我们目录名是 pt-br

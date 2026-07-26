@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>推荐中心 · ShopBG Remover</title>
+  <meta name="description" content="Gerencie seu código, link e recompensas por indicação do ShopBG Remover.">
+  <link rel="canonical" href="https://www.shopbgremover.com/zh-cn/referrals">
+  <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/referrals">
+  <link rel="alternate" hreflang="zh-CN" href="https://www.shopbgremover.com/zh-cn/referrals">
+  <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/referrals-localized.css">
+  <script src="/referrals-localized.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/zh-cn/">ShopBG Remover</a>
+    <nav class="nav" aria-label="Navegação da página">
+      <a class="back" href="/zh-cn/pricing">价格</a>
+      <div class="languages" aria-label="Idioma">
+        <a href="/referrals" hreflang="en" lang="en">EN</a>
+        <a href="/de/referrals" hreflang="de" lang="de">DE</a>
+        <a href="/es/referrals" hreflang="es" lang="es">ES</a>
+        <a href="/fr/referrals" hreflang="fr" lang="fr">FR</a>
+        <a href="/pt-br/referrals" hreflang="pt-BR" lang="pt-BR">PT</a>
+        <a href="/zh-cn/referrals" hreflang="zh-CN" lang="zh-CN" aria-current="page">简中</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <div class="eyebrow">推荐计划</div>
+    <h1>推荐中心</h1>
+    <p class="lead">分享你的专属链接。推荐人在完成首次真实充值后，符合条件的购买可为双方带来额外积分。</p>
+    <section class="card">
+      <div id="loading">正在加载推荐数据…</div>
+      <div id="content" hidden>
+        <div class="label">我的推荐码</div>
+        <div class="code" id="code"></div>
+        <div class="linkrow">
+          <input id="link" readonly aria-label="Link de indicação">
+          <button id="copyButton" type="button">复制链接</button>
+        </div>
+        <div class="status" id="eligibility"></div>
+        <div class="stats">
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">已邀请注册</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">已完成充值</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">风险审核中</div></div>
+        </div>
+        <div class="section">
+          <h2>奖励积分</h2>
+          <p class="section-note" id="rewardPolicy"></p>
+          <div class="reward-stats">
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">当前可用</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">待生效</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">累计发放</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">累计冲正</div></div>
+          </div>
+          <div class="status" id="expiry状态"></div>
+        </div>
+        <div class="section">
+          <h2>奖励流水</h2>
+          <p class="section-note">显示最近 50 条推荐奖励发放、使用和冲正记录。</p>
+          <div class="table-wrap" id="rewardTableWrap">
+            <table>
+              <thead><tr><th>时间</th><th>变化</th><th>原因</th><th>被推荐账号</th><th>有效期</th><th>状态</th></tr></thead>
+              <tbody id="rewardRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="rewardEmpty" hidden>暂无推荐奖励流水。</div>
+        </div>
+        <div class="section">
+          <h2>邀请明细</h2>
+          <p class="section-note">账号只显示脱敏邮箱；仅共享同一 IP 不会导致封禁。</p>
+          <div class="table-wrap" id="inviteeTableWrap">
+            <table>
+              <thead><tr><th>账号</th><th>绑定时间</th><th>首充时间</th><th>关系状态</th><th>风险状态</th></tr></thead>
+              <tbody id="inviteeRows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="inviteeEmpty" hidden>暂无邀请记录。</div>
+        </div>
+      </div>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>登录后查看</a>
+      <div class="status error" id="error" hidden></div>
+      <ul class="rules">
+        <li>首笔有效充值奖励基础积分的 15%，后续充值奖励 10%。</li>
+        <li>被推荐用户首次购买 300 或 1000 基础积分时，额外获得 30 积分。</li>
+        <li>推荐奖励积分 90 天后过期，不可提现或转让。</li>
+        <li>退款、拒付、同一付款账户或异常邀请不会产生有效奖励。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="zh-CN">
 <head>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-GMM5Z81M3X"></script>
@@ -11,17 +11,17 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hintergrund entfernen für Shopify-Produktbilder – KI-Stapelverarbeitung | ShopBG Remover</title>
-  <meta property="og:title" content="Hintergrund entfernen für Shopify-Produktbilder – KI-Stapelverarbeitung" />
-  <meta property="og:description" content="Entferne den Hintergrund deiner Shopify-Produktfotos im Stapel. KI generiert 2048×2048-Bilder mit weißem Hintergrund, bereit zum Upload. Kein Designer nötig." />
-  <meta property="og:locale" content="de_DE" />
+  <title>Shopify 产品图去背景 – AI 批量处理工具 | ShopBG Remover</title>
+  <meta property="og:title" content="Shopify 产品图去背景 – AI 批量处理工具" />
+  <meta property="og:description" content="批量去除 Shopify 产品图背景，生成可上传的 2048×2048 白底图片，无需设计经验。" />
+  <meta property="og:locale" content="zh_CN" />
   <meta property="og:image" content="https://www.shopbgremover.com/logo1200.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://www.shopbgremover.com/logo1200.png" />
-  <meta name="description" content="Entferne den Hintergrund deiner Shopify-Produktfotos im Stapel. KI generiert 2048×2048-Bilder mit weißem Hintergrund, bereit zum Upload. Kein Designer nötig.">
-  <link rel="canonical" href="https://www.shopbgremover.com/de/shopify-background-remover">
+  <meta name="description" content="批量去除 Shopify 产品图背景，生成可上传的 2048×2048 白底图片，无需设计经验。">
+  <link rel="canonical" href="https://www.shopbgremover.com/zh-cn/shopify-background-remover">
   <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/shopify-background-remover" />
   <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/shopify-background-remover" />
   <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/shopify-background-remover" />
@@ -38,17 +38,17 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "ShopBG Remover für Shopify",
-    "url": "https://www.shopbgremover.com/de/shopify-background-remover",
+    "name": "ShopBG Remover Shopify 工具",
+    "url": "https://www.shopbgremover.com/zh-cn/shopify-background-remover",
     "applicationCategory": "PhotographyApplication",
     "operatingSystem": "Web",
-    "description": "KI-Tool zur Stapelverarbeitung, das den Hintergrund von Shopify-Produktbildern entfernt. Liefert JPG/PNG 2048×2048 mit weißem Hintergrund, bereit zum Upload.",
-    "inLanguage": "de",
+    "description": "用于批量去除 Shopify 产品图背景的 AI 工具，可生成 2048×2048 白底 JPG/PNG 文件。",
+    "inLanguage": "zh-CN",
     "offers": {
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "USD",
-      "description": "3 kostenlose Bilder insgesamt, ohne Anmeldung"
+      "description": "3 imagens grátis no total, sem cadastro"
     }
   }
   </script>
@@ -61,6 +61,8 @@
       --green: #10B981; --text: #111827; --text-2: #4B5563;
       --text-muted: #9CA3AF; --border: #E5E7EB; --bg: #F8FAFC;
       --white: #FFFFFF; --dark: #0A0A0A;
+      --sh: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05);
+      --sh-lg: 0 8px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.07);
     }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
@@ -148,112 +150,112 @@
 <body>
 
 <nav class="navbar">
-  <a class="nav-logo" href="/de/">
+  <a class="nav-logo" href="/zh-cn/">
     <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
   </a>
   <div class="nav-links">
-    <a href="/de/#how">So funktioniert's</a>
-    <a href="/de/pricing">Preise</a>
-    <a href="/de/shopify-background-remover">Shopify</a>
-    <a href="/de/amazon-ebay-product-images">Amazon &amp; eBay</a>
+    <a href="/zh-cn/#how">使用方法</a>
+    <a href="/zh-cn/pricing">价格</a>
+    <a href="/zh-cn/shopify-background-remover">Shopify</a>
+    <a href="/zh-cn/amazon-ebay-product-images">Amazon 与 eBay</a>
   </div>
   <div class="nav-right">
     <div class="credits-badge" id="creditsBadge">
-      <span id="creditsText">— Credits</span>
+      <span id="creditsText">— 积分</span>
     </div>
     <span class="user-name" id="userName"></span>
     <div class="lang-switcher">
-      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Sprache ändern" aria-haspopup="true">
-        <span>🌐 DE</span>
+      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="切换语言" aria-haspopup="true">
+        <span>🌐 简中</span>
         <span class="lang-caret">▾</span>
       </button>
       <ul class="lang-menu" id="langMenu" role="menu">
         <li role="none"><a role="menuitem" href="/shopify-background-remover" hreflang="en">English <span class="lang-code">EN</span></a></li>
         <li role="none"><a role="menuitem" href="/es/shopify-background-remover" hreflang="es">Español <span class="lang-code">ES</span></a></li>
         <li role="none"><a role="menuitem" href="/pt-br/shopify-background-remover" hreflang="pt-BR">Português <span class="lang-code">PT-BR</span></a></li>
-        <li role="none"><a role="menuitem" href="/zh-cn/shopify-background-remover" hreflang="zh-CN">简体中文 <span class="lang-code">简中</span></a></li>
-        <li role="none"><a role="menuitem" href="/de/shopify-background-remover" hreflang="de" class="active">Deutsch <span class="lang-code">DE</span></a></li>
+        <li role="none"><a role="menuitem" href="/zh-cn/shopify-background-remover" hreflang="zh-CN" class="active">简体中文 <span class="lang-code">简中</span></a></li>
+        <li role="none"><a role="menuitem" href="/de/shopify-background-remover" hreflang="de">Deutsch <span class="lang-code">DE</span></a></li>
         <li role="none"><a role="menuitem" href="/fr/shopify-background-remover" hreflang="fr">Français <span class="lang-code">FR</span></a></li>
       </ul>
     </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/de/'">Anmelden</button>
+    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/zh-cn/'">登录</button>
   </div>
 </nav>
 
 <section class="hero">
-  <div class="hero-badge">🟣 Entwickelt für Shopify-Verkäufer</div>
-  <h1>Hintergrund entfernen<br><em>für deinen Shopify-Shop</em></h1>
+  <div class="hero-badge">🟣 专为 Shopify 卖家打造</div>
+  <h1>为 Shopify 店铺<br><em>去除产品图背景</em></h1>
   <p class="hero-sub">
-    KI-Stapelverarbeitung, die Shopify-fertige Bilder im Format 2048×2048 mit weißem Hintergrund erzeugt.
-    Lade 50 Produktfotos auf einmal hoch — fertig in Minuten, nicht in Stunden.
+    使用 AI 批量生成 2048×2048 白底产品图。
+    一次上传 50 张，几分钟即可完成。
   </p>
   <div class="hero-ctas">
-    <a class="btn-primary" href="/de/#tool">Kostenlos testen — keine Anmeldung →</a>
-    <a class="btn-secondary" href="/de/pricing">Preise ansehen</a>
+    <a class="btn-primary" href="/zh-cn/#tool">免费试用——无需注册 →</a>
+    <a class="btn-secondary" href="/zh-cn/pricing">查看价格</a>
   </div>
   <div class="hero-stats">
     <div>
       <div class="hero-stat-val">2048×2048</div>
-      <div class="hero-stat-label">Shopify-fertige Bildgröße</div>
+      <div class="hero-stat-label">Shopify 推荐尺寸</div>
     </div>
     <div>
-      <div class="hero-stat-val">50 Bilder</div>
-      <div class="hero-stat-label">Pro Stapel</div>
+      <div class="hero-stat-val">50 张图片</div>
+      <div class="hero-stat-label">每批</div>
     </div>
     <div>
-      <div class="hero-stat-val">3 gratis</div>
-      <div class="hero-stat-label">Bilder insgesamt, ohne Anmeldung</div>
+      <div class="hero-stat-val">免费 3 次</div>
+      <div class="hero-stat-label">无需注册的累计次数</div>
     </div>
   </div>
 </section>
 
 <div class="spec-bar">
-  <div class="spec-item"><div class="dot"></div>2048×2048 px Ausgabe</div>
-  <div class="spec-item"><div class="dot"></div>Reinweißer Hintergrund (RGB 255,255,255)</div>
-  <div class="spec-item"><div class="dot"></div>JPG und PNG unterstützt</div>
-  <div class="spec-item"><div class="dot"></div>Optimiert für Shopifys CDN</div>
+  <div class="spec-item"><div class="dot"></div>输出 2048×2048 px</div>
+  <div class="spec-item"><div class="dot"></div>纯白背景（RGB 255,255,255）</div>
+  <div class="spec-item"><div class="dot"></div>支持 JPG 和 PNG</div>
+  <div class="spec-item"><div class="dot"></div>适合 Shopify CDN</div>
 </div>
 
 <section class="section section-alt">
   <div class="section-inner">
-    <span class="section-eyebrow">Shopify Bildrichtlinien</span>
-    <h2 class="section-title">Was Shopify für deine Produktbilder verlangt</h2>
-    <p class="section-sub">Shopify empfiehlt bestimmte Bildstandards, um Conversions zu maximieren und deinen Shop auf allen Geräten professionell wirken zu lassen.</p>
+    <span class="section-eyebrow">Shopify 图片指南</span>
+    <h2 class="section-title">Shopify 产品图应注意什么</h2>
+    <p class="section-sub">Shopify 提供产品媒体建议，帮助图片在不同设备和店铺主题中保持一致。</p>
     <div class="req-grid">
       <div class="req-card">
         <div class="req-card-head">
           <div class="req-icon">📐</div>
-          <div class="req-title">Größe und Auflösung</div>
+          <div class="req-title">尺寸与分辨率</div>
         </div>
         <ul>
-          <li>2048×2048 px empfohlen (quadratisch)</li>
-          <li>Bis 5000×5000 px oder 25 Megapixel</li>
-          <li>Datei muss kleiner als 20 MB sein</li>
-          <li>Einheitliche Seitenverhältnisse für Produktraster</li>
+          <li>建议 2048×2048 px（方形）</li>
+          <li>最高 5000×5000 px 或 2500 万像素</li>
+          <li>文件必须小于 20 MB</li>
+          <li>产品网格中保持一致的宽高比</li>
         </ul>
       </div>
       <div class="req-card">
         <div class="req-card-head">
           <div class="req-icon">🎨</div>
-          <div class="req-title">Hintergrund</div>
+          <div class="req-title">背景</div>
         </div>
         <ul>
-          <li>Weiß, transparent oder markengerechten Hintergrund wählen</li>
-          <li>Einheitliches Seitenverhältnis im Produktraster</li>
-          <li>Ergebnis im aktuellen Theme prüfen</li>
-          <li>Shopify verlangt kein festes Produkt-Flächenverhältnis</li>
+          <li>可选择白色、透明或品牌背景</li>
+          <li>产品网格中保持相同宽高比</li>
+          <li>在当前店铺主题中检查效果</li>
+          <li>Shopify 不要求固定的商品占图比例</li>
         </ul>
       </div>
       <div class="req-card">
         <div class="req-card-head">
           <div class="req-icon">📁</div>
-          <div class="req-title">Dateiformat</div>
+          <div class="req-title">文件格式</div>
         </div>
         <ul>
-          <li>JPG (ideal für weiße Hintergründe)</li>
-          <li>PNG (wenn Transparenz nötig ist)</li>
-          <li>WebP unterstützt</li>
-          <li>GIF für animierte Produktansichten</li>
+          <li>JPG（适合白色背景）</li>
+          <li>PNG（需要透明背景时）</li>
+          <li>支持 WebP</li>
+          <li>GIF 可用于动画展示</li>
         </ul>
       </div>
     </div>
@@ -262,23 +264,23 @@
 
 <section class="section">
   <div class="section-inner">
-    <span class="section-eyebrow">So funktioniert's</span>
-    <h2 class="section-title">Von Rohfotos zu Shopify-fertig in 3 Schritten</h2>
+    <span class="section-eyebrow">使用方法</span>
+    <h2 class="section-title">三步把原始图片变成 Shopify 产品图</h2>
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
-        <h3>Produktfotos hochladen</h3>
-        <p>Ziehe bis zu 50 Bilder per Drag &amp; Drop. JPG, PNG oder WebP — beliebiger Hintergrund, beliebiger Produkttyp.</p>
+        <h3>上传产品图片</h3>
+        <p>一次拖放最多 50 张 JPG、PNG 或 WebP 图片，适用于不同背景和商品类型。</p>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <h3>KI entfernt den Hintergrund</h3>
-        <p>Unsere KI erkennt das Produkt sofort und entfernt den Hintergrund mit sauberen, scharfen Kanten — auch bei Kleidung, Schmuck und komplexen Formen.</p>
+        <h3>AI 去除背景</h3>
+        <p>AI 自动识别商品并去除背景，可处理服装、珠宝等复杂轮廓；实际效果取决于原图。</p>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <h3>Shopify-fertiges ZIP herunterladen</h3>
-        <p>Erhalte alle Bilder als 2048×2048 JPG mit weißem Hintergrund in einem ZIP. Lade sie direkt zu deinen Shopify-Produkten hoch.</p>
+        <h3>下载适用于 Shopify 的 ZIP</h3>
+        <p>将 2048×2048 白底 JPG 图片打包为一个 ZIP，再上传到 Shopify 商品。</p>
       </div>
     </div>
   </div>
@@ -286,54 +288,54 @@
 
 <section class="section section-alt">
   <div class="section-inner">
-    <span class="section-eyebrow">Häufige Fragen</span>
-    <h2 class="section-title">Häufige Fragen von Shopify-Verkäufern</h2>
+    <span class="section-eyebrow">常见问题</span>
+    <h2 class="section-title">Shopify 卖家常见问题</h2>
     <div class="faq-list">
       <div class="faq-item">
-        <div class="faq-q">Garantiert die Shopify-Voreinstellung die Freigabe?</div>
-        <div class="faq-a">Nein. Die Voreinstellung nutzt Shopifys empfohlene quadratische Größe 2048×2048, akzeptierte PNG-, JPEG- und WebP-Formate und prüft die 20-MB-Grenze. Prüfe das Endergebnis vor der Veröffentlichung in deinem Theme.</div>
+        <div class="faq-q">Shopify 预设能保证通过审核吗？</div>
+        <div class="faq-a">不能。预设采用 Shopify 建议的 2048×2048 方形尺寸、支持 PNG/JPEG/WebP，并检查小于 20 MB；发布前仍需在店铺主题中核对最终效果。</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Kann ich alle Produktfotos auf einmal verarbeiten?</div>
-        <div class="faq-a">Ja. Du kannst bis zu 50 Bilder pro Stapel hochladen. Alle werden parallel verarbeitet und in einer einzigen ZIP-Datei geliefert, bereit für den Massenupload zu Shopify.</div>
+        <div class="faq-q">可以一次处理全部图片吗？</div>
+        <div class="faq-a">可以。每批最多上传 50 张图片，处理后会打包为一个 ZIP，便于批量上传。</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Funktioniert es für Kleidung, Schmuck und Schuhe?</div>
-        <div class="faq-a">Absolut. Die KI bewältigt komplexe Formen wie Kleidung an Schaufensterpuppen, Schmuck mit feinen Details, Schuhe und Accessoires — allesamt häufige Kategorien in Shopify-Shops.</div>
+        <div class="faq-q">适用于服装、珠宝和鞋类吗？</div>
+        <div class="faq-a">可以尝试。AI 能处理模特服装、精细珠宝、鞋类和配饰等复杂轮廓，但效果会随图片复杂度变化。</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Gibt es eine kostenlose Testversion?</div>
-        <div class="faq-a">Ja — 3 kostenlose Bilder insgesamt, ohne Konto. Melde dich an, um mehr Credits und Stapelverarbeitung freizuschalten.</div>
+        <div class="faq-q">有免费试用吗？</div>
+        <div class="faq-a">有。无需账户可累计免费处理 3 张；登录后可获得更多免费额度并使用批量处理。</div>
       </div>
     </div>
   </div>
 </section>
 
 <section class="cta-section">
-  <h2>Bereit, deine Shopify-Produktfotos aufzuwerten?</h2>
-  <p>Schließe dich Tausenden Shopify-Verkäufern an, die jede Woche Stunden bei der Bildbearbeitung sparen.</p>
-  <a class="btn-cta" href="/de/#tool">Kostenlos starten — keine Anmeldung</a>
+  <h2>准备好优化 Shopify 产品图了吗？</h2>
+  <p>批量处理图片，减少重复的手工编辑工作。</p>
+  <a class="btn-cta" href="/zh-cn/#tool">免费开始——无需注册</a>
 </section>
 
 <footer class="footer">
   <div class="footer-logo">ShopBG Remover</div>
   <div class="footer-links">
-    <a href="/de/pricing">Preise</a>
-    <a href="/de/shopify-background-remover">Shopify-Leitfaden</a>
-    <a href="/de/amazon-ebay-product-images">Amazon &amp; eBay Leitfaden</a>
-    <a href="/de/contact">Kontakt</a>
-    <a href="/de/privacy">Datenschutz</a>
-    <a href="/de/terms">AGB</a>
+    <a href="/zh-cn/pricing">价格</a>
+    <a href="/zh-cn/shopify-background-remover">Shopify 指南</a>
+    <a href="/zh-cn/amazon-ebay-product-images">Amazon 与 eBay 指南</a>
+    <a href="/zh-cn/contact">联系我们</a>
+    <a href="/zh-cn/privacy">隐私政策</a>
+    <a href="/zh-cn/terms">服务条款</a>
   </div>
-  <div class="footer-langs" aria-label="Sprache ändern">
+  <div class="footer-langs" aria-label="切换语言">
     <a href="/shopify-background-remover" hreflang="en">English</a>
     <a href="/es/shopify-background-remover" hreflang="es">Español</a>
     <a href="/pt-br/shopify-background-remover" hreflang="pt-BR">Português</a>
-    <a href="/zh-cn/shopify-background-remover" hreflang="zh-CN">简体中文</a>
-    <a href="/de/shopify-background-remover" hreflang="de" class="active">Deutsch</a>
+    <a href="/zh-cn/shopify-background-remover" hreflang="zh-CN" lang="zh-CN" aria-current="page">简中</a>
+    <a href="/de/shopify-background-remover" hreflang="de">Deutsch</a>
     <a href="/fr/shopify-background-remover" hreflang="fr">Français</a>
   </div>
-  <div class="footer-copy">© 2026 ShopBG Remover. Entwickelt für E-Commerce-Verkäufer weltweit.</div>
+  <div class="footer-copy">© 2026 ShopBG Remover。为全球电商卖家打造。</div>
 </footer>
 
 <script>

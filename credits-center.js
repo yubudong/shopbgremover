@@ -20,6 +20,25 @@
         empty: 'No records yet.', never: 'Never', loadError: 'Unable to load the credit center. Please try again.',
       },
     },
+    'zh-cn': {
+      html: 'zh-CN', date: 'zh-CN', home: '/zh-cn/', pricing: '/zh-cn/pricing', referrals: '/zh-cn/referrals',
+      text: {
+        eyebrow: '账户与计费', title: '积分中心', lead: '查看余额、购买积分，并核对账户的每一笔变动。',
+        home: '返回工作区', pricing: '价格', account: '当前登录账户',
+        signinTitle: '登录后查看积分', signinBody: '余额、订单和交易记录仅对当前账户可见。', signin: '登录',
+        total: '可用积分', paid: '付费积分', rewards: '免费与奖励积分', used: '累计使用',
+        totalNote: '可用于 AI 去背景', paidNote: '永久有效', rewardsNote: '可能存在有效期', usedNote: '成功的 AI 任务',
+        paypal: '使用 PayPal 购买', paypalDesc: '以美元购买 100、300 或 1000 个永久积分。',
+        voucher: '兑换卡密', voucherDesc: '输入通过闲鱼购买的一次性卡密。',
+        referral: '推荐中心', referralDesc: '查看推荐码和待生效奖励。',
+        orders: '充值订单', ordersNote: 'PayPal 付款与卡密兑换',
+        transactions: '积分流水', transactionsNote: '每一笔积分增加与扣除',
+        grants: '积分批次', grantsNote: '每批积分的剩余数量和有效期',
+        dateCol: '时间', methodCol: '方式', amountCol: '金额', creditsCol: '积分', statusCol: '状态',
+        changeCol: '变化', typeCol: '类型', reasonCol: '原因', remainingCol: '剩余', expiresCol: '有效期',
+        empty: '暂无记录。', never: '永久有效', loadError: '无法加载积分中心，请重试。',
+      },
+    },
     de: {
       html: 'de', date: 'de-DE', home: '/de/', pricing: '/de/pricing', referrals: '/de/referrals',
       text: {
@@ -120,26 +139,26 @@
     return text.length > 18 ? `${text.slice(0, 9)}…${text.slice(-6)}` : text || '—';
   };
   const typeNames = {
-    paid: { en: 'Paid', de: 'Bezahlt', es: 'Pagado', fr: 'Payé', 'pt-br': 'Pago' },
-    free: { en: 'Free', de: 'Kostenlos', es: 'Gratis', fr: 'Gratuit', 'pt-br': 'Grátis' },
-    referral: { en: 'Referral', de: 'Empfehlung', es: 'Referido', fr: 'Parrainage', 'pt-br': 'Indicação' },
-    promotion: { en: 'Promotion', de: 'Aktion', es: 'Promoción', fr: 'Promotion', 'pt-br': 'Promoção' },
-    legacy: { en: 'Legacy', de: 'Altbestand', es: 'Anterior', fr: 'Historique', 'pt-br': 'Legado' },
+    paid: { en: 'Paid', 'zh-cn': '付费', de: 'Bezahlt', es: 'Pagado', fr: 'Payé', 'pt-br': 'Pago' },
+    free: { en: 'Free', 'zh-cn': '免费', de: 'Kostenlos', es: 'Gratis', fr: 'Gratuit', 'pt-br': 'Grátis' },
+    referral: { en: 'Referral', 'zh-cn': '推荐奖励', de: 'Empfehlung', es: 'Referido', fr: 'Parrainage', 'pt-br': 'Indicação' },
+    promotion: { en: 'Promotion', 'zh-cn': '促销', de: 'Aktion', es: 'Promoción', fr: 'Promotion', 'pt-br': 'Promoção' },
+    legacy: { en: 'Legacy', 'zh-cn': '历史余额', de: 'Altbestand', es: 'Anterior', fr: 'Historique', 'pt-br': 'Legado' },
   };
   const reasonNames = {
-    paypal_purchase: { en: 'PayPal purchase', de: 'PayPal-Kauf', es: 'Compra PayPal', fr: 'Achat PayPal', 'pt-br': 'Compra PayPal' },
-    voucher_redeem: { en: 'Voucher redeemed', de: 'Gutschein eingelöst', es: 'Cupón canjeado', fr: 'Bon utilisé', 'pt-br': 'Voucher resgatado' },
-    ai_background_removal: { en: 'AI background removal', de: 'KI-Hintergrundentfernung', es: 'Eliminación de fondo con IA', fr: 'Détourage IA', 'pt-br': 'Remoção de fundo com IA' },
-    registration_free: { en: 'Registration credits', de: 'Registrierungs-Credits', es: 'Créditos de registro', fr: 'Crédits d’inscription', 'pt-br': 'Créditos de cadastro' },
-    first_purchase_bonus: { en: 'First top-up bonus', de: 'Erste Aufladeprämie', es: 'Bono de primera recarga', fr: 'Bonus de premier achat', 'pt-br': 'Bônus da primeira recarga' },
-    referral_first_purchase: { en: 'First referral reward', de: 'Erste Empfehlungsprämie', es: 'Primera recompensa de referido', fr: 'Première récompense de parrainage', 'pt-br': 'Primeira recompensa de indicação' },
-    referral_repeat_purchase: { en: 'Repeat referral reward', de: 'Weitere Empfehlungsprämie', es: 'Recompensa de referido posterior', fr: 'Récompense de parrainage suivante', 'pt-br': 'Recompensa recorrente de indicação' },
-    paypal_refund: { en: 'PayPal refund', de: 'PayPal-Rückerstattung', es: 'Reembolso PayPal', fr: 'Remboursement PayPal', 'pt-br': 'Reembolso PayPal' },
-    paypal_refund_promotion: { en: 'Bonus reversed after refund', de: 'Bonus nach Erstattung storniert', es: 'Bono revertido tras reembolso', fr: 'Bonus annulé après remboursement', 'pt-br': 'Bônus revertido após reembolso' },
-    paypal_refund_referral: { en: 'Referral reward reversed after refund', de: 'Empfehlungsprämie nach Erstattung storniert', es: 'Recompensa revertida tras reembolso', fr: 'Parrainage annulé après remboursement', 'pt-br': 'Indicação revertida após reembolso' },
-    voucher_dispute: { en: 'Voucher dispute refund', de: 'Gutschein-Streitfall', es: 'Reembolso por disputa del cupón', fr: 'Remboursement après litige du bon', 'pt-br': 'Reembolso por disputa do voucher' },
-    voucher_dispute_promotion: { en: 'Bonus reversed after voucher dispute', de: 'Bonus nach Gutschein-Streitfall storniert', es: 'Bono revertido tras disputa', fr: 'Bonus annulé après litige', 'pt-br': 'Bônus revertido após disputa' },
-    voucher_dispute_referral: { en: 'Referral reward reversed after voucher dispute', de: 'Empfehlungsprämie nach Streitfall storniert', es: 'Recompensa revertida tras disputa', fr: 'Parrainage annulé après litige', 'pt-br': 'Indicação revertida após disputa' },
+    paypal_purchase: { en: 'PayPal purchase', 'zh-cn': 'PayPal 购买', de: 'PayPal-Kauf', es: 'Compra PayPal', fr: 'Achat PayPal', 'pt-br': 'Compra PayPal' },
+    voucher_redeem: { en: 'Voucher redeemed', 'zh-cn': '卡密兑换', de: 'Gutschein eingelöst', es: 'Cupón canjeado', fr: 'Bon utilisé', 'pt-br': 'Voucher resgatado' },
+    ai_background_removal: { en: 'AI background removal', 'zh-cn': 'AI 去背景', de: 'KI-Hintergrundentfernung', es: 'Eliminación de fondo con IA', fr: 'Détourage IA', 'pt-br': 'Remoção de fundo com IA' },
+    registration_free: { en: 'Registration credits', 'zh-cn': '注册免费积分', de: 'Registrierungs-Credits', es: 'Créditos de registro', fr: 'Crédits d’inscription', 'pt-br': 'Créditos de cadastro' },
+    first_purchase_bonus: { en: 'First top-up bonus', 'zh-cn': '首充赠送', de: 'Erste Aufladeprämie', es: 'Bono de primera recarga', fr: 'Bonus de premier achat', 'pt-br': 'Bônus da primeira recarga' },
+    referral_first_purchase: { en: 'First referral reward', 'zh-cn': '首充推荐奖励', de: 'Erste Empfehlungsprämie', es: 'Primera recompensa de referido', fr: 'Première récompense de parrainage', 'pt-br': 'Primeira recompensa de indicação' },
+    referral_repeat_purchase: { en: 'Repeat referral reward', 'zh-cn': '后续充值推荐奖励', de: 'Weitere Empfehlungsprämie', es: 'Recompensa de referido posterior', fr: 'Récompense de parrainage suivante', 'pt-br': 'Recompensa recorrente de indicação' },
+    paypal_refund: { en: 'PayPal refund', 'zh-cn': 'PayPal 退款', de: 'PayPal-Rückerstattung', es: 'Reembolso PayPal', fr: 'Remboursement PayPal', 'pt-br': 'Reembolso PayPal' },
+    paypal_refund_promotion: { en: 'Bonus reversed after refund', 'zh-cn': '退款后冲正赠送积分', de: 'Bonus nach Erstattung storniert', es: 'Bono revertido tras reembolso', fr: 'Bonus annulé après remboursement', 'pt-br': 'Bônus revertido após reembolso' },
+    paypal_refund_referral: { en: 'Referral reward reversed after refund', 'zh-cn': '退款后冲正推荐奖励', de: 'Empfehlungsprämie nach Erstattung storniert', es: 'Recompensa revertida tras reembolso', fr: 'Parrainage annulé après remboursement', 'pt-br': 'Indicação revertida após reembolso' },
+    voucher_dispute: { en: 'Voucher dispute refund', 'zh-cn': '卡密争议退款', de: 'Gutschein-Streitfall', es: 'Reembolso por disputa del cupón', fr: 'Remboursement après litige du bon', 'pt-br': 'Reembolso por disputa do voucher' },
+    voucher_dispute_promotion: { en: 'Bonus reversed after voucher dispute', 'zh-cn': '卡密争议后冲正赠送积分', de: 'Bonus nach Gutschein-Streitfall storniert', es: 'Bono revertido tras disputa', fr: 'Bonus annulé après litige', 'pt-br': 'Bônus revertido após disputa' },
+    voucher_dispute_referral: { en: 'Referral reward reversed after voucher dispute', 'zh-cn': '卡密争议后冲正推荐奖励', de: 'Empfehlungsprämie nach Streitfall storniert', es: 'Recompensa revertida tras disputa', fr: 'Parrainage annulé après litige', 'pt-br': 'Indicação revertida após disputa' },
   };
   const labelFor = (map, value) => map[value]?.[locale]
     || String(value || '—').replaceAll('_', ' ');
@@ -165,10 +184,16 @@
     orders.forEach((order) => {
       const row = document.createElement('tr');
       cell(row, formatDate(order.completed_at || order.created_at));
-      cell(row, order.payment_method === 'voucher' ? 'Xianyu voucher' : 'PayPal');
+      cell(row, order.payment_method === 'voucher'
+        ? (locale === 'zh-cn' ? '闲鱼卡密' : 'Xianyu voucher')
+        : 'PayPal');
       cell(row, `${order.currency} ${Number(order.amount || 0).toFixed(2)}`);
       cell(row, String(Number(order.base_credits || 0) + Number(order.bonus_credits || 0)));
-      cell(row, order.refunded_at ? 'refunded' : order.status, `cc-pill ${order.status === 'completed' ? 'paid' : order.status === 'pending' ? 'pending' : 'failed'}`);
+      const orderStatus = order.refunded_at ? 'refunded' : order.status;
+      const localizedOrderStatus = locale === 'zh-cn'
+        ? ({ completed: '已完成', pending: '待处理', refunded: '已退款', failed: '失败' }[orderStatus] || orderStatus)
+        : orderStatus;
+      cell(row, localizedOrderStatus, `cc-pill ${order.status === 'completed' ? 'paid' : order.status === 'pending' ? 'pending' : 'failed'}`);
       row.title = shortId(order.id);
       body.append(row);
     });
