@@ -18,6 +18,11 @@
     .table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:970px;font-size:13px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #e8edf4;vertical-align:top}th{font-size:11px;color:#64748b;text-transform:uppercase}
     .score{font-weight:900;color:#b45309}.reason{display:inline-block;margin:2px 4px 2px 0;padding:3px 7px;border-radius:999px;background:#fff7ed;color:#9a3412}
     .actions{display:flex;gap:6px}.empty{padding:36px;text-align:center;color:#64748b}.error{color:#b91c1c;margin-bottom:12px}
+    dialog{width:min(560px,calc(100% - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.3)}
+    dialog::backdrop{background:rgba(15,23,42,.55)}.dialog-body{padding:24px}.dialog-body h2{margin:0 0 8px}.dialog-impact{margin:0 0 18px;color:#475569;line-height:1.55}
+    .dialog-field{margin-bottom:16px}.dialog-field label{display:block;margin-bottom:7px;font-size:13px;font-weight:800}.dialog-field textarea{width:100%;min-height:120px;resize:vertical;border:1px solid #cbd5e1;border-radius:9px;padding:10px 12px;font:inherit}
+    .dialog-confirm{display:flex;gap:9px;align-items:flex-start;margin:0 0 16px;color:#334155;font-size:13px;line-height:1.45}.dialog-confirm input{margin-top:3px}.dialog-error{color:#b91c1c;margin:0 0 14px}
+    .dialog-actions{display:flex;justify-content:flex-end;gap:8px}.dialog-actions .secondary{background:#e8eef8;color:#20304a}.dialog-actions .danger{background:#b91c1c}
   </style>
 </head>
 <body>
@@ -39,6 +44,25 @@
         <div class="empty" id="empty" hidden>当前没有记录。</div>
       </div>
     </section>
+    <dialog id="reviewDialog" aria-labelledby="reviewDialogTitle">
+      <form id="reviewForm" class="dialog-body">
+        <h2 id="reviewDialogTitle">审核推荐奖励</h2>
+        <p class="dialog-impact" id="reviewDialogImpact"></p>
+        <div class="dialog-field">
+          <label for="reviewNote" id="reviewNoteLabel">审核说明（3–500 字符）</label>
+          <textarea id="reviewNote" minlength="3" maxlength="500" required></textarea>
+        </div>
+        <label class="dialog-confirm">
+          <input id="reviewConfirm" type="checkbox" required>
+          <span id="reviewConfirmText"></span>
+        </label>
+        <p class="dialog-error" id="reviewDialogError" hidden></p>
+        <div class="dialog-actions">
+          <button class="secondary" id="reviewCancel" type="button">取消</button>
+          <button id="reviewSubmit" type="submit">确认提交</button>
+        </div>
+      </form>
+    </dialog>
   </main>
   <script>
     const API = 'https://api.shopbgremover.com';
@@ -63,27 +87,59 @@
       row.append(value);
       return value;
     }
-    async function decide(id, decision, button) {
-      const note = prompt(decision === 'approve' ? '请输入批准说明（3–500 字符）' : '请输入拒绝原因（3–500 字符）');
-      if (note === null) return;
-      const normalized = note.trim();
+    let activeReviewAction = null;
+    function openReviewDialog(id, decision, button) {
+      activeReviewAction = { id, decision, button };
+      const approving = decision === 'approve';
+      document.getElementById('reviewDialogTitle').textContent = approving ? '批准推荐奖励审核' : '拒绝推荐奖励审核';
+      document.getElementById('reviewDialogImpact').textContent = approving
+        ? '批准后，两项奖励只会进入 7 天观察期，不会立即变为可用积分。'
+        : '拒绝后，本次首充赠送和推荐奖励都不会发放。';
+      document.getElementById('reviewNoteLabel').textContent = approving ? '批准说明（3–500 字符）' : '拒绝原因（3–500 字符）';
+      document.getElementById('reviewConfirmText').textContent = approving
+        ? '我已核对账号、订单和风险原因，确认批准并进入 7 天观察期。'
+        : '我已核对账号、订单和风险原因，确认拒绝且不发放奖励。';
+      document.getElementById('reviewSubmit').className = approving ? '' : 'danger';
+      document.getElementById('reviewNote').value = '';
+      document.getElementById('reviewConfirm').checked = false;
+      document.getElementById('reviewDialogError').hidden = true;
+      document.getElementById('reviewDialog').showModal();
+      document.getElementById('reviewNote').focus();
+    }
+    document.getElementById('reviewCancel').addEventListener('click', () => {
+      document.getElementById('reviewDialog').close();
+      activeReviewAction = null;
+    });
+    document.getElementById('reviewForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!activeReviewAction) return;
+      const normalized = document.getElementById('reviewNote').value.trim();
+      const dialogError = document.getElementById('reviewDialogError');
       if (normalized.length < 3 || normalized.length > 500) {
-        alert('审核说明必须为 3–500 个字符。');
+        dialogError.textContent = '审核说明必须为 3–500 个字符。';
+        dialogError.hidden = false;
         return;
       }
-      if (!confirm(decision === 'approve' ? '确认通过风控审核并进入 7 天观察期？' : '确认拒绝且不发放奖励？')) return;
+      const { id, decision, button } = activeReviewAction;
+      const submit = document.getElementById('reviewSubmit');
+      submit.disabled = true;
       button.disabled = true;
       try {
         await api(`/api/admin/referral-reviews/${encodeURIComponent(id)}/${decision}`, {
           method: 'POST',
           body: JSON.stringify({ note: normalized }),
         });
+        document.getElementById('reviewDialog').close();
+        activeReviewAction = null;
         await load();
       } catch (error) {
-        alert(error.message);
+        dialogError.textContent = error.message;
+        dialogError.hidden = false;
         button.disabled = false;
+      } finally {
+        submit.disabled = false;
       }
-    }
+    });
     async function load() {
       const error = document.getElementById('error');
       error.hidden = true;
@@ -115,11 +171,11 @@
           if (review.status === 'pending') {
             const approve = document.createElement('button');
             approve.textContent = '批准';
-            approve.addEventListener('click', () => decide(review.id, 'approve', approve));
+            approve.addEventListener('click', () => openReviewDialog(review.id, 'approve', approve));
             const reject = document.createElement('button');
             reject.textContent = '拒绝';
             reject.className = 'reject';
-            reject.addEventListener('click', () => decide(review.id, 'reject', reject));
+            reject.addEventListener('click', () => openReviewDialog(review.id, 'reject', reject));
             actions.append(approve, reject);
           }
           rows.append(row);

@@ -535,6 +535,12 @@ test('referral review admin uses masked risk queue and explicit decisions', asyn
   assert.match(admin, /\/\$\{decision\}/);
   assert.match(admin, /same_device/);
   assert.match(admin, /审核说明必须为 3–500 个字符/);
+  assert.match(admin, /<dialog id="reviewDialog"/);
+  assert.match(admin, /<textarea id="reviewNote" minlength="3" maxlength="500" required>/);
+  assert.match(admin, /<input id="reviewConfirm" type="checkbox" required>/);
+  assert.match(admin, /function openReviewDialog\(id, decision, button\)/);
+  assert.doesNotMatch(admin, /\bprompt\s*\(/);
+  assert.doesNotMatch(admin, /\bconfirm\s*\(/);
   assert.match(admin, /rows\.append\(row\)/);
   assert.doesNotMatch(admin, /\.innerHTML\s*=/);
 });
@@ -550,6 +556,11 @@ test('voucher admin exposes server-backed dispute reversal with an explicit reas
   assert.match(admin, /JSON\.stringify\(\{\s*reason:\s*normalized\s*\}\)/);
   assert.match(admin, /争议冲正/);
   assert.match(admin, /不可撤销/);
+  assert.match(admin, /<dialog id="disputeDialog"/);
+  assert.match(admin, /<textarea id="disputeReason" minlength="10" maxlength="500" required>/);
+  assert.match(admin, /<input id="disputeConfirm" type="checkbox" required>/);
+  assert.match(admin, /function openDisputeDialog\(id, button\)/);
+  assert.doesNotMatch(admin, /\bprompt\s*\(/);
 });
 
 test('localized homepages capture referral links through the signed server endpoint', async () => {

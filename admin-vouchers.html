@@ -25,6 +25,10 @@
     .table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px;min-width:830px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e8edf4;vertical-align:top}th{color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
     .status{display:inline-block;padding:3px 7px;border-radius:999px;background:#edf2f7;font-weight:800}.actions{display:flex;gap:5px}.actions button{padding:6px 8px;font-size:11px}
     .hidden{display:none!important}
+    dialog{width:min(590px,calc(100% - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 24px 80px rgba(15,23,42,.3)}
+    dialog::backdrop{background:rgba(15,23,42,.55)}.dialog-body{padding:24px}.dialog-body h2{margin:0 0 8px}.dialog-impact{margin:0 0 18px;color:#475569;line-height:1.55}
+    .dialog-confirm{display:flex;gap:9px;align-items:flex-start;margin:0 0 16px;color:#334155;font-size:13px;line-height:1.45}.dialog-confirm input{width:auto;margin:3px 0 0}.dialog-error{color:#b91c1c;margin:0 0 14px}
+    .dialog-actions{display:flex;justify-content:flex-end;gap:8px}.dialog-actions button{flex:none}
     @media(max-width:900px){.grid{grid-template-columns:1fr}.toolbar{flex-wrap:wrap}.toolbar select{width:100%}}
   </style>
 </head>
@@ -66,6 +70,25 @@
         </div>
       </section>
     </div>
+    <dialog id="disputeDialog" aria-labelledby="disputeDialogTitle">
+      <form id="disputeForm" class="dialog-body">
+        <h2 id="disputeDialogTitle">卡密争议冲正</h2>
+        <p class="dialog-impact">此操作不可撤销。原兑换记录会保留，购买积分、首充赠送和推荐奖励将通过负流水收回；尚未释放的奖励观察期会被取消。</p>
+        <div class="field">
+          <label for="disputeReason">闲鱼争议冲正原因（10–500 字符）</label>
+          <textarea id="disputeReason" minlength="10" maxlength="500" required></textarea>
+        </div>
+        <label class="dialog-confirm">
+          <input id="disputeConfirm" type="checkbox" required>
+          <span>我已核对闲鱼订单、兑换账号和退款结果，确认执行不可撤销的积分冲正。</span>
+        </label>
+        <p class="dialog-error" id="disputeDialogError" hidden></p>
+        <div class="dialog-actions">
+          <button class="secondary" id="disputeCancel" type="button">取消</button>
+          <button class="danger" id="disputeSubmit" type="submit">确认争议冲正</button>
+        </div>
+      </form>
+    </dialog>
   </main>
   <script>
     const API = 'https://api.shopbgremover.com';
@@ -221,33 +244,60 @@
       });
       return button;
     }
+    let activeDisputeAction = null;
+    function openDisputeDialog(id, button) {
+      activeDisputeAction = { id, button };
+      document.getElementById('disputeReason').value = '';
+      document.getElementById('disputeConfirm').checked = false;
+      document.getElementById('disputeDialogError').hidden = true;
+      document.getElementById('disputeDialog').showModal();
+      document.getElementById('disputeReason').focus();
+    }
+    document.getElementById('disputeCancel').addEventListener('click', () => {
+      document.getElementById('disputeDialog').close();
+      activeDisputeAction = null;
+    });
+    document.getElementById('disputeForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!activeDisputeAction) return;
+      const normalized = document.getElementById('disputeReason').value.trim();
+      const dialogError = document.getElementById('disputeDialogError');
+      if (normalized.length < 10 || normalized.length > 500) {
+        dialogError.textContent = '冲正原因必须为 10–500 个字符。';
+        dialogError.hidden = false;
+        return;
+      }
+      const { id, button } = activeDisputeAction;
+      const submit = document.getElementById('disputeSubmit');
+      submit.disabled = true;
+      button.disabled = true;
+      try {
+        const result = await api(`/api/admin/vouchers/${encodeURIComponent(id)}/dispute-reverse`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: normalized }),
+        });
+        document.getElementById('disputeDialog').close();
+        activeDisputeAction = null;
+        showNotice(
+          document.getElementById('globalNotice'),
+          result.already_reversed ? '这张卡密已完成争议冲正。' : '争议冲正完成。',
+          'ok',
+        );
+        await loadVouchers();
+      } catch (error) {
+        dialogError.textContent = error.message;
+        dialogError.hidden = false;
+        button.disabled = false;
+      } finally {
+        submit.disabled = false;
+      }
+    });
     function disputeButton(id) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = '争议冲正';
       button.className = 'danger';
-      button.addEventListener('click', async () => {
-        const reason = prompt('请输入闲鱼争议冲正原因（10–500 字符）。此操作会收回购买积分、首充赠送和推荐奖励，且不可撤销。');
-        if (reason === null) return;
-        const normalized = reason.trim();
-        if (normalized.length < 10 || normalized.length > 500) {
-          alert('冲正原因必须为 10–500 个字符。');
-          return;
-        }
-        if (!confirm('确认执行争议冲正？原兑换记录会保留，相关积分将通过负流水全部收回。')) return;
-        button.disabled = true;
-        try {
-          const result = await api(`/api/admin/vouchers/${encodeURIComponent(id)}/dispute-reverse`, {
-            method: 'POST',
-            body: JSON.stringify({ reason: normalized }),
-          });
-          alert(result.already_reversed ? '这张卡密已完成争议冲正。' : '争议冲正完成。');
-          await loadVouchers();
-        } catch (error) {
-          alert(error.message);
-          button.disabled = false;
-        }
-      });
+      button.addEventListener('click', () => openDisputeDialog(id, button));
       return button;
     }
     document.getElementById('refreshButton').addEventListener('click', loadVouchers);
