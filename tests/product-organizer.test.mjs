@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import JSZip from 'jszip';
 
 await import('../product-organizer.js');
 
@@ -51,4 +52,31 @@ test('archive filenames cannot escape their assigned product folder', () => {
     [' SKU/01 '],
   );
   assert.equal(entry.name, 'SKU-01/hero-.png');
+});
+
+test('a real ZIP preserves root entries and same-directory collision suffixes', async () => {
+  const outputs = [
+    { index: 0, name: 'image.png', blob: new Uint8Array([1]) },
+    { index: 1, name: 'IMAGE.PNG', blob: new Uint8Array([2]) },
+    { index: 2, name: 'image.png', blob: new Uint8Array([3]) },
+    { index: 3, name: 'IMAGE.PNG', blob: new Uint8Array([4]) },
+  ];
+  const entries = buildArchiveEntries(outputs, ['', '', 'SKU/A', 'SKU/A']);
+  const archive = new JSZip();
+  entries.forEach(entry => archive.file(entry.name, entry.blob));
+
+  const bytes = await archive.generateAsync({ type: 'uint8array' });
+  const restored = await JSZip.loadAsync(bytes);
+  const files = Object.values(restored.files).filter(entry => !entry.dir);
+
+  assert.deepEqual(files.map(entry => entry.name), [
+    'image.png',
+    'IMAGE-2.PNG',
+    'SKU-A/image.png',
+    'SKU-A/IMAGE-2.PNG',
+  ]);
+  assert.deepEqual(
+    await Promise.all(files.map(entry => entry.async('uint8array').then(value => value[0]))),
+    [1, 2, 3, 4],
+  );
 });

@@ -79,10 +79,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage7c-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage7c-v1"/, file);
-    assert.match(html, /src="\/product-organizer\.js\?v=20260726-ai-stage7c-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage7c-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage8a-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage8a-v1"/, file);
+    assert.match(html, /src="\/product-organizer\.js\?v=20260726-ai-stage8a-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage8a-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -235,6 +235,15 @@ test('workspace preview and columns share a responsive aligned layout', async ()
   assert.match(css, /\.workspace-preview\.visible\{display:block\}/);
   assert.match(css, /\.workspace-preview-stage\{/);
   assert.match(css, /object-fit:contain/);
+});
+
+test('signed-in mobile navigation stays within the viewport', async () => {
+  const css = await read('ai-workflow.css');
+  assert.match(css, /@media\(max-width:640px\)\{/);
+  assert.match(css, /\.navbar\{padding-left:12px;padding-right:12px;gap:10px\}/);
+  assert.match(css, /\.nav-logo-text\{display:none\}/);
+  assert.match(css, /\.credits-add,\.user-name\{display:none\}/);
+  assert.match(css, /\.nav-right\{min-width:0;gap:6px\}/);
 });
 
 test('ZIP download is local-only and never invokes the AI endpoint', async () => {

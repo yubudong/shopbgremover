@@ -229,6 +229,14 @@ div.bg-row.background-mode-grid{display:grid;grid-template-columns:repeat(2,minm
 .product-organizer-clear{border:1px solid #cbd5e1;background:#fff;color:#475569}
 .product-organizer-done{border:1px solid #7c3aed;background:#7c3aed;color:#fff}
 @media(max-width:640px){
+  .navbar{padding-left:12px;padding-right:12px;gap:10px}
+  .nav-logo{min-width:0}
+  .nav-logo-text{display:none}
+  .nav-right{min-width:0;gap:6px}
+  .credits-badge.show{padding:5px 9px}
+  .credits-add,.user-name{display:none}
+  .lang-btn{padding:7px 9px}
+  .btn-nav{padding:8px 10px}
   .ai-workflow-panel{padding:12px}
   .ai-card-control small{max-width:100px}
   .composition-editor-overlay{align-items:flex-end;padding:12px}
