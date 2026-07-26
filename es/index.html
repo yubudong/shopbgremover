@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6c-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6c-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6d-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6d-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -809,7 +809,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6c-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6d-v1">
 </head>
 <body>
 
@@ -1106,6 +1106,24 @@
             Original<span class="size-sub">Mantener tamaño</span>
           </button>
         </div>
+      </div>
+
+      <div class="setting-group">
+        <span class="setting-label">Formato de salida</span>
+        <div class="output-format-grid">
+          <button class="output-format-btn active" data-format="png" type="button" onclick="setOutputFormat(this,'png')">PNG</button>
+          <button class="output-format-btn" data-format="jpeg" type="button" onclick="setOutputFormat(this,'jpeg')">JPEG</button>
+          <button class="output-format-btn" data-format="webp" type="button" onclick="setOutputFormat(this,'webp')">WebP</button>
+        </div>
+        <div class="output-quality-row" id="outputQualityRow" hidden>
+          <label for="outputQuality">Calidad</label>
+          <input id="outputQuality" type="range" min="50" max="100" step="1" value="90" oninput="setOutputQuality(this.value)">
+          <output id="outputQualityValue" for="outputQuality">90%</output>
+        </div>
+        <small class="output-format-note" id="outputFormatNote"
+          data-png-note="Salida sin pérdida con transparencia."
+          data-jpeg-note="JPEG no admite transparencia. Los fondos transparentes se exportan en blanco."
+          data-webp-note="Archivos más pequeños con transparencia.">Salida sin pérdida con transparencia.</small>
       </div>
 
       <!-- Rename Template -->
@@ -1452,18 +1470,24 @@ let selectedFiles   = [];
   let currentUser     = null;
   let outputSize      = 'original';   // '2048' | '1000' | '500' | 'original'
   let renameMode      = 'original';   // 'original' | 'sequence' | 'date'
+  let outputFormat    = 'png';
+  let outputQuality   = 90;
 
   async function restoreCompositionState(settings = {}) {
     const validSizes = new Set(['2048', '1000', '500', 'original']);
     const validRenameModes = new Set(['original', 'sequence', 'date']);
+    const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
+    if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
+    outputQuality = Math.min(100, Math.max(50, Number(settings.outputQuality) || 90));
 
     document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
     document.querySelectorAll('.rename-opt').forEach((option, index) => {
       option.classList.toggle('active', ['original', 'sequence', 'date'][index] === renameMode);
     });
+    renderOutputFormat();
   }
 
   // ── Settings UI ───────────────────────────────────────────
@@ -1488,7 +1512,42 @@ let selectedFiles   = [];
     document.querySelectorAll('.rename-opt').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     aiWorkflow?.markCompositionChanged();
-}
+  }
+
+  function renderOutputFormat() {
+    const encoding = window.ShopBGBackgroundComposer.getOutputEncoding(outputFormat, outputQuality);
+    document.querySelectorAll('.output-format-btn').forEach(button => {
+      button.classList.toggle('active', button.dataset.format === outputFormat);
+    });
+    const qualityRow = document.getElementById('outputQualityRow');
+    const qualityInput = document.getElementById('outputQuality');
+    const qualityValue = document.getElementById('outputQualityValue');
+    const note = document.getElementById('outputFormatNote');
+    qualityRow.hidden = outputFormat === 'png';
+    qualityInput.value = String(outputQuality);
+    qualityValue.textContent = `${outputQuality}%`;
+    note.textContent = note.dataset[`${outputFormat}Note`];
+    note.classList.toggle('is-warning', outputFormat === 'jpeg');
+    document.querySelectorAll('.rename-eg').forEach(example => {
+      if (!example.dataset.baseExample) example.dataset.baseExample = example.textContent;
+      example.textContent = example.dataset.baseExample.replace(/\.png/g, `.${encoding.extension}`);
+    });
+  }
+
+  function setOutputFormat(el, format) {
+    if (!['png', 'jpeg', 'webp'].includes(format) || outputFormat === format) return;
+    outputFormat = format;
+    renderOutputFormat();
+    aiWorkflow?.markCompositionChanged();
+  }
+
+  function setOutputQuality(value) {
+    const quality = Math.min(100, Math.max(50, Number(value) || 90));
+    const changed = quality !== outputQuality;
+    outputQuality = quality;
+    renderOutputFormat();
+    if (changed) aiWorkflow?.markCompositionChanged();
+  }
 
   // ── Auth ──────────────────────────────────────────────────
 
@@ -1854,7 +1913,10 @@ let selectedFiles   = [];
   // ── Background + resize compositing ──────────────────────
 
   async function applyBackground(inputBlob, index) {
-    return backgroundComposer.compose(inputBlob, outputSize, index);
+    return backgroundComposer.compose(inputBlob, outputSize, index, {
+      format: outputFormat,
+      quality: outputQuality,
+    });
   }
 
   // ── File naming ───────────────────────────────────────────
@@ -1863,10 +1925,14 @@ let selectedFiles   = [];
     const base = originalName.replace(/\.[^.]+$/, '');
     const num  = String(seqIndex + 1).padStart(2, '0');
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const extension = window.ShopBGBackgroundComposer.getOutputEncoding(
+      outputFormat,
+      outputQuality,
+    ).extension;
     switch (renameMode) {
-      case 'sequence': return num + '.png';
-      case 'date':     return `${date}_${num}.png`;
-      default:         return base + '.png';
+      case 'sequence': return `${num}.${extension}`;
+      case 'date':     return `${date}_${num}.${extension}`;
+      default:         return `${base}.${extension}`;
     }
   }
 
@@ -1974,7 +2040,13 @@ let selectedFiles   = [];
     getFiles: () => selectedFiles,
     getCurrentUser: () => currentUser,
     getSessionOwner: () => currentUser?.id ? `user:${currentUser.id}` : `device:${DEVICE_ID}`,
-    getCompositionState: () => ({ ...backgroundComposer.getState(), outputSize, renameMode }),
+    getCompositionState: () => ({
+      ...backgroundComposer.getState(),
+      outputSize,
+      renameMode,
+      outputFormat,
+      outputQuality,
+    }),
     restoreFiles: async (items, composition) => {
       await restoreCompositionState(composition);
       handleFiles(items.map(item => item.file), { restoredItems: items });

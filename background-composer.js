@@ -5,6 +5,11 @@
   const BACKGROUND_MODES = new Set(['white', 'transparent', 'custom', 'image']);
   const BACKGROUND_FITS = new Set(['cover', 'contain', 'stretch']);
   const PRODUCT_ALIGNMENTS = new Set(['center', 'bottom', 'custom']);
+  const OUTPUT_ENCODINGS = Object.freeze({
+    png: Object.freeze({ extension: 'png', mime: 'image/png', supportsAlpha: true }),
+    jpeg: Object.freeze({ extension: 'jpg', mime: 'image/jpeg', supportsAlpha: false }),
+    webp: Object.freeze({ extension: 'webp', mime: 'image/webp', supportsAlpha: true }),
+  });
 
   function clampNumber(value, minimum, maximum, fallback) {
     const number = Number(value);
@@ -96,6 +101,17 @@
       return itemOverrides.get(index) || globalConfig;
     }
     return itemOverrides?.[String(index)] || globalConfig;
+  }
+
+  function getOutputEncoding(format = 'png', quality = 90) {
+    const normalizedFormat = Object.prototype.hasOwnProperty.call(OUTPUT_ENCODINGS, format)
+      ? format
+      : 'png';
+    return {
+      ...OUTPUT_ENCODINGS[normalizedFormat],
+      format: normalizedFormat,
+      quality: clampNumber(quality, 50, 100, 90) / 100,
+    };
   }
 
   function loadBlobImage(blob) {
@@ -387,8 +403,9 @@
       return blocked > 0 ? format(text.needsForeground, { count: blocked }) : null;
     }
 
-    async function compose(inputBlob, outputSize, index = null) {
+    async function compose(inputBlob, outputSize, index = null, outputOptions = {}) {
       const config = resolvedConfig(index);
+      const encoding = getOutputEncoding(outputOptions.format, outputOptions.quality);
       const foreground = await loadBlobImage(inputBlob);
       let canvasWidth;
       let canvasHeight;
@@ -430,6 +447,11 @@
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
       const context = canvas.getContext('2d');
+
+      if (!encoding.supportsAlpha) {
+        context.fillStyle = '#FFFFFF';
+        context.fillRect(0, 0, canvasWidth, canvasHeight);
+      }
 
       if (config.bgMode === 'image') {
         if (!config.backgroundImageBlob) throw new Error(text.missingError || 'Missing background image.');
@@ -485,7 +507,20 @@
           foregroundHeight,
         );
       }
-      return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      return new Promise((resolve, reject) => {
+        const encoded = (blob) => {
+          if (!blob || blob.type !== encoding.mime) {
+            reject(new Error('output_encoding_failed'));
+            return;
+          }
+          resolve(blob);
+        };
+        if (encoding.format === 'png') {
+          canvas.toBlob(encoded, encoding.mime);
+        } else {
+          canvas.toBlob(encoded, encoding.mime, encoding.quality);
+        }
+      });
     }
 
     let editorOverlay = null;
@@ -855,6 +890,7 @@
     format,
     getForegroundPlacement,
     getImagePlacement,
+    getOutputEncoding,
     resolveCompositionConfig,
     validateBackgroundFile,
     MAX_BACKGROUND_BYTES,

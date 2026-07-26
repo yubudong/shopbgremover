@@ -153,6 +153,22 @@ div.bg-row.background-mode-grid{display:grid;grid-template-columns:repeat(2,minm
 .composition-editor-reset{border:1px solid #cbd5e1;background:#fff;color:#475569}
 .composition-editor-reset:disabled{cursor:not-allowed;opacity:.45}
 .composition-editor-apply{border:1px solid #2563eb;background:#2563eb;color:#fff}
+.output-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.output-format-btn{
+  padding:9px 6px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#475569;
+  cursor:pointer;font-size:10px;font-weight:850
+}
+.output-format-btn.active{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}
+.output-quality-row{
+  display:grid;grid-template-columns:70px minmax(0,1fr) 38px;align-items:center;gap:7px;
+  margin-top:10px
+}
+.output-quality-row[hidden]{display:none}
+.output-quality-row label{color:#475569;font-size:9px;font-weight:750}
+.output-quality-row input{width:100%;accent-color:#2563eb}
+.output-quality-row output{color:#1e3a8a;font-size:9px;font-weight:800;text-align:right}
+.output-format-note{display:block;margin-top:8px;color:#64748b;font-size:8px;line-height:1.4}
+.output-format-note.is-warning{color:#92400e;font-weight:750}
 @media(max-width:640px){
   .ai-workflow-panel{padding:12px}
   .ai-card-control small{max-width:100px}

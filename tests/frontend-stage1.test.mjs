@@ -72,9 +72,9 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage6c-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage6c-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage6c-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage6d-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage6d-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage6d-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -85,7 +85,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /id="aiSessionClear"/, file);
     assert.match(html, /data-session-restored=/, file);
     assert.match(html, /getSessionOwner: \(\) => currentUser\?\.id/, file);
-    assert.match(html, /getCompositionState: \(\) => \(\{ \.\.\.backgroundComposer\.getState\(\), outputSize, renameMode \}\)/, file);
+    assert.match(html, /getCompositionState: \(\) => \(\{[\s\S]*outputFormat,[\s\S]*outputQuality,[\s\S]*\}\)/, file);
     assert.match(html, /restoreFiles: async \(items, composition\)/, file);
     assert.match(html, /handleFiles\(files, \{ restoredItems = \[\] \} = \{\}\)/, file);
     assert.match(html, /initialSource: restoredItem\?\.sourceBlob \|\| null/, file);
@@ -106,13 +106,23 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/id="productBottom"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productShadow"/g) || []).length, 1, file);
     assert.equal((html.match(/id="itemOverrideCopy"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="outputQuality"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="outputFormatNote"/g) || []).length, 1, file);
+    assert.equal((html.match(/class="output-format-btn/g) || []).length, 3, file);
     assert.match(html, /id="productScale" type="range" min="50" max="140"/, file);
     assert.match(html, /id="productOffsetX" type="range" min="-40" max="40"/, file);
     assert.match(html, /id="productOffsetY" type="range" min="-40" max="40"/, file);
+    assert.match(html, /id="outputQuality" type="range" min="50" max="100"/, file);
+    assert.match(html, /data-format="png"/, file);
+    assert.match(html, /data-format="jpeg"/, file);
+    assert.match(html, /data-format="webp"/, file);
+    assert.match(html, /data-jpeg-note="[^"]+(?:white|weiß|blanco|blanc|branco)[^"]*"/i, file);
     assert.match(html, /accept="\.jpg,\.jpeg,\.png,\.webp,image\/jpeg,image\/png,image\/webp"/, file);
     assert.match(html, /validateComposition: \(\{ jobs \}\) => backgroundComposer\.validateJobs\(jobs\)/, file);
     assert.match(html, /backgroundComposer\?\.decorateCard\(card, i, file\.name\)/, file);
-    assert.match(html, /return backgroundComposer\.compose\(inputBlob, outputSize, index\)/, file);
+    assert.match(html, /backgroundComposer\.compose\(inputBlob, outputSize, index, \{[\s\S]*format: outputFormat,[\s\S]*quality: outputQuality/, file);
+    assert.match(html, /case 'sequence': return `\$\{num\}\.\$\{extension\}`/, file);
+    assert.match(html, /getOutputEncoding\([\s\S]*outputFormat,[\s\S]*outputQuality/, file);
     assert.match(html, /onChanged: index => aiWorkflow\?\.markCompositionChanged\(index\)/, file);
     assert.match(html, /\.local-clean-card-btn, \.composition-card-btn/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
@@ -211,6 +221,10 @@ test('uploaded background validation and composition stay browser-local', async 
   assert.match(composer, /itemOverrides: Object\.fromEntries/);
   assert.match(composer, /options\.onChanged\?\.\(index\)/);
   assert.match(composer, /editorElements\.name\.textContent = fileName/);
+  assert.match(composer, /if \(!encoding\.supportsAlpha\)/);
+  assert.match(composer, /context\.fillStyle = '#FFFFFF'/);
+  assert.match(composer, /canvas\.toBlob\(encoded, encoding\.mime, encoding\.quality\)/);
+  assert.match(composer, /blob\.type !== encoding\.mime/);
   assert.doesNotMatch(composer, /\bfetch\s*\(/);
   assert.doesNotMatch(composer, /\/api\/|https?:\/\//);
 });

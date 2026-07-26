@@ -24,6 +24,7 @@ const {
 const {
   getForegroundPlacement,
   getImagePlacement,
+  getOutputEncoding,
   resolveCompositionConfig,
   validateBackgroundFile,
   MAX_BACKGROUND_BYTES,
@@ -83,6 +84,31 @@ test('single-image composition settings override batch defaults by stable index'
   assert.equal(resolveCompositionConfig(batch, overrides, 1), one);
   assert.equal(resolveCompositionConfig(batch, { 2: one }, 2), one);
   assert.equal(resolveCompositionConfig(batch, overrides, null), batch);
+});
+
+test('output encodings preserve MIME, extension, alpha support, and bounded quality', () => {
+  assert.deepEqual(getOutputEncoding('png', 20), {
+    extension: 'png',
+    mime: 'image/png',
+    supportsAlpha: true,
+    format: 'png',
+    quality: 0.5,
+  });
+  assert.deepEqual(getOutputEncoding('jpeg', 86), {
+    extension: 'jpg',
+    mime: 'image/jpeg',
+    supportsAlpha: false,
+    format: 'jpeg',
+    quality: 0.86,
+  });
+  assert.deepEqual(getOutputEncoding('webp', 120), {
+    extension: 'webp',
+    mime: 'image/webp',
+    supportsAlpha: true,
+    format: 'webp',
+    quality: 1,
+  });
+  assert.equal(getOutputEncoding('unknown').format, 'png');
 });
 
 test('product placement preserves legacy defaults and supports scale, offsets, and bottom alignment', () => {
