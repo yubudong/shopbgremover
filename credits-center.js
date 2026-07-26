@@ -122,6 +122,7 @@
   const config = locales[locale];
   const t = config.text;
   document.documentElement.lang = config.html;
+  document.title = `${t.title} · ShopBG Remover`;
   document.querySelectorAll('[data-i18n]').forEach((node) => {
     const value = t[node.dataset.i18n];
     if (value) node.textContent = value;

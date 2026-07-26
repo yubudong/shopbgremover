@@ -546,6 +546,7 @@ test('credit center is visible from every localized workspace and pricing page',
   assert.match(script, /credentials:\s*'include'/);
   assert.match(script, /registration_free/);
   assert.match(script, /first_purchase_bonus/);
+  assert.match(script, /document\.title = `\$\{t\.title\} · ShopBG Remover`/);
   assert.match(script, /replaceChildren\(\)/);
   assert.doesNotMatch(script, /\.innerHTML\s*=/);
 
