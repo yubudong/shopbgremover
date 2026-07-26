@@ -322,9 +322,9 @@ ZIP 已支持：
 
 ### 6.2 当前生产版本
 
-- Pages 部署：`359e9c7d-8c1d-4682-92f5-0cb8fbd77243`
-- Pages 来源提交：`638ef65`
-- Pages 独立地址：`https://359e9c7d.shopbgremover.pages.dev`
+- Pages 部署：`db182b92-8271-4af1-8345-576ecfa635ab`
+- Pages 来源提交：`b2312bd`
+- Pages 独立地址：`https://db182b92.shopbgremover.pages.dev`
 - Worker 版本：`482eb5f9-c817-4d97-aaa0-ed3d591824a4`
 - 文档恢复点：`4b0b7f2`
 - 恢复点 CI：`30202067070`，通过
@@ -446,7 +446,7 @@ npm run pages:deploy
 
 1. 真实 PayPal 付款等待可用的境外买家账号，暂不执行。
 2. 背景独立缩放、移动和模糊已完成生产零 AI 合成、恢复和下载验收，阶段 6 已关闭。
-3. Shopify、Amazon 和 eBay 完整规则已实现并通过本地回归，等待本次 Pages 部署与生产静态验收后关闭该未完成项。
+3. Shopify、Amazon 和 eBay 完整规则已完成并部署；下一项不依赖外部账号的增强，可先为复杂纹理和大面积本地修复建立代表性样本、质量基线和性能预算，再决定算法。
 4. 若恢复 PayPal 验收，先确认可用买家账号和即时验证码，再核对付款前 D1 基线。
 5. 出现自然待审核/可争议记录时，补做管理员表单零写入正常入口冒烟。
 
@@ -480,7 +480,7 @@ npm run pages:deploy
 - 当前状态：代码、五语种、单图覆盖、恢复、107 项回归、本地与生产零 AI 交互、CI、Pages 部署、五语种生产静态核对和 ZIP 下载均已完成；阶段 6 已完成。
 - 下一步：核验 Shopify、Amazon 和 eBay 官方格式与文件上限，再决定平台专用提示和 ZIP 目录范围；真实 PayPal 付款继续等待可用境外买家账号。
 
-### 8.6 2026-07-26：Shopify、Amazon 和 eBay 完整规则（本地完成，待部署）
+### 8.6 2026-07-26：Shopify、Amazon 和 eBay 完整规则（已完成）
 
 - 任务：用公开官方资料核验 Shopify、Amazon 和 eBay 当前图片尺寸、格式、文件上限与内容提示，修正旧预设和“自动合规”承诺，并决定是否增加平台 ZIP 目录。
 - 官方证据：
@@ -496,11 +496,13 @@ npm run pages:deploy
   - 不增加平台专用 ZIP 目录：三家官方上传规则没有要求此目录层级；当前单平台批次与可选 SKU/商品文件夹已满足整理需求，继续保留未分组文件位于 ZIP 根目录的兼容性。
 - 修改文件：五语种 `index.html`、五语种 Shopify 指南、五语种 Amazon/eBay 指南、`tests/frontend-stage1.test.mjs` 和本文档；按生产架构说明未修改 `public/` 下的旧兼容副本，也未触碰未跟踪的 `docs/SEO-Roadmap-2026-05-22.md`。
 - 测试：备份保护 3 项、前端 58 项、Worker 47 项全部通过，共 108 项；`node --check worker/index.js`、`git diff --check` 通过；Pages 白名单构建仍为 81 个文件。Worker 测试首次因沙箱不能监听 `127.0.0.1` 和写 Wrangler 日志失败，在授权环境原命令重跑后 47 项全部通过，属于测试环境限制而非代码失败。
-- 生产写入/AI/资金影响：截至本记录仅执行本地静态构建与测试；没有远端 D1、fal.ai、积分、PayPal、Secrets 或 Cron 操作。
-- 部署状态：尚未部署；不能据此标记生产完成。计划仅部署 Cloudflare Pages，Worker 和 D1 不变，并用公开静态 GET/DOM 核对五语种预设、提示和指南。
+- Git/CI：功能提交 `b2312bd` 已推送到 `origin/main`；GitHub Actions `30219232092` 通过，任务用时 48 秒。
+- 生产静态验收：Pages 独立地址的英语、德语、西班牙语、法语和巴西葡萄牙语首页均包含独立 Amazon/eBay 1600×1600 按钮、平台提示和 Shopify/eBay 文件上限逻辑；英文 Shopify 指南包含 5000×5000、25 MP、20 MB 和 WebP，英文 Amazon/eBay 指南包含 1600×1600、12 MB 和 WebP；自定义域名首页与 Amazon/eBay 指南也已返回新版本。
+- 生产写入/AI/资金影响：只部署并读取公开静态 Pages；没有远端 D1、Worker、fal.ai、积分、PayPal、Secrets 或 Cron 操作。
+- 部署状态：已仅部署 Pages `db182b92-8271-4af1-8345-576ecfa635ab`，来源提交 `b2312bd`，独立地址 `https://db182b92.shopbgremover.pages.dev`；Worker 仍为 `482eb5f9-c817-4d97-aaa0-ed3d591824a4`，D1、Secrets 和 Cron 未变。
 - 踩坑与调整：Amazon 与 eBay 的推荐预设同为 1600，不能继续只用数值推断平台，因此增加独立平台状态；Amazon Seller Central 通用帮助需要登录，公开官方资料没有可靠的通用文件上限，因此选择“不猜、不拦截”；Shopify 的限制是“小于 20 MB”，实现使用 `20 * 1024 * 1024 - 1` 字节作为可接受最大整数大小。
-- 当前状态：功能、五语种文案、旧会话迁移、108 项回归和 Pages 构建已完成，尚未提交、CI、部署或生产验收。
-- 下一步：提交并推送本阶段，等待 CI 通过后只部署 Pages；完成五语种生产静态核对并把部署编号、来源提交和最终生产状态写回本文档。真实 PayPal 付款继续等待可用境外买家账号。
+- 当前状态：功能、五语种文案、旧会话迁移、108 项回归、CI、Pages 部署、五语种生产静态核对和自定义域名新版本确认均已完成；Shopify、Amazon 和 eBay 完整规则增强已关闭。阶段 7 仍仅因 Temu 缺少官方证据保持进行中。
+- 下一步：真实 PayPal 付款继续等待可用境外买家账号；不依赖外部状态的下一项建议是先建立复杂纹理和大面积本地修复的代表性质量/性能基线，不直接承诺或替换算法。出现自然待审核/可争议记录时，再补管理员表单零写入正常入口冒烟。
 
 ---
 
