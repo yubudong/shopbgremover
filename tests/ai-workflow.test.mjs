@@ -24,6 +24,7 @@ const {
 const {
   getForegroundPlacement,
   getImagePlacement,
+  resolveCompositionConfig,
   validateBackgroundFile,
   MAX_BACKGROUND_BYTES,
 } = globalThis.ShopBGBackgroundComposer;
@@ -71,6 +72,17 @@ test('background fit defaults to centered cover and supports contain and stretch
     width: 1000,
     height: 1000,
   });
+});
+
+test('single-image composition settings override batch defaults by stable index', () => {
+  const batch = { bgMode: 'white', productScale: 100 };
+  const one = { bgMode: 'custom', productScale: 72 };
+  const overrides = new Map([[1, one]]);
+
+  assert.equal(resolveCompositionConfig(batch, overrides, 0), batch);
+  assert.equal(resolveCompositionConfig(batch, overrides, 1), one);
+  assert.equal(resolveCompositionConfig(batch, { 2: one }, 2), one);
+  assert.equal(resolveCompositionConfig(batch, overrides, null), batch);
 });
 
 test('product placement preserves legacy defaults and supports scale, offsets, and bottom alignment', () => {
@@ -504,6 +516,8 @@ test('refresh recovery validates owner, schema, expiry, and the 150 MB cap', () 
 });
 
 test('refresh recovery size includes every persisted image blob', () => {
+  const sharedBackground = { size: 50 };
+  const itemBackground = { size: 25 };
   assert.equal(sessionByteSize([{
     file: { size: 10 },
     sourceBlob: { size: 20 },
@@ -512,6 +526,10 @@ test('refresh recovery size includes every persisted image blob', () => {
       outputBlob: { size: 40 },
     },
   }], {
-    backgroundImageBlob: { size: 50 },
-  }), 150);
+    backgroundImageBlob: sharedBackground,
+    itemOverrides: {
+      0: { backgroundImageBlob: sharedBackground },
+      1: { backgroundImageBlob: itemBackground },
+    },
+  }), 175);
 });

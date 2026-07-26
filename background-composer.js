@@ -90,6 +90,14 @@
     return { x, y, width, height };
   }
 
+  function resolveCompositionConfig(globalConfig, itemOverrides, index) {
+    if (!Number.isInteger(index)) return globalConfig;
+    if (itemOverrides instanceof Map) {
+      return itemOverrides.get(index) || globalConfig;
+    }
+    return itemOverrides?.[String(index)] || globalConfig;
+  }
+
   function loadBlobImage(blob) {
     return new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(blob);
@@ -133,8 +141,10 @@
       productCenter: document.getElementById('productCenter'),
       productBottom: document.getElementById('productBottom'),
       productShadow: document.getElementById('productShadow'),
+      itemOverrideCopy: document.getElementById('itemOverrideCopy'),
     };
     const text = elements.imagePanel?.dataset || {};
+    const itemText = elements.itemOverrideCopy?.dataset || {};
     let state = {
       bgMode: 'white',
       customHex: '#F0F0F0',
@@ -148,9 +158,50 @@
       productShadow: false,
     };
     let decodedBackgroundImage = null;
+    const itemOverrides = new Map();
+    const decodedOverrideBackgrounds = new Map();
+    const overrideCardButtons = new Map();
 
-    function notifyChanged(message) {
-      options.onChanged?.();
+    function snapshotConfig(source = state) {
+      return {
+        bgMode: BACKGROUND_MODES.has(source.bgMode) ? source.bgMode : 'white',
+        customHex: /^#[0-9A-Fa-f]{6}$/.test(source.customHex || '')
+          ? source.customHex
+          : '#F0F0F0',
+        backgroundFit: BACKGROUND_FITS.has(source.backgroundFit)
+          ? source.backgroundFit
+          : 'cover',
+        backgroundImageBlob: source.backgroundImageBlob instanceof Blob
+          ? source.backgroundImageBlob
+          : null,
+        backgroundImageName: String(source.backgroundImageName || ''),
+        productScale: clampNumber(source.productScale, 50, 140, 100),
+        productOffsetX: clampNumber(source.productOffsetX, -40, 40, 0),
+        productOffsetY: clampNumber(source.productOffsetY, -40, 40, 0),
+        productAlign: PRODUCT_ALIGNMENTS.has(source.productAlign)
+          ? source.productAlign
+          : 'center',
+        productShadow: source.productShadow === true,
+      };
+    }
+
+    function resolvedConfig(index) {
+      return resolveCompositionConfig(state, itemOverrides, index);
+    }
+
+    function syncOverrideCardButton(index) {
+      const button = overrideCardButtons.get(index);
+      if (!button) return;
+      const active = itemOverrides.has(index);
+      button.classList.toggle('active', active);
+      button.textContent = active
+        ? (itemText.overriddenLabel || 'Customized')
+        : (itemText.customizeLabel || 'Customize');
+      button.setAttribute('aria-pressed', String(active));
+    }
+
+    function notifyChanged(message, index = null) {
+      options.onChanged?.(index);
       if (message) options.onStatus?.(message);
     }
 
@@ -268,29 +319,76 @@
         }
       }
       state.bgMode = requestedMode === 'image' && !state.backgroundImageBlob ? 'white' : requestedMode;
+      itemOverrides.clear();
+      decodedOverrideBackgrounds.clear();
+      const restoredOverrides = settings.itemOverrides && typeof settings.itemOverrides === 'object'
+        ? Object.entries(settings.itemOverrides)
+        : [];
+      await Promise.all(restoredOverrides.map(async ([rawIndex, savedOverride]) => {
+        const index = Number(rawIndex);
+        if (!Number.isInteger(index) || index < 0 || !savedOverride) return;
+        const override = snapshotConfig(savedOverride);
+        if (override.backgroundImageBlob) {
+          const validation = validateBackgroundFile(override.backgroundImageBlob);
+          if (validation) {
+            override.backgroundImageBlob = null;
+            override.backgroundImageName = '';
+          } else {
+            try {
+              decodedOverrideBackgrounds.set(
+                index,
+                await loadBlobImage(override.backgroundImageBlob),
+              );
+            } catch {
+              override.backgroundImageBlob = null;
+              override.backgroundImageName = '';
+            }
+          }
+        }
+        if (override.bgMode === 'image' && !override.backgroundImageBlob) {
+          override.bgMode = 'white';
+        }
+        itemOverrides.set(index, override);
+      }));
       render();
+      for (const index of overrideCardButtons.keys()) syncOverrideCardButton(index);
     }
 
     function getState() {
-      return { ...state };
+      return {
+        ...state,
+        itemOverrides: Object.fromEntries(
+          Array.from(itemOverrides, ([index, override]) => [
+            String(index),
+            snapshotConfig(override),
+          ]),
+        ),
+      };
     }
 
     function validateJobs(jobs = []) {
-      const needsTransparentSubject = state.bgMode === 'image' || state.productShadow;
-      if (!needsTransparentSubject) return null;
-      if (state.bgMode === 'image' && !state.backgroundImageBlob) {
-        return text.missingError || text.decodeError;
+      let blocked = 0;
+      for (const job of jobs) {
+        if (!job) continue;
+        const config = resolvedConfig(job.index);
+        const needsTransparentSubject = config.bgMode === 'image' || config.productShadow;
+        if (!needsTransparentSubject) continue;
+        if (config.bgMode === 'image' && !config.backgroundImageBlob) {
+          return text.missingError || text.decodeError;
+        }
+        if (
+          job.transparent !== true
+          && !(job.foregroundBlob && !job.needsReprocess)
+          && !job.aiRequested
+        ) {
+          blocked += 1;
+        }
       }
-      const blocked = jobs.filter((job) => (
-        job
-        && job.transparent !== true
-        && !(job.foregroundBlob && !job.needsReprocess)
-        && !job.aiRequested
-      )).length;
       return blocked > 0 ? format(text.needsForeground, { count: blocked }) : null;
     }
 
-    async function compose(inputBlob, outputSize) {
+    async function compose(inputBlob, outputSize, index = null) {
+      const config = resolvedConfig(index);
       const foreground = await loadBlobImage(inputBlob);
       let canvasWidth;
       let canvasHeight;
@@ -317,10 +415,10 @@
         canvasHeight,
         {
           baseFitRatio,
-          productScale: state.productScale,
-          productOffsetX: state.productOffsetX,
-          productOffsetY: state.productOffsetY,
-          productAlign: state.productAlign,
+          productScale: config.productScale,
+          productOffsetX: config.productOffsetX,
+          productOffsetY: config.productOffsetY,
+          productAlign: config.productAlign,
         },
       );
       foregroundWidth = foregroundPlacement.width;
@@ -333,16 +431,23 @@
       canvas.height = canvasHeight;
       const context = canvas.getContext('2d');
 
-      if (state.bgMode === 'image') {
-        if (!state.backgroundImageBlob) throw new Error(text.missingError || 'Missing background image.');
-        const background = decodedBackgroundImage || await loadBlobImage(state.backgroundImageBlob);
-        decodedBackgroundImage = background;
+      if (config.bgMode === 'image') {
+        if (!config.backgroundImageBlob) throw new Error(text.missingError || 'Missing background image.');
+        let background = Number.isInteger(index)
+          ? decodedOverrideBackgrounds.get(index)
+          : decodedBackgroundImage;
+        if (!background) background = await loadBlobImage(config.backgroundImageBlob);
+        if (Number.isInteger(index) && itemOverrides.has(index)) {
+          decodedOverrideBackgrounds.set(index, background);
+        } else {
+          decodedBackgroundImage = background;
+        }
         const placement = getImagePlacement(
           background.naturalWidth,
           background.naturalHeight,
           canvasWidth,
           canvasHeight,
-          state.backgroundFit,
+          config.backgroundFit,
         );
         context.drawImage(
           background,
@@ -351,12 +456,12 @@
           placement.width,
           placement.height,
         );
-      } else if (state.bgMode !== 'transparent') {
-        context.fillStyle = state.bgMode === 'white' ? '#FFFFFF' : state.customHex;
+      } else if (config.bgMode !== 'transparent') {
+        context.fillStyle = config.bgMode === 'white' ? '#FFFFFF' : config.customHex;
         context.fillRect(0, 0, canvasWidth, canvasHeight);
       }
 
-      if (state.productShadow) {
+      if (config.productShadow) {
         const shortestSide = Math.min(canvasWidth, canvasHeight);
         context.save();
         context.shadowColor = 'rgba(15, 23, 42, 0.28)';
@@ -381,6 +486,300 @@
         );
       }
       return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    }
+
+    let editorOverlay = null;
+    let editorElements = null;
+    let editorIndex = null;
+    let editorDraft = null;
+    let editorDecodedBackground = null;
+
+    function renderEditor() {
+      if (!editorElements || !editorDraft) return;
+      editorElements.mode.value = editorDraft.bgMode;
+      editorElements.customRow.hidden = editorDraft.bgMode !== 'custom';
+      editorElements.imageRow.hidden = editorDraft.bgMode !== 'image';
+      editorElements.color.value = editorDraft.customHex;
+      editorElements.colorHex.value = editorDraft.customHex.toUpperCase();
+      editorElements.imageName.textContent = editorDraft.backgroundImageName
+        || itemText.noImageLabel
+        || 'No image selected';
+      editorElements.fit.value = editorDraft.backgroundFit;
+      editorElements.scale.value = String(editorDraft.productScale);
+      editorElements.scaleValue.textContent = `${editorDraft.productScale}%`;
+      editorElements.offsetX.value = String(editorDraft.productOffsetX);
+      editorElements.offsetXValue.textContent = `${editorDraft.productOffsetX}%`;
+      editorElements.offsetY.value = String(editorDraft.productOffsetY);
+      editorElements.offsetYValue.textContent = editorDraft.productAlign === 'bottom'
+        ? (text.bottomValue || itemText.bottomLabel || 'Bottom')
+        : `${editorDraft.productOffsetY}%`;
+      editorElements.center.classList.toggle(
+        'active',
+        editorDraft.productAlign === 'center',
+      );
+      editorElements.bottom.classList.toggle(
+        'active',
+        editorDraft.productAlign === 'bottom',
+      );
+      editorElements.shadow.checked = editorDraft.productShadow;
+      editorElements.reset.disabled = !itemOverrides.has(editorIndex);
+    }
+
+    function closeEditor() {
+      editorOverlay?.classList.remove('visible');
+      editorIndex = null;
+      editorDraft = null;
+      editorDecodedBackground = null;
+    }
+
+    function ensureEditor() {
+      if (editorOverlay) return;
+      editorOverlay = document.createElement('div');
+      editorOverlay.className = 'composition-editor-overlay';
+      editorOverlay.innerHTML = `
+        <section class="composition-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="itemOverrideTitle">
+          <header class="composition-editor-head">
+            <div>
+              <strong id="itemOverrideTitle">${itemText.title || 'Customize one image'}</strong>
+              <span id="itemOverrideName"></span>
+              <small>${itemText.subtitle || 'These settings override the batch defaults for this image.'}</small>
+            </div>
+            <button class="composition-editor-close" type="button" aria-label="${itemText.closeLabel || 'Close'}">×</button>
+          </header>
+          <div class="composition-editor-body">
+            <label class="composition-editor-field">
+              <span>${itemText.backgroundLabel || 'Background'}</span>
+              <select id="itemOverrideBgMode">
+                <option value="white">${itemText.whiteLabel || 'White'}</option>
+                <option value="transparent">${itemText.transparentLabel || 'Transparent'}</option>
+                <option value="custom">${itemText.customLabel || 'Custom color'}</option>
+                <option value="image">${itemText.uploadLabel || 'Uploaded image'}</option>
+              </select>
+            </label>
+            <div class="composition-editor-inline" id="itemOverrideCustomRow" hidden>
+              <input id="itemOverrideColor" type="color" value="#F0F0F0" aria-label="${itemText.customLabel || 'Custom color'}">
+              <input id="itemOverrideColorHex" type="text" maxlength="7" value="#F0F0F0" aria-label="HEX">
+            </div>
+            <div class="composition-editor-image" id="itemOverrideImageRow" hidden>
+              <button id="itemOverrideChooseImage" type="button">${itemText.chooseImageLabel || 'Choose image'}</button>
+              <input id="itemOverrideImageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
+              <span id="itemOverrideImageName"></span>
+            </div>
+            <label class="composition-editor-field">
+              <span>${itemText.fitLabel || 'Background fit'}</span>
+              <select id="itemOverrideFit">
+                <option value="cover">${itemText.coverLabel || 'Fill & crop'}</option>
+                <option value="contain">${itemText.containLabel || 'Show full image'}</option>
+                <option value="stretch">${itemText.stretchLabel || 'Stretch'}</option>
+              </select>
+            </label>
+            <div class="product-transform-panel">
+              <div class="product-range-row">
+                <label for="itemOverrideScale">${itemText.sizeLabel || 'Size'}</label>
+                <input id="itemOverrideScale" type="range" min="50" max="140" step="1">
+                <output class="product-range-value" id="itemOverrideScaleValue"></output>
+              </div>
+              <div class="product-range-row">
+                <label for="itemOverrideOffsetX">${itemText.horizontalLabel || 'Horizontal'}</label>
+                <input id="itemOverrideOffsetX" type="range" min="-40" max="40" step="1">
+                <output class="product-range-value" id="itemOverrideOffsetXValue"></output>
+              </div>
+              <div class="product-range-row">
+                <label for="itemOverrideOffsetY">${itemText.verticalLabel || 'Vertical'}</label>
+                <input id="itemOverrideOffsetY" type="range" min="-40" max="40" step="1">
+                <output class="product-range-value" id="itemOverrideOffsetYValue"></output>
+              </div>
+              <div class="product-align-row">
+                <button class="product-transform-btn" id="itemOverrideCenter" type="button">${itemText.centerLabel || 'Center'}</button>
+                <button class="product-transform-btn" id="itemOverrideBottom" type="button">${itemText.bottomLabel || 'Bottom align'}</button>
+              </div>
+              <label class="product-shadow-row" for="itemOverrideShadow">
+                <span>${itemText.shadowLabel || 'Soft product shadow'}</span>
+                <input id="itemOverrideShadow" type="checkbox">
+              </label>
+            </div>
+            <div class="composition-editor-status" id="itemOverrideStatus" aria-live="polite"></div>
+          </div>
+          <footer class="composition-editor-actions">
+            <button class="composition-editor-reset" id="itemOverrideReset" type="button">${itemText.useBatchLabel || 'Use batch settings'}</button>
+            <button class="composition-editor-apply" id="itemOverrideApply" type="button">${itemText.applyLabel || 'Apply to this image'}</button>
+          </footer>
+        </section>`;
+      document.body.append(editorOverlay);
+      editorElements = {
+        name: editorOverlay.querySelector('#itemOverrideName'),
+        close: editorOverlay.querySelector('.composition-editor-close'),
+        mode: editorOverlay.querySelector('#itemOverrideBgMode'),
+        customRow: editorOverlay.querySelector('#itemOverrideCustomRow'),
+        color: editorOverlay.querySelector('#itemOverrideColor'),
+        colorHex: editorOverlay.querySelector('#itemOverrideColorHex'),
+        imageRow: editorOverlay.querySelector('#itemOverrideImageRow'),
+        chooseImage: editorOverlay.querySelector('#itemOverrideChooseImage'),
+        imageInput: editorOverlay.querySelector('#itemOverrideImageInput'),
+        imageName: editorOverlay.querySelector('#itemOverrideImageName'),
+        fit: editorOverlay.querySelector('#itemOverrideFit'),
+        scale: editorOverlay.querySelector('#itemOverrideScale'),
+        scaleValue: editorOverlay.querySelector('#itemOverrideScaleValue'),
+        offsetX: editorOverlay.querySelector('#itemOverrideOffsetX'),
+        offsetXValue: editorOverlay.querySelector('#itemOverrideOffsetXValue'),
+        offsetY: editorOverlay.querySelector('#itemOverrideOffsetY'),
+        offsetYValue: editorOverlay.querySelector('#itemOverrideOffsetYValue'),
+        center: editorOverlay.querySelector('#itemOverrideCenter'),
+        bottom: editorOverlay.querySelector('#itemOverrideBottom'),
+        shadow: editorOverlay.querySelector('#itemOverrideShadow'),
+        status: editorOverlay.querySelector('#itemOverrideStatus'),
+        reset: editorOverlay.querySelector('#itemOverrideReset'),
+        apply: editorOverlay.querySelector('#itemOverrideApply'),
+      };
+
+      editorElements.close.addEventListener('click', closeEditor);
+      editorOverlay.addEventListener('click', (event) => {
+        if (event.target === editorOverlay) closeEditor();
+      });
+      editorElements.mode.addEventListener('change', () => {
+        editorDraft.bgMode = BACKGROUND_MODES.has(editorElements.mode.value)
+          ? editorElements.mode.value
+          : 'white';
+        renderEditor();
+      });
+      editorElements.color.addEventListener('input', () => {
+        editorDraft.customHex = editorElements.color.value;
+        renderEditor();
+      });
+      editorElements.colorHex.addEventListener('input', () => {
+        const value = editorElements.colorHex.value.trim();
+        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) return;
+        editorDraft.customHex = value;
+        renderEditor();
+      });
+      editorElements.chooseImage.addEventListener('click', () => {
+        editorElements.imageInput.click();
+      });
+      editorElements.imageInput.addEventListener('change', async () => {
+        const [file] = editorElements.imageInput.files || [];
+        editorElements.imageInput.value = '';
+        if (!file) return;
+        const validation = validateBackgroundFile(file);
+        if (validation) {
+          editorElements.status.textContent = text[`${validation}Error`] || text.decodeError;
+          return;
+        }
+        try {
+          editorDecodedBackground = await loadBlobImage(file);
+        } catch {
+          editorElements.status.textContent = text.decodeError;
+          return;
+        }
+        editorDraft.backgroundImageBlob = file;
+        editorDraft.backgroundImageName = file.name || itemText.restoredName || 'Background image';
+        editorDraft.bgMode = 'image';
+        editorElements.status.textContent = '';
+        renderEditor();
+      });
+      editorElements.fit.addEventListener('change', () => {
+        if (BACKGROUND_FITS.has(editorElements.fit.value)) {
+          editorDraft.backgroundFit = editorElements.fit.value;
+        }
+      });
+      editorElements.scale.addEventListener('input', () => {
+        editorDraft.productScale = clampNumber(editorElements.scale.value, 50, 140, 100);
+        renderEditor();
+      });
+      editorElements.offsetX.addEventListener('input', () => {
+        editorDraft.productOffsetX = clampNumber(editorElements.offsetX.value, -40, 40, 0);
+        renderEditor();
+      });
+      editorElements.offsetY.addEventListener('input', () => {
+        editorDraft.productOffsetY = clampNumber(editorElements.offsetY.value, -40, 40, 0);
+        editorDraft.productAlign = (
+          editorDraft.productOffsetX === 0 && editorDraft.productOffsetY === 0
+        ) ? 'center' : 'custom';
+        renderEditor();
+      });
+      editorElements.center.addEventListener('click', () => {
+        editorDraft.productOffsetX = 0;
+        editorDraft.productOffsetY = 0;
+        editorDraft.productAlign = 'center';
+        renderEditor();
+      });
+      editorElements.bottom.addEventListener('click', () => {
+        editorDraft.productOffsetX = 0;
+        editorDraft.productOffsetY = 0;
+        editorDraft.productAlign = 'bottom';
+        renderEditor();
+      });
+      editorElements.shadow.addEventListener('change', () => {
+        editorDraft.productShadow = editorElements.shadow.checked;
+      });
+      editorElements.apply.addEventListener('click', () => {
+        if (editorDraft.bgMode === 'image' && !editorDraft.backgroundImageBlob) {
+          editorElements.status.textContent = itemText.imageRequired || text.missingError;
+          return;
+        }
+        const override = snapshotConfig(editorDraft);
+        itemOverrides.set(editorIndex, override);
+        if (editorDecodedBackground && override.backgroundImageBlob) {
+          decodedOverrideBackgrounds.set(editorIndex, editorDecodedBackground);
+        } else {
+          decodedOverrideBackgrounds.delete(editorIndex);
+        }
+        syncOverrideCardButton(editorIndex);
+        const changedIndex = editorIndex;
+        closeEditor();
+        notifyChanged(
+          itemText.appliedStatus || 'Single-image settings applied locally.',
+          changedIndex,
+        );
+      });
+      editorElements.reset.addEventListener('click', () => {
+        const changedIndex = editorIndex;
+        itemOverrides.delete(changedIndex);
+        decodedOverrideBackgrounds.delete(changedIndex);
+        syncOverrideCardButton(changedIndex);
+        closeEditor();
+        notifyChanged(
+          itemText.resetStatus || 'This image now uses batch settings.',
+          changedIndex,
+        );
+      });
+    }
+
+    function openEditor(index, fileName = '') {
+      ensureEditor();
+      editorIndex = index;
+      editorDraft = snapshotConfig(resolvedConfig(index));
+      editorDecodedBackground = itemOverrides.has(index)
+        ? decodedOverrideBackgrounds.get(index) || null
+        : (
+          editorDraft.backgroundImageBlob === state.backgroundImageBlob
+            ? decodedBackgroundImage
+            : null
+        );
+      editorElements.name.textContent = fileName;
+      editorElements.status.textContent = itemOverrides.has(index)
+        ? (itemText.overriddenNotice || 'This image has custom settings.')
+        : (itemText.inheritedNotice || 'Starting from the current batch settings.');
+      renderEditor();
+      editorOverlay.classList.add('visible');
+    }
+
+    function decorateCard(card, index, fileName = '') {
+      if (!card || !Number.isInteger(index) || overrideCardButtons.has(index)) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'composition-card-btn';
+      button.setAttribute(
+        'aria-label',
+        format(itemText.customizeAria || 'Customize {name}', { name: fileName }),
+      );
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openEditor(index, fileName);
+      });
+      card.appendChild(button);
+      overrideCardButtons.set(index, button);
+      syncOverrideCardButton(index);
     }
 
     elements.imageInput?.addEventListener('change', async () => {
@@ -442,6 +841,7 @@
     return {
       acceptBackgroundFile,
       compose,
+      decorateCard,
       getState,
       restore,
       setMode,
@@ -455,6 +855,7 @@
     format,
     getForegroundPlacement,
     getImagePlacement,
+    resolveCompositionConfig,
     validateBackgroundFile,
     MAX_BACKGROUND_BYTES,
   };

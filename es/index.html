@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6c-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6c-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -809,7 +809,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6c-v1">
 </head>
 <body>
 
@@ -1057,6 +1057,37 @@
           </label>
         </div>
       </div>
+      <div id="itemOverrideCopy" hidden
+        data-customize-label="Personalizar"
+        data-overridden-label="Personalizada"
+        data-customize-aria="Personalizar {name}"
+        data-title="Personalizar una imagen"
+        data-subtitle="Estos ajustes sustituyen los valores del lote solo para esta imagen."
+        data-close-label="Cerrar"
+        data-background-label="Fondo"
+        data-white-label="Blanco"
+        data-transparent-label="Transparente"
+        data-custom-label="Color personalizado"
+        data-upload-label="Imagen subida"
+        data-choose-image-label="Elegir imagen"
+        data-no-image-label="Ninguna imagen seleccionada"
+        data-fit-label="Ajuste del fondo"
+        data-cover-label="Rellenar y recortar"
+        data-contain-label="Mostrar completa"
+        data-stretch-label="Estirar"
+        data-size-label="Tamaño"
+        data-horizontal-label="Horizontal"
+        data-vertical-label="Vertical"
+        data-center-label="Centrar"
+        data-bottom-label="Alinear abajo"
+        data-shadow-label="Sombra suave del producto"
+        data-use-batch-label="Usar ajustes del lote"
+        data-apply-label="Aplicar a esta imagen"
+        data-image-required="Elige primero una imagen de fondo."
+        data-applied-status="Ajustes de esta imagen aplicados localmente."
+        data-reset-status="Esta imagen vuelve a usar los ajustes del lote."
+        data-overridden-notice="Esta imagen tiene ajustes propios."
+        data-inherited-notice="Se parte de los ajustes actuales del lote."></div>
 
       <!-- Output Size -->
       <div class="setting-group">
@@ -1746,11 +1777,12 @@ let selectedFiles   = [];
           resetProcessActionAfterLocalEdit(i, restored);
         },
       });
+      backgroundComposer?.decorateCard(card, i, file.name);
       img.tabIndex = 0;
       img.setAttribute('role', 'button');
       img.setAttribute('aria-label', `Vista previa ${file.name}`);
       card.addEventListener('click', event => {
-        if (!event.target.closest('.local-clean-card-btn')) showWorkspacePreview(i);
+        if (!event.target.closest('.local-clean-card-btn, .composition-card-btn')) showWorkspacePreview(i);
       });
       img.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -1821,8 +1853,8 @@ let selectedFiles   = [];
 
   // ── Background + resize compositing ──────────────────────
 
-  async function applyBackground(inputBlob) {
-    return backgroundComposer.compose(inputBlob, outputSize);
+  async function applyBackground(inputBlob, index) {
+    return backgroundComposer.compose(inputBlob, outputSize, index);
   }
 
   // ── File naming ───────────────────────────────────────────
@@ -1932,7 +1964,7 @@ let selectedFiles   = [];
 
   // ── Init ──────────────────────────────────────────────────
   backgroundComposer = window.ShopBGBackgroundComposer.create({
-    onChanged: () => aiWorkflow?.markCompositionChanged(),
+    onChanged: index => aiWorkflow?.markCompositionChanged(index),
     onStatus: setStatus,
   });
 

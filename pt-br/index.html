@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6c-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6c-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -276,7 +276,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6c-v1">
 </head>
 <body>
 
@@ -514,6 +514,37 @@
           </label>
         </div>
       </div>
+      <div id="itemOverrideCopy" hidden
+        data-customize-label="Personalizar"
+        data-overridden-label="Personalizada"
+        data-customize-aria="Personalizar {name}"
+        data-title="Personalizar uma imagem"
+        data-subtitle="Estas configurações substituem os padrões do lote somente para esta imagem."
+        data-close-label="Fechar"
+        data-background-label="Fundo"
+        data-white-label="Branco"
+        data-transparent-label="Transparente"
+        data-custom-label="Cor personalizada"
+        data-upload-label="Imagem enviada"
+        data-choose-image-label="Escolher imagem"
+        data-no-image-label="Nenhuma imagem selecionada"
+        data-fit-label="Ajuste do fundo"
+        data-cover-label="Preencher e cortar"
+        data-contain-label="Mostrar inteira"
+        data-stretch-label="Esticar"
+        data-size-label="Tamanho"
+        data-horizontal-label="Horizontal"
+        data-vertical-label="Vertical"
+        data-center-label="Centralizar"
+        data-bottom-label="Alinhar embaixo"
+        data-shadow-label="Sombra suave do produto"
+        data-use-batch-label="Usar configurações do lote"
+        data-apply-label="Aplicar a esta imagem"
+        data-image-required="Escolha primeiro uma imagem de fundo."
+        data-applied-status="Configurações desta imagem aplicadas localmente."
+        data-reset-status="Esta imagem voltou a usar as configurações do lote."
+        data-overridden-notice="Esta imagem tem configurações próprias."
+        data-inherited-notice="O ponto de partida são as configurações atuais do lote."></div>
 
       <div class="setting-group">
         <span class="setting-label">Tamanho de saída</span>
@@ -1163,11 +1194,12 @@ let selectedFiles   = [];
           resetProcessActionAfterLocalEdit(i, restored);
         },
       });
+      backgroundComposer?.decorateCard(card, i, file.name);
       img.tabIndex = 0;
       img.setAttribute('role', 'button');
       img.setAttribute('aria-label', `Prévia ${file.name}`);
       card.addEventListener('click', event => {
-        if (!event.target.closest('.local-clean-card-btn')) showWorkspacePreview(i);
+        if (!event.target.closest('.local-clean-card-btn, .composition-card-btn')) showWorkspacePreview(i);
       });
       img.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -1232,8 +1264,8 @@ let selectedFiles   = [];
     });
   }
 
-  async function applyBackground(inputBlob) {
-    return backgroundComposer.compose(inputBlob, outputSize);
+  async function applyBackground(inputBlob, index) {
+    return backgroundComposer.compose(inputBlob, outputSize, index);
   }
 
   function getFileName(originalName, seqIndex) {
@@ -1332,7 +1364,7 @@ let selectedFiles   = [];
   });
 
   backgroundComposer = window.ShopBGBackgroundComposer.create({
-    onChanged: () => aiWorkflow?.markCompositionChanged(),
+    onChanged: index => aiWorkflow?.markCompositionChanged(index),
     onStatus: setStatus,
   });
 

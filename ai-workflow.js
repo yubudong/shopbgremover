@@ -131,14 +131,24 @@
   }
 
   function sessionByteSize(items, composition = {}) {
-    const itemBytes = items.reduce((total, item) => (
-      total
-      + Number(item.file?.size || 0)
-      + Number(item.sourceBlob?.size || 0)
-      + Number(item.job?.foregroundBlob?.size || 0)
-      + Number(item.job?.outputBlob?.size || 0)
-    ), 0);
-    return itemBytes + Number(composition.backgroundImageBlob?.size || 0);
+    const counted = new Set();
+    let total = 0;
+    const addBlob = (blob) => {
+      if (!blob || counted.has(blob)) return;
+      counted.add(blob);
+      total += Number(blob.size || 0);
+    };
+    for (const item of items) {
+      addBlob(item.file);
+      addBlob(item.sourceBlob);
+      addBlob(item.job?.foregroundBlob);
+      addBlob(item.job?.outputBlob);
+    }
+    addBlob(composition.backgroundImageBlob);
+    for (const override of Object.values(composition.itemOverrides || {})) {
+      addBlob(override?.backgroundImageBlob);
+    }
+    return total;
   }
 
   function buildSessionRecord({
@@ -555,8 +565,9 @@
       schedulePersist();
     }
 
-    function markCompositionChanged() {
-      for (const job of jobs) {
+    function markCompositionChanged(index = null) {
+      const affectedJobs = Number.isInteger(index) ? [jobs[index]] : jobs;
+      for (const job of affectedJobs) {
         if (!job) continue;
         job.outputBlob = null;
         job.outputName = null;
@@ -684,7 +695,7 @@
             }
           }
 
-          const output = await options.applyBackground(foreground);
+          const output = await options.applyBackground(foreground, index);
           if (!output) throw new Error(text.failed);
           job.outputBlob = output;
           job.outputName = options.getFileName(files[index].name, index);

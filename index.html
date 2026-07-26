@@ -48,8 +48,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6c-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6c-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -805,7 +805,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6c-v1">
 </head>
 <body>
 
@@ -1055,6 +1055,37 @@
           </label>
         </div>
       </div>
+      <div id="itemOverrideCopy" hidden
+        data-customize-label="Customize"
+        data-overridden-label="Customized"
+        data-customize-aria="Customize {name}"
+        data-title="Customize one image"
+        data-subtitle="These settings override the batch defaults for this image."
+        data-close-label="Close"
+        data-background-label="Background"
+        data-white-label="White"
+        data-transparent-label="Transparent"
+        data-custom-label="Custom color"
+        data-upload-label="Uploaded image"
+        data-choose-image-label="Choose image"
+        data-no-image-label="No image selected"
+        data-fit-label="Background fit"
+        data-cover-label="Fill &amp; crop"
+        data-contain-label="Show full image"
+        data-stretch-label="Stretch"
+        data-size-label="Size"
+        data-horizontal-label="Horizontal"
+        data-vertical-label="Vertical"
+        data-center-label="Center"
+        data-bottom-label="Bottom align"
+        data-shadow-label="Soft product shadow"
+        data-use-batch-label="Use batch settings"
+        data-apply-label="Apply to this image"
+        data-image-required="Choose a background image first."
+        data-applied-status="Single-image settings applied locally."
+        data-reset-status="This image now uses batch settings."
+        data-overridden-notice="This image has custom settings."
+        data-inherited-notice="Starting from the current batch settings."></div>
 
       <!-- Output Size -->
       <div class="setting-group">
@@ -1744,11 +1775,12 @@ let selectedFiles   = [];
           resetProcessActionAfterLocalEdit(i, restored);
         },
       });
+      backgroundComposer?.decorateCard(card, i, file.name);
       img.tabIndex = 0;
       img.setAttribute('role', 'button');
       img.setAttribute('aria-label', `Preview ${file.name}`);
       card.addEventListener('click', event => {
-        if (!event.target.closest('.local-clean-card-btn')) showWorkspacePreview(i);
+        if (!event.target.closest('.local-clean-card-btn, .composition-card-btn')) showWorkspacePreview(i);
       });
       img.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -1819,8 +1851,8 @@ let selectedFiles   = [];
 
   // ── Background + resize compositing ──────────────────────
 
-  async function applyBackground(inputBlob) {
-    return backgroundComposer.compose(inputBlob, outputSize);
+  async function applyBackground(inputBlob, index) {
+    return backgroundComposer.compose(inputBlob, outputSize, index);
   }
 
   // ── File naming ───────────────────────────────────────────
@@ -1909,7 +1941,7 @@ let selectedFiles   = [];
 
   // ── Init ──────────────────────────────────────────────────
   backgroundComposer = window.ShopBGBackgroundComposer.create({
-    onChanged: () => aiWorkflow?.markCompositionChanged(),
+    onChanged: index => aiWorkflow?.markCompositionChanged(index),
     onStatus: setStatus,
   });
 

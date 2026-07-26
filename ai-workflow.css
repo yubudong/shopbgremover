@@ -83,7 +83,83 @@ div.bg-row.background-mode-grid{display:grid;grid-template-columns:repeat(2,minm
   color:#475569;font-size:9px;font-weight:750
 }
 .product-shadow-row input{width:15px;height:15px;accent-color:#2563eb}
+.composition-card-btn{
+  position:absolute;right:7px;bottom:7px;z-index:4;max-width:calc(100% - 14px);
+  overflow:hidden;padding:6px 8px;border:1px solid rgba(255,255,255,.8);border-radius:8px;
+  background:rgba(51,65,85,.92);color:#fff;box-shadow:0 3px 10px rgba(15,23,42,.24);
+  cursor:pointer;font-size:9px;font-weight:850;line-height:1.2;text-overflow:ellipsis;
+  white-space:nowrap;backdrop-filter:blur(5px)
+}
+.composition-card-btn:hover,.composition-card-btn:focus-visible{background:rgba(30,64,175,.96)}
+.composition-card-btn:focus-visible{outline:3px solid rgba(37,99,235,.28);outline-offset:2px}
+.composition-card-btn.active{background:rgba(4,120,87,.94)}
+.composition-editor-overlay{
+  position:fixed;inset:0;z-index:260;display:none;align-items:center;justify-content:center;
+  padding:24px;background:rgba(15,23,42,.62);backdrop-filter:blur(5px)
+}
+.composition-editor-overlay.visible{display:flex}
+.composition-editor-dialog{
+  width:min(560px,100%);max-height:calc(100vh - 48px);overflow:auto;border-radius:16px;
+  background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.34)
+}
+.composition-editor-head{
+  position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;padding:20px 22px 15px;border-bottom:1px solid #e2e8f0;background:#fff
+}
+.composition-editor-head strong,.composition-editor-head span,.composition-editor-head small{display:block}
+.composition-editor-head strong{color:#0f172a;font-size:16px;font-weight:850}
+.composition-editor-head span{
+  max-width:420px;margin-top:4px;overflow:hidden;color:#1d4ed8;font-size:11px;font-weight:750;
+  text-overflow:ellipsis;white-space:nowrap
+}
+.composition-editor-head small{margin-top:5px;color:#64748b;font-size:10px;line-height:1.45}
+.composition-editor-close{
+  flex:0 0 auto;width:32px;height:32px;border:0;border-radius:9px;background:#f1f5f9;
+  color:#475569;cursor:pointer;font-size:20px;line-height:1
+}
+.composition-editor-body{display:grid;gap:12px;padding:18px 22px}
+.composition-editor-field{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px}
+.composition-editor-field>span{color:#475569;font-size:10px;font-weight:800}
+.composition-editor-field select,.composition-editor-inline input[type="text"]{
+  min-width:0;padding:8px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;
+  color:#1f2937;font-size:11px
+}
+.composition-editor-inline,.composition-editor-image{
+  display:flex;align-items:center;gap:8px;margin-left:128px
+}
+.composition-editor-inline[hidden],.composition-editor-image[hidden]{display:none}
+.composition-editor-inline input[type="color"]{
+  width:42px;height:34px;padding:2px;border:1px solid #cbd5e1;border-radius:8px;background:#fff
+}
+.composition-editor-inline input[type="text"]{width:105px}
+.composition-editor-image button,.composition-editor-reset,.composition-editor-apply{
+  padding:9px 12px;border-radius:9px;cursor:pointer;font-size:10px;font-weight:800
+}
+.composition-editor-image button{
+  flex:0 0 auto;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8
+}
+.composition-editor-image span{
+  min-width:0;overflow:hidden;color:#64748b;font-size:9px;font-weight:700;
+  text-overflow:ellipsis;white-space:nowrap
+}
+.composition-editor-body>.product-transform-panel{
+  margin-top:3px;padding:13px;border:1px solid #e2e8f0;border-radius:11px;background:#f8fafc
+}
+.composition-editor-status{min-height:17px;color:#1d4ed8;font-size:10px;font-weight:750;line-height:1.45}
+.composition-editor-actions{
+  position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:9px;padding:14px 22px 18px;
+  border-top:1px solid #e2e8f0;background:#fff
+}
+.composition-editor-reset{border:1px solid #cbd5e1;background:#fff;color:#475569}
+.composition-editor-reset:disabled{cursor:not-allowed;opacity:.45}
+.composition-editor-apply{border:1px solid #2563eb;background:#2563eb;color:#fff}
 @media(max-width:640px){
   .ai-workflow-panel{padding:12px}
   .ai-card-control small{max-width:100px}
+  .composition-editor-overlay{align-items:flex-end;padding:12px}
+  .composition-editor-dialog{max-height:calc(100vh - 24px);border-radius:14px}
+  .composition-editor-head,.composition-editor-body{padding-left:16px;padding-right:16px}
+  .composition-editor-field{grid-template-columns:1fr;gap:5px}
+  .composition-editor-inline,.composition-editor-image{margin-left:0}
+  .composition-editor-actions{padding:12px 16px 16px}
 }
