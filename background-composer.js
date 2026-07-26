@@ -4,6 +4,13 @@
   const ACCEPTED_BACKGROUND_EXTENSIONS = /\.(?:jpe?g|png|webp)$/i;
   const BACKGROUND_MODES = new Set(['white', 'transparent', 'custom', 'image']);
   const BACKGROUND_FITS = new Set(['cover', 'contain', 'stretch']);
+  const PRODUCT_ALIGNMENTS = new Set(['center', 'bottom', 'custom']);
+
+  function clampNumber(value, minimum, maximum, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(maximum, Math.max(minimum, number));
+  }
 
   function format(template, values = {}) {
     return String(template || '').replace(/\{(\w+)\}/g, (_, key) => (
@@ -49,6 +56,40 @@
     };
   }
 
+  function getForegroundPlacement(
+    imageWidth,
+    imageHeight,
+    canvasWidth,
+    canvasHeight,
+    {
+      baseFitRatio = 0.9,
+      productScale = 100,
+      productOffsetX = 0,
+      productOffsetY = 0,
+      productAlign = 'center',
+    } = {},
+  ) {
+    if (
+      ![imageWidth, imageHeight, canvasWidth, canvasHeight].every(
+        (value) => Number.isFinite(value) && value > 0,
+      )
+    ) {
+      throw new TypeError('Image and canvas dimensions must be positive numbers.');
+    }
+
+    const scale = Math.min(
+      canvasWidth / imageWidth,
+      canvasHeight / imageHeight,
+    ) * baseFitRatio * (productScale / 100);
+    const width = imageWidth * scale;
+    const height = imageHeight * scale;
+    const x = ((canvasWidth - width) / 2) + (canvasWidth * productOffsetX / 100);
+    const y = productAlign === 'bottom'
+      ? canvasHeight - height - (canvasHeight * 0.05)
+      : ((canvasHeight - height) / 2) + (canvasHeight * productOffsetY / 100);
+    return { x, y, width, height };
+  }
+
   function loadBlobImage(blob) {
     return new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(blob);
@@ -83,6 +124,15 @@
       imageName: document.getElementById('backgroundImageName'),
       imageFit: document.getElementById('backgroundFit'),
       imageRemove: document.getElementById('backgroundImageRemove'),
+      productScale: document.getElementById('productScale'),
+      productScaleValue: document.getElementById('productScaleValue'),
+      productOffsetX: document.getElementById('productOffsetX'),
+      productOffsetXValue: document.getElementById('productOffsetXValue'),
+      productOffsetY: document.getElementById('productOffsetY'),
+      productOffsetYValue: document.getElementById('productOffsetYValue'),
+      productCenter: document.getElementById('productCenter'),
+      productBottom: document.getElementById('productBottom'),
+      productShadow: document.getElementById('productShadow'),
     };
     const text = elements.imagePanel?.dataset || {};
     let state = {
@@ -91,6 +141,11 @@
       backgroundFit: 'cover',
       backgroundImageBlob: null,
       backgroundImageName: '',
+      productScale: 100,
+      productOffsetX: 0,
+      productOffsetY: 0,
+      productAlign: 'center',
+      productShadow: false,
     };
     let decodedBackgroundImage = null;
 
@@ -115,6 +170,23 @@
       if (elements.imageName) {
         elements.imageName.textContent = state.backgroundImageName || text.emptyName || '';
       }
+      if (elements.productScale) elements.productScale.value = String(state.productScale);
+      if (elements.productScaleValue) {
+        elements.productScaleValue.textContent = `${state.productScale}%`;
+      }
+      if (elements.productOffsetX) elements.productOffsetX.value = String(state.productOffsetX);
+      if (elements.productOffsetXValue) {
+        elements.productOffsetXValue.textContent = `${state.productOffsetX}%`;
+      }
+      if (elements.productOffsetY) elements.productOffsetY.value = String(state.productOffsetY);
+      if (elements.productOffsetYValue) {
+        elements.productOffsetYValue.textContent = state.productAlign === 'bottom'
+          ? (text.bottomValue || 'Bottom')
+          : `${state.productOffsetY}%`;
+      }
+      elements.productCenter?.classList.toggle('active', state.productAlign === 'center');
+      elements.productBottom?.classList.toggle('active', state.productAlign === 'bottom');
+      if (elements.productShadow) elements.productShadow.checked = state.productShadow;
     }
 
     async function acceptBackgroundFile(file, { restored = false } = {}) {
@@ -177,6 +249,13 @@
       if (BACKGROUND_FITS.has(settings.backgroundFit)) {
         state.backgroundFit = settings.backgroundFit;
       }
+      state.productScale = clampNumber(settings.productScale, 50, 140, 100);
+      state.productOffsetX = clampNumber(settings.productOffsetX, -40, 40, 0);
+      state.productOffsetY = clampNumber(settings.productOffsetY, -40, 40, 0);
+      state.productAlign = PRODUCT_ALIGNMENTS.has(settings.productAlign)
+        ? settings.productAlign
+        : 'center';
+      state.productShadow = settings.productShadow === true;
       const requestedMode = BACKGROUND_MODES.has(settings.bgMode) ? settings.bgMode : 'white';
       if (settings.backgroundImageBlob instanceof Blob) {
         const restored = await acceptBackgroundFile(settings.backgroundImageBlob, { restored: true });
@@ -197,8 +276,11 @@
     }
 
     function validateJobs(jobs = []) {
-      if (state.bgMode !== 'image') return null;
-      if (!state.backgroundImageBlob) return text.missingError || text.decodeError;
+      const needsTransparentSubject = state.bgMode === 'image' || state.productShadow;
+      if (!needsTransparentSubject) return null;
+      if (state.bgMode === 'image' && !state.backgroundImageBlob) {
+        return text.missingError || text.decodeError;
+      }
       const blocked = jobs.filter((job) => (
         job
         && job.transparent !== true
@@ -217,26 +299,34 @@
       let foregroundX;
       let foregroundY;
 
+      let baseFitRatio;
       if (outputSize === 'original') {
         canvasWidth = foreground.naturalWidth;
         canvasHeight = foreground.naturalHeight;
-        foregroundWidth = canvasWidth;
-        foregroundHeight = canvasHeight;
-        foregroundX = 0;
-        foregroundY = 0;
+        baseFitRatio = 1;
       } else {
         const size = Number.parseInt(outputSize, 10);
         canvasWidth = size;
         canvasHeight = size;
-        const foregroundScale = Math.min(
-          size / foreground.naturalWidth,
-          size / foreground.naturalHeight,
-        ) * 0.9;
-        foregroundWidth = Math.round(foreground.naturalWidth * foregroundScale);
-        foregroundHeight = Math.round(foreground.naturalHeight * foregroundScale);
-        foregroundX = Math.round((size - foregroundWidth) / 2);
-        foregroundY = Math.round((size - foregroundHeight) / 2);
+        baseFitRatio = 0.9;
       }
+      const foregroundPlacement = getForegroundPlacement(
+        foreground.naturalWidth,
+        foreground.naturalHeight,
+        canvasWidth,
+        canvasHeight,
+        {
+          baseFitRatio,
+          productScale: state.productScale,
+          productOffsetX: state.productOffsetX,
+          productOffsetY: state.productOffsetY,
+          productAlign: state.productAlign,
+        },
+      );
+      foregroundWidth = foregroundPlacement.width;
+      foregroundHeight = foregroundPlacement.height;
+      foregroundX = foregroundPlacement.x;
+      foregroundY = foregroundPlacement.y;
 
       const canvas = document.createElement('canvas');
       canvas.width = canvasWidth;
@@ -266,13 +356,30 @@
         context.fillRect(0, 0, canvasWidth, canvasHeight);
       }
 
-      context.drawImage(
-        foreground,
-        foregroundX,
-        foregroundY,
-        foregroundWidth,
-        foregroundHeight,
-      );
+      if (state.productShadow) {
+        const shortestSide = Math.min(canvasWidth, canvasHeight);
+        context.save();
+        context.shadowColor = 'rgba(15, 23, 42, 0.28)';
+        context.shadowBlur = Math.max(4, shortestSide * 0.025);
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = Math.max(2, shortestSide * 0.02);
+        context.drawImage(
+          foreground,
+          foregroundX,
+          foregroundY,
+          foregroundWidth,
+          foregroundHeight,
+        );
+        context.restore();
+      } else {
+        context.drawImage(
+          foreground,
+          foregroundX,
+          foregroundY,
+          foregroundWidth,
+          foregroundHeight,
+        );
+      }
       return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
     }
 
@@ -294,6 +401,42 @@
       render();
       notifyChanged(text.removed);
     });
+    elements.productScale?.addEventListener('input', () => {
+      state.productScale = clampNumber(elements.productScale.value, 50, 140, 100);
+      render();
+      notifyChanged();
+    });
+    elements.productOffsetX?.addEventListener('input', () => {
+      state.productOffsetX = clampNumber(elements.productOffsetX.value, -40, 40, 0);
+      render();
+      notifyChanged();
+    });
+    elements.productOffsetY?.addEventListener('input', () => {
+      state.productOffsetY = clampNumber(elements.productOffsetY.value, -40, 40, 0);
+      state.productAlign = state.productOffsetY === 0 && state.productOffsetX === 0
+        ? 'center'
+        : 'custom';
+      render();
+      notifyChanged();
+    });
+    elements.productCenter?.addEventListener('click', () => {
+      state.productOffsetX = 0;
+      state.productOffsetY = 0;
+      state.productAlign = 'center';
+      render();
+      notifyChanged();
+    });
+    elements.productBottom?.addEventListener('click', () => {
+      state.productOffsetX = 0;
+      state.productOffsetY = 0;
+      state.productAlign = 'bottom';
+      render();
+      notifyChanged();
+    });
+    elements.productShadow?.addEventListener('change', () => {
+      state.productShadow = elements.productShadow.checked;
+      notifyChanged();
+    });
 
     render();
     return {
@@ -310,6 +453,7 @@
   globalThis.ShopBGBackgroundComposer = {
     create,
     format,
+    getForegroundPlacement,
     getImagePlacement,
     validateBackgroundFile,
     MAX_BACKGROUND_BYTES,

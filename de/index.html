@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6a-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6a-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage6b-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage6b-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -276,7 +276,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6a-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6b-v1">
 </head>
 <body>
 
@@ -467,7 +467,8 @@
           data-ready="Hintergrund „{name}“ ist bereit. Verarbeite die Bilder, um ihn lokal anzuwenden."
           data-removed="Hochgeladener Hintergrund entfernt. Weißer Hintergrund wiederhergestellt."
           data-restored-name="Wiederhergestellter Hintergrund"
-          data-empty-name="Hochgeladener Hintergrund">
+          data-empty-name="Hochgeladener Hintergrund"
+          data-bottom-value="Unten">
           <input id="backgroundImageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
           <div class="background-image-head">
             <span class="background-image-name" id="backgroundImageName"></span>
@@ -482,6 +483,35 @@
             </select>
           </div>
           <small class="background-local-note">Nur bis zu 24 Stunden in diesem Browser gespeichert · max. 20 MB</small>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <span class="setting-label">Produkt</span>
+        <div class="product-transform-panel">
+          <div class="product-range-row">
+            <label for="productScale">Größe</label>
+            <input id="productScale" type="range" min="50" max="140" step="1" value="100">
+            <output class="product-range-value" id="productScaleValue" for="productScale">100%</output>
+          </div>
+          <div class="product-range-row">
+            <label for="productOffsetX">Horizontal</label>
+            <input id="productOffsetX" type="range" min="-40" max="40" step="1" value="0">
+            <output class="product-range-value" id="productOffsetXValue" for="productOffsetX">0%</output>
+          </div>
+          <div class="product-range-row">
+            <label for="productOffsetY">Vertikal</label>
+            <input id="productOffsetY" type="range" min="-40" max="40" step="1" value="0">
+            <output class="product-range-value" id="productOffsetYValue" for="productOffsetY">0%</output>
+          </div>
+          <div class="product-align-row">
+            <button class="product-transform-btn active" id="productCenter" type="button">Zentrieren</button>
+            <button class="product-transform-btn" id="productBottom" type="button">Unten ausrichten</button>
+          </div>
+          <label class="product-shadow-row" for="productShadow">
+            <span>Weicher Produktschatten</span>
+            <input id="productShadow" type="checkbox">
+          </label>
         </div>
       </div>
 

@@ -22,6 +22,7 @@ const {
   TRANSPARENCY_DETECTOR_VERSION,
 } = globalThis.ShopBGAiWorkflow;
 const {
+  getForegroundPlacement,
   getImagePlacement,
   validateBackgroundFile,
   MAX_BACKGROUND_BYTES,
@@ -69,6 +70,42 @@ test('background fit defaults to centered cover and supports contain and stretch
     y: 0,
     width: 1000,
     height: 1000,
+  });
+});
+
+test('product placement preserves legacy defaults and supports scale, offsets, and bottom alignment', () => {
+  assert.deepEqual(getForegroundPlacement(400, 200, 400, 200, {
+    baseFitRatio: 1,
+  }), {
+    x: 0,
+    y: 0,
+    width: 400,
+    height: 200,
+  });
+  assert.deepEqual(getForegroundPlacement(1600, 900, 1000, 1000), {
+    x: 50,
+    y: 246.875,
+    width: 900,
+    height: 506.25,
+  });
+  assert.deepEqual(getForegroundPlacement(1600, 900, 1000, 1000, {
+    productScale: 80,
+    productOffsetX: 10,
+    productOffsetY: -5,
+    productAlign: 'custom',
+  }), {
+    x: 240,
+    y: 247.5,
+    width: 720,
+    height: 405,
+  });
+  assert.deepEqual(getForegroundPlacement(1600, 900, 1000, 1000, {
+    productAlign: 'bottom',
+  }), {
+    x: 50,
+    y: 443.75,
+    width: 900,
+    height: 506.25,
   });
 });
 
