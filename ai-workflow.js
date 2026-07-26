@@ -44,6 +44,14 @@
     return file?.type === 'image/png' || /\.png$/i.test(file?.name || '');
   }
 
+  function enforceOutputMaxBytes(output, { maxBytes, userMessage, reason = 'output_too_large' }) {
+    if (!output || output.size <= maxBytes) return output;
+    const error = new Error(reason);
+    error.reason = reason;
+    error.userMessage = userMessage;
+    throw error;
+  }
+
   function applyTransparencyResult(job, transparent) {
     const upgradedOpaqueResult = (
       job.transparencyDetectorVersion !== TRANSPARENCY_DETECTOR_VERSION
@@ -110,6 +118,7 @@
     job.needsReprocess = hadAiResult;
     job.status = 'checking';
     job.error = null;
+    job.userError = null;
     return job;
   }
 
@@ -127,6 +136,7 @@
       needsReprocess: Boolean(job.needsReprocess),
       status: job.status === 'processing' ? 'failed' : job.status,
       error: job.status === 'processing' ? 'interrupted' : (job.error || null),
+      userError: job.status === 'processing' ? null : (job.userError || null),
     };
   }
 
@@ -389,11 +399,13 @@
 
     function jobStateText(job) {
       if (job.status === 'checking') return text.checking;
+      if (job.status === 'failed') {
+        return job.userError ? `${text.failed} · ${job.userError}` : text.failed;
+      }
       if (job.transparent === true) return text.transparent;
       if (!job.aiRequested) return text.off;
       if (job.foregroundBlob && !job.needsReprocess) return text.cached;
       if (job.needsReprocess) return text.reprocess;
-      if (job.status === 'failed') return text.failed;
       return text.ready;
     }
 
@@ -534,6 +546,7 @@
         needsReprocess: Boolean(restored?.needsReprocess),
         status: restored?.status || 'checking',
         error: restored?.error || null,
+        userError: restored?.userError || null,
       };
       if (job.transparent === true) job.aiRequested = false;
       if (job.status === 'processing') {
@@ -571,6 +584,7 @@
         if (!job) continue;
         job.outputBlob = null;
         job.outputName = null;
+        job.userError = null;
       }
       options.onOutputsChanged?.(getOutputs());
       sync({ notify: true });
@@ -701,12 +715,14 @@
           job.outputName = options.getFileName(files[index].name, index);
           job.status = 'succeeded';
           job.error = null;
+          job.userError = null;
           options.onResult?.(index, output);
           if (badge) badge.textContent = '✅';
         } catch (error) {
           errors += 1;
           job.status = 'failed';
           job.error = error.message;
+          job.userError = error.userMessage || null;
           job.outputBlob = null;
           job.outputName = null;
           if (badge) badge.textContent = '❌';
@@ -822,6 +838,7 @@
   globalThis.ShopBGAiWorkflow = {
     create,
     applyTransparencyResult,
+    enforceOutputMaxBytes,
     format,
     hasMeaningfulTransparency,
     isPng,

@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage7a-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage7a-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage7b-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage7b-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -276,7 +276,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7a-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7b-v1">
 </head>
 <body>
 
@@ -561,6 +561,9 @@
           <button class="size-btn" data-sz="600" onclick="setSize(this,'600')">
             TikTok Shop<span class="size-sub">600 × 600</span>
           </button>
+          <button class="size-btn" data-sz="1024" onclick="setSize(this,'1024')">
+            Shopee<span class="size-sub">1024 × 1024</span>
+          </button>
           <button class="size-btn active" data-sz="original" onclick="setSize(this,'original')">
             Original<span class="size-sub">Größe beibehalten</span>
           </button>
@@ -584,7 +587,10 @@
           data-jpeg-note="JPEG unterstützt keine Transparenz. Transparente Hintergründe werden weiß exportiert."
           data-webp-note="Kleinere Dateien mit Transparenzunterstützung."
           data-tiktok-note=" TikTok Shop akzeptiert nur PNG oder JPEG (maximal 10 MB pro Bild)."
-          data-tiktok-disabled="WebP wird von den Produktbildregeln von TikTok Shop nicht akzeptiert.">Verlustfreie Ausgabe mit Transparenz.</small>
+          data-tiktok-disabled="WebP wird von den Produktbildregeln von TikTok Shop nicht akzeptiert."
+          data-shopee-note=" Shopee-Empfehlung: 1024 × 1024, PNG oder JPEG, bis 2 MB. Verwende ein schlichtes weißes Hauptbild und lasse das Produkt mehr als die Hälfte der Fläche einnehmen. Anforderungen können je nach Markt variieren."
+          data-shopee-disabled="WebP gehört nicht zu den bestätigten Shopee-Produktbildformaten."
+          data-shopee-too-large="Diese Shopee-Ausgabe überschreitet 2 MB. Wähle JPEG oder eine niedrigere JPEG-Qualität und versuche es erneut.">Verlustfreie Ausgabe mit Transparenz.</small>
       </div>
 
       <div class="setting-group">
@@ -908,14 +914,14 @@ let selectedFiles   = [];
   let outputQuality   = 90;
 
   async function restoreCompositionState(settings = {}) {
-    const validSizes = new Set(['2048', '1000', '500', '600', 'original']);
+    const validSizes = new Set(['2048', '1000', '500', '600', '1024', 'original']);
     const validRenameModes = new Set(['original', 'sequence', 'date']);
     const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
     if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
-    if (outputSize === '600' && outputFormat === 'webp') outputFormat = 'jpeg';
+    if (['600', '1024'].includes(outputSize) && outputFormat === 'webp') outputFormat = 'jpeg';
     outputQuality = Math.min(100, Math.max(50, Number(settings.outputQuality) || 90));
 
     document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
@@ -935,7 +941,7 @@ let selectedFiles   = [];
 
   function setSize(el, val) {
     outputSize = val;
-    if (outputSize === '600' && outputFormat === 'webp') outputFormat = 'jpeg';
+    if (['600', '1024'].includes(outputSize) && outputFormat === 'webp') outputFormat = 'jpeg';
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     renderOutputFormat();
@@ -952,11 +958,14 @@ let selectedFiles   = [];
   function renderOutputFormat() {
     const encoding = window.ShopBGBackgroundComposer.getOutputEncoding(outputFormat, outputQuality);
     const isTikTokShop = outputSize === '600';
+    const isShopee = outputSize === '1024';
     const note = document.getElementById('outputFormatNote');
     document.querySelectorAll('.output-format-btn').forEach(button => {
-      const isUnsupportedWebP = isTikTokShop && button.dataset.format === 'webp';
+      const isUnsupportedWebP = (isTikTokShop || isShopee) && button.dataset.format === 'webp';
       button.disabled = isUnsupportedWebP;
-      button.title = isUnsupportedWebP ? note.dataset.tiktokDisabled : '';
+      button.title = isUnsupportedWebP
+        ? (isShopee ? note.dataset.shopeeDisabled : note.dataset.tiktokDisabled)
+        : '';
       button.classList.toggle('active', button.dataset.format === outputFormat);
     });
     const qualityRow = document.getElementById('outputQualityRow');
@@ -965,8 +974,11 @@ let selectedFiles   = [];
     qualityRow.hidden = outputFormat === 'png';
     qualityInput.value = String(outputQuality);
     qualityValue.textContent = `${outputQuality}%`;
-    note.textContent = `${note.dataset[`${outputFormat}Note`]}${isTikTokShop ? note.dataset.tiktokNote : ''}`;
-    note.classList.toggle('is-warning', outputFormat === 'jpeg' || isTikTokShop);
+    const platformNote = isTikTokShop
+      ? note.dataset.tiktokNote
+      : (isShopee ? note.dataset.shopeeNote : '');
+    note.textContent = `${note.dataset[`${outputFormat}Note`]}${platformNote}`;
+    note.classList.toggle('is-warning', outputFormat === 'jpeg' || isTikTokShop || isShopee);
     document.querySelectorAll('.rename-eg').forEach(example => {
       if (!example.dataset.baseExample) example.dataset.baseExample = example.textContent;
       example.textContent = example.dataset.baseExample.replace(/\.png/g, `.${encoding.extension}`);
@@ -974,7 +986,7 @@ let selectedFiles   = [];
   }
 
   function setOutputFormat(el, format) {
-    if (outputSize === '600' && format === 'webp') return;
+    if (['600', '1024'].includes(outputSize) && format === 'webp') return;
     if (!['png', 'jpeg', 'webp'].includes(format) || outputFormat === format) return;
     outputFormat = format;
     renderOutputFormat();
@@ -1337,9 +1349,15 @@ let selectedFiles   = [];
   }
 
   async function applyBackground(inputBlob, index) {
-    return backgroundComposer.compose(inputBlob, outputSize, index, {
+    const output = await backgroundComposer.compose(inputBlob, outputSize, index, {
       format: outputFormat,
       quality: outputQuality,
+    });
+    if (outputSize !== '1024') return output;
+    return window.ShopBGAiWorkflow.enforceOutputMaxBytes(output, {
+      maxBytes: 2 * 1024 * 1024,
+      reason: 'shopee_output_too_large',
+      userMessage: document.getElementById('outputFormatNote').dataset.shopeeTooLarge,
     });
   }
 

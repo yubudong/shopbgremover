@@ -7,6 +7,7 @@ await import('../background-composer.js');
 const {
   applyTransparencyResult,
   buildSessionRecord,
+  enforceOutputMaxBytes,
   fetchAiResult,
   format,
   hasMeaningfulTransparency,
@@ -52,6 +53,30 @@ test('uploaded background files accept only JPG, PNG, or WebP up to 20 MB', () =
   });
   Object.defineProperty(oversized, 'name', { value: 'large.jpg' });
   assert.equal(validateBackgroundFile(oversized), 'size');
+});
+
+test('platform output size enforcement accepts 2 MB exactly and rejects one byte over', () => {
+  const exact = { size: 2 * 1024 * 1024 };
+  assert.equal(
+    enforceOutputMaxBytes(exact, {
+      maxBytes: 2 * 1024 * 1024,
+      userMessage: 'Use JPEG.',
+    }),
+    exact,
+  );
+
+  assert.throws(
+    () => enforceOutputMaxBytes({ size: 2 * 1024 * 1024 + 1 }, {
+      maxBytes: 2 * 1024 * 1024,
+      reason: 'shopee_output_too_large',
+      userMessage: 'Use JPEG.',
+    }),
+    (error) => (
+      error.message === 'shopee_output_too_large'
+      && error.reason === 'shopee_output_too_large'
+      && error.userMessage === 'Use JPEG.'
+    ),
+  );
 });
 
 test('background fit defaults to centered cover and supports contain and stretch', () => {
