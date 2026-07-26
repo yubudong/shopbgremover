@@ -93,7 +93,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /id="aiSessionClear"/, file);
     assert.match(html, /data-session-restored=/, file);
     assert.match(html, /getSessionOwner: \(\) => currentUser\?\.id/, file);
-    assert.match(html, /getCompositionState: \(\) => \(\{[\s\S]*outputFormat,[\s\S]*outputQuality,[\s\S]*\}\)/, file);
+    assert.match(html, /getCompositionState: \(\) => \(\{[\s\S]*outputSize,[\s\S]*outputPlatform,[\s\S]*outputFormat,[\s\S]*outputQuality,[\s\S]*\}\)/, file);
     assert.match(html, /productFolders: productOrganizer\.getState\(\)/, file);
     assert.match(html, /productOrganizer\.restore\(settings\.productFolders\)/, file);
     assert.match(html, /productOrganizer\?\.register\(file, i\)/, file);
@@ -145,18 +145,30 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /data-format="png"/, file);
     assert.match(html, /data-format="jpeg"/, file);
     assert.match(html, /data-format="webp"/, file);
+    assert.match(html, /data-sz="2048" data-platform="shopify"[\s\S]*Shopify[\s\S]*2048 × 2048/, file);
+    assert.match(html, /data-sz="1600" data-platform="amazon"[\s\S]*Amazon[\s\S]*1600 × 1600/, file);
+    assert.match(html, /data-sz="1600" data-platform="ebay"[\s\S]*eBay[\s\S]*1600 × 1600/, file);
     assert.match(html, /data-sz="600"[\s\S]*TikTok Shop[\s\S]*600 × 600/, file);
     assert.match(html, /data-sz="1024"[\s\S]*Shopee[\s\S]*1024 × 1024/, file);
-    assert.match(html, /new Set\(\['2048', '1000', '500', '600', '1024', 'original'\]\)/, file);
+    assert.match(html, /const validSizes = new Set\(Object\.values\(platformSizes\)\)/, file);
+    assert.match(html, /settings\.outputSize === '1000'[\s\S]*outputPlatform = 'amazon'/, file);
+    assert.match(html, /settings\.outputSize === '500'[\s\S]*outputPlatform = 'ebay'/, file);
     assert.equal(
-      (html.match(/if \(\['600', '1024'\]\.includes\(outputSize\) && outputFormat === 'webp'\) outputFormat = 'jpeg'/g) || []).length,
+      (html.match(/if \(\['amazon', 'tiktok', 'shopee'\]\.includes\(outputPlatform\) && outputFormat === 'webp'\) outputFormat = 'jpeg'/g) || []).length,
       2,
       file,
     );
-    assert.match(html, /const isTikTokShop = outputSize === '600'/, file);
-    assert.match(html, /const isShopee = outputSize === '1024'/, file);
+    assert.match(html, /const isAmazon = outputPlatform === 'amazon'/, file);
+    assert.match(html, /const isTikTokShop = outputPlatform === 'tiktok'/, file);
+    assert.match(html, /const isShopee = outputPlatform === 'shopee'/, file);
     assert.match(html, /button\.disabled = isUnsupportedWebP/, file);
-    assert.match(html, /if \(\['600', '1024'\]\.includes\(outputSize\) && format === 'webp'\) return/, file);
+    assert.match(html, /if \(\['amazon', 'tiktok', 'shopee'\]\.includes\(outputPlatform\) && format === 'webp'\) return/, file);
+    assert.match(html, /data-shopify-note="[^"]+2048 × 2048[^"]+(?:20 MB|20 Mo)[^"]*"/i, file);
+    assert.match(html, /data-shopify-too-large="[^"]+(?:20 MB|20 Mo)[^"]+(?:JPEG)[^"]*"/i, file);
+    assert.match(html, /data-amazon-note="[^"]+1600 × 1600[^"]+85 ?%[^"]*"/i, file);
+    assert.match(html, /data-amazon-disabled="[^"]*WebP[^"]+(?:JPEG)[^"]+(?:PNG)[^"]*"/i, file);
+    assert.match(html, /data-ebay-note="[^"]+1600 × 1600[^"]+500 px[^"]+(?:12 MB|12 Mo)[^"]*"/i, file);
+    assert.match(html, /data-ebay-too-large="[^"]+(?:12 MB|12 Mo)[^"]+(?:JPEG)[^"]*"/i, file);
     assert.match(html, /data-tiktok-note="[^"]+TikTok Shop[^"]+10 (?:MB|Mo)[^"]*"/i, file);
     assert.match(html, /data-tiktok-disabled="[^"]*WebP[^"]*"/i, file);
     assert.match(html, /data-tiktok-disabled="[^"]*TikTok Shop[^"]*"/i, file);
@@ -169,8 +181,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /validateComposition: \(\{ jobs \}\) => backgroundComposer\.validateJobs\(jobs\)/, file);
     assert.match(html, /backgroundComposer\?\.decorateCard\(card, i, file\.name\)/, file);
     assert.match(html, /backgroundComposer\.compose\(inputBlob, outputSize, index, \{[\s\S]*format: outputFormat,[\s\S]*quality: outputQuality/, file);
-    assert.match(html, /if \(outputSize !== '1024'\) return output/, file);
-    assert.match(html, /enforceOutputMaxBytes\(output, \{[\s\S]*maxBytes: 2 \* 1024 \* 1024,[\s\S]*reason: 'shopee_output_too_large',[\s\S]*dataset\.shopeeTooLarge/, file);
+    assert.match(html, /shopify: \{[\s\S]*maxBytes: 20 \* 1024 \* 1024 - 1,[\s\S]*reason: 'shopify_output_too_large'/, file);
+    assert.match(html, /ebay: \{[\s\S]*maxBytes: 12 \* 1024 \* 1024,[\s\S]*reason: 'ebay_output_too_large'/, file);
+    assert.match(html, /shopee: \{[\s\S]*maxBytes: 2 \* 1024 \* 1024,[\s\S]*reason: 'shopee_output_too_large'/, file);
+    assert.match(html, /userMessage: note\.dataset\[platformLimit\.message\]/, file);
     assert.match(html, /case 'sequence': return `\$\{num\}\.\$\{extension\}`/, file);
     assert.match(html, /getOutputEncoding\([\s\S]*outputFormat,[\s\S]*outputQuality/, file);
     assert.match(html, /onChanged: index => aiWorkflow\?\.markCompositionChanged\(index\)/, file);
@@ -235,6 +249,33 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     assert.match(html, /updateWorkspacePreview\(index, objectUrl\)/, file);
     assert.match(html, /card\.addEventListener\('click'/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
+  }
+});
+
+test('marketplace guides use verified current image limits without compliance guarantees', async () => {
+  const shopifyFiles = locales.map((locale) => `${locale}shopify-background-remover.html`);
+  const marketplaceFiles = locales.map((locale) => `${locale}amazon-ebay-product-images.html`);
+
+  for (const file of shopifyFiles) {
+    const html = await read(file);
+    assert.match(html, /2048×2048/, file);
+    assert.match(html, /5000×5000/, file);
+    assert.match(html, /25 (?:megapixels|Megapixel|megapíxeles|mégapixels)/i, file);
+    assert.match(html, /(?:20 MB|20 Mo)/, file);
+    assert.doesNotMatch(html, /800×800|4472×4472|80–90/, file);
+  }
+
+  for (const file of marketplaceFiles) {
+    const html = await read(file);
+    assert.match(html, /1600×1600/, file);
+    assert.match(html, /(?:12 MB|12 Mo)/, file);
+    assert.match(html, /WebP/, file);
+    assert.doesNotMatch(html, /1000×1000|500×500/, file);
+    assert.doesNotMatch(
+      html,
+      /(?:policies automatically|Richtlinien[^<]*automatisch|políticas[^<]*automáticamente|politiques[^<]*automatiquement|políticas[^<]*automaticamente)/i,
+      file,
+    );
   }
 });
 

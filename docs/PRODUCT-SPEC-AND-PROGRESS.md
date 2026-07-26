@@ -53,7 +53,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 4 本地去物体/水印 | 🟡 MVP 完成 | 小面积简单背景可用；复杂纹理和大面积遮挡仍是明确质量限制 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
-| 7 平台支持 | 🟡 进行中 | TikTok Shop、Shopee、SKU 分组完成；Temu 等待官方规则证据 |
+| 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
 | 8 完整发布验收 | 🟡 进行中 | 除真实 PayPal 资金闭环和一项无写入表单补验外，发布清单已有证据 |
 
 ### 2.2 当前未完成项
@@ -63,7 +63,6 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | P0 | 真实 PayPal 捕获与退款 | 页面、订单 Worker、Webhook 和冲正自动化已上线；没有带 Capture ID 的可退款生产订单 | 使用可验证的境外买家账号完成 USD 3.49 付款、100 积分到账、全额退款、Webhook 冲正和最终余额恢复 |
 | P1（外部阻塞） | Temu 官方预设 | 公开资料不足，不能用第三方参数硬编码；SKU 分组替代能力已上线 | 获得目标站点官方卖家后台的尺寸、格式、文件上限和规则证据后实施 |
 | P2（补验） | 管理员审计表单正常入口 | 表单已上线；生产没有待审核推荐或可争议卡密，操作按钮为 0 | 自然符合条件的记录出现后，完成“打开→字符校验→勾选→取消”，不得产生审核或争议写入 |
-| 后续增强 | Shopify/Amazon/eBay 完整规则 | 基础尺寸已进入新工作区 | 核验官方格式、文件上限、提示和平台专用 ZIP 目录 |
 | 后续增强 | 复杂纹理和大面积本地修复 | 当前浏览器算法只承诺小面积简单背景 | 选定新算法并建立代表性质量与性能验收 |
 
 补充边界：
@@ -447,7 +446,7 @@ npm run pages:deploy
 
 1. 真实 PayPal 付款等待可用的境外买家账号，暂不执行。
 2. 背景独立缩放、移动和模糊已完成生产零 AI 合成、恢复和下载验收，阶段 6 已关闭。
-3. 下一项可完成增强优先核验 Shopify、Amazon 和 eBay 官方格式与文件上限，再决定是否增加平台专用提示和 ZIP 目录。
+3. Shopify、Amazon 和 eBay 完整规则已实现并通过本地回归，等待本次 Pages 部署与生产静态验收后关闭该未完成项。
 4. 若恢复 PayPal 验收，先确认可用买家账号和即时验证码，再核对付款前 D1 基线。
 5. 出现自然待审核/可争议记录时，补做管理员表单零写入正常入口冒烟。
 
@@ -480,6 +479,28 @@ npm run pages:deploy
 - 发布警告：Wrangler 因仓库存在未跟踪 SEO 路线图提示 working directory dirty，但 Pages 白名单仍为 81 个文件且 SEO 文档未进入产物；`wrangler.toml` 没有 `pages_build_output_dir` 的提示为现有 Worker/Pages 共用配置行为，本次继续由明确的 `.pages-dist` 参数部署。
 - 当前状态：代码、五语种、单图覆盖、恢复、107 项回归、本地与生产零 AI 交互、CI、Pages 部署、五语种生产静态核对和 ZIP 下载均已完成；阶段 6 已完成。
 - 下一步：核验 Shopify、Amazon 和 eBay 官方格式与文件上限，再决定平台专用提示和 ZIP 目录范围；真实 PayPal 付款继续等待可用境外买家账号。
+
+### 8.6 2026-07-26：Shopify、Amazon 和 eBay 完整规则（本地完成，待部署）
+
+- 任务：用公开官方资料核验 Shopify、Amazon 和 eBay 当前图片尺寸、格式、文件上限与内容提示，修正旧预设和“自动合规”承诺，并决定是否增加平台 ZIP 目录。
+- 官方证据：
+  - Shopify 官方产品媒体帮助：方形 2048×2048 通常显示最佳；产品图可到 5000×5000 或 25 MP；文件必须小于 20 MB；接受 PNG、JPEG、WebP 等格式，并建议同一展示区域保持一致宽高比。来源：`https://help.shopify.com/en/manual/products/product-media/product-media-types`
+  - Amazon 官方商品详情页 PDF：最长边 1600 px 及以上提供较佳缩放体验，1000 px 是缩放下限，最长边上限 10,000 px；支持 JPEG、TIFF、PNG、非动画 GIF，JPEG 为首选；商品至少占 85%。来源：`https://m.media-amazon.com/images/G/35/sp-marketing-toolkit/Sellerfacingguides/Amazon_Listings_Product_Detail_Page_Guide.pdf`
+  - eBay 官方图片帮助与图片政策：建议约 1600×1600，最低 500 px；单图最大 12 MB；接受 JPEG、PNG、GIF、TIFF、BMP、WebP、HEIC、AVIF；不得增加边框、文字、营销图形或水印。来源：`https://www.ebay.com/help/selling/listings/photos-videos?id=4148`、`https://www.ebay.com/help/listing-policies/policies/picture-policy?id=4370`
+- 成果：
+  - 五语种工作区把 Amazon 和 eBay 从旧的 1000×1000 / 500×500 最低门槛改为各自 1600×1600 推荐预设；新增独立 `outputPlatform` 状态，避免相同尺寸串用平台格式、提示或文件上限。
+  - 旧 1000 / 500 会话恢复记录分别安全迁移到 Amazon / eBay 1600 预设；平台状态进入 24 小时 IndexedDB 恢复。
+  - Amazon 禁用 WebP，只允许当前工具已验证的 JPEG/PNG 路径，并明确 MAIN 图白底、至少 85% 商品占比、无文字/Logo/水印及分类规则复核；没有硬编码无法从公开通用官方资料可靠确认的 Amazon 文件大小上限。
+  - Shopify 保留 2048×2048 推荐预设，并在浏览器本地拒绝不小于 20 MB 的输出；eBay 在浏览器本地拒绝超过 12 MB 的输出；Shopee 既有 2 MB 检查保持不变。
+  - 五语种 Shopify / Amazon / eBay 指南页已更新官方数字、格式与边界，移除最低尺寸冒充推荐值、过期 4472 上限、固定 80%–90% Shopify 占比和“自动合规/保证通过”等承诺。
+  - 不增加平台专用 ZIP 目录：三家官方上传规则没有要求此目录层级；当前单平台批次与可选 SKU/商品文件夹已满足整理需求，继续保留未分组文件位于 ZIP 根目录的兼容性。
+- 修改文件：五语种 `index.html`、五语种 Shopify 指南、五语种 Amazon/eBay 指南、`tests/frontend-stage1.test.mjs` 和本文档；按生产架构说明未修改 `public/` 下的旧兼容副本，也未触碰未跟踪的 `docs/SEO-Roadmap-2026-05-22.md`。
+- 测试：备份保护 3 项、前端 58 项、Worker 47 项全部通过，共 108 项；`node --check worker/index.js`、`git diff --check` 通过；Pages 白名单构建仍为 81 个文件。Worker 测试首次因沙箱不能监听 `127.0.0.1` 和写 Wrangler 日志失败，在授权环境原命令重跑后 47 项全部通过，属于测试环境限制而非代码失败。
+- 生产写入/AI/资金影响：截至本记录仅执行本地静态构建与测试；没有远端 D1、fal.ai、积分、PayPal、Secrets 或 Cron 操作。
+- 部署状态：尚未部署；不能据此标记生产完成。计划仅部署 Cloudflare Pages，Worker 和 D1 不变，并用公开静态 GET/DOM 核对五语种预设、提示和指南。
+- 踩坑与调整：Amazon 与 eBay 的推荐预设同为 1600，不能继续只用数值推断平台，因此增加独立平台状态；Amazon Seller Central 通用帮助需要登录，公开官方资料没有可靠的通用文件上限，因此选择“不猜、不拦截”；Shopify 的限制是“小于 20 MB”，实现使用 `20 * 1024 * 1024 - 1` 字节作为可接受最大整数大小。
+- 当前状态：功能、五语种文案、旧会话迁移、108 项回归和 Pages 构建已完成，尚未提交、CI、部署或生产验收。
+- 下一步：提交并推送本阶段，等待 CI 通过后只部署 Pages；完成五语种生产静态核对并把部署编号、来源提交和最终生产状态写回本文档。真实 PayPal 付款继续等待可用境外买家账号。
 
 ---
 

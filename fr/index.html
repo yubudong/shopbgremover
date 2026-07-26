@@ -597,22 +597,22 @@
       <div class="setting-group">
         <span class="setting-label">Taille de sortie</span>
         <div class="size-grid">
-          <button class="size-btn" data-sz="2048" onclick="setSize(this,'2048')">
+          <button class="size-btn" data-sz="2048" data-platform="shopify" onclick="setSize(this,'2048')">
             Shopify<span class="size-sub">2048 × 2048</span>
           </button>
-          <button class="size-btn" data-sz="1000" onclick="setSize(this,'1000')">
-            Amazon<span class="size-sub">1000 × 1000</span>
+          <button class="size-btn" data-sz="1600" data-platform="amazon" onclick="setSize(this,'1600')">
+            Amazon<span class="size-sub">1600 × 1600</span>
           </button>
-          <button class="size-btn" data-sz="500" onclick="setSize(this,'500')">
-            eBay<span class="size-sub">500 × 500</span>
+          <button class="size-btn" data-sz="1600" data-platform="ebay" onclick="setSize(this,'1600')">
+            eBay<span class="size-sub">1600 × 1600</span>
           </button>
-          <button class="size-btn" data-sz="600" onclick="setSize(this,'600')">
+          <button class="size-btn" data-sz="600" data-platform="tiktok" onclick="setSize(this,'600')">
             TikTok Shop<span class="size-sub">600 × 600</span>
           </button>
-          <button class="size-btn" data-sz="1024" onclick="setSize(this,'1024')">
+          <button class="size-btn" data-sz="1024" data-platform="shopee" onclick="setSize(this,'1024')">
             Shopee<span class="size-sub">1024 × 1024</span>
           </button>
-          <button class="size-btn active" data-sz="original" onclick="setSize(this,'original')">
+          <button class="size-btn active" data-sz="original" data-platform="original" onclick="setSize(this,'original')">
             Original<span class="size-sub">Conserver la taille</span>
           </button>
         </div>
@@ -634,6 +634,12 @@
           data-png-note="Sortie sans perte avec transparence."
           data-jpeg-note="JPEG ne gère pas la transparence. Les fonds transparents sont exportés en blanc."
           data-webp-note="Fichiers plus légers avec transparence."
+          data-shopify-note=" Shopify recommande des images carrées de 2048 × 2048 ; PNG, JPEG et WebP sont acceptés. La sortie doit peser moins de 20 Mo."
+          data-shopify-too-large="Cette sortie Shopify ne fait pas moins de 20 Mo. Choisissez JPEG ou réduisez la qualité JPEG/WebP, puis réessayez."
+          data-amazon-note=" Amazon : 1600 × 1600 est le préréglage recommandé pour une bonne qualité de zoom. JPEG est préféré et PNG accepté. Pour les images PRINCIPALES, choisissez un blanc pur, faites occuper au produit au moins 85 % du cadre et n’ajoutez ni texte, ni logo, ni filigrane. Vérifiez les règles de la catégorie avant l’envoi."
+          data-amazon-disabled="WebP ne fait pas partie des formats d’image produit Amazon vérifiés. Choisissez JPEG ou PNG."
+          data-ebay-note=" eBay recommande 1600 × 1600 (500 px minimum), accepte PNG, JPEG et WebP, et autorise jusqu’à 12 Mo par image. Utilisez un fond neutre ou blanc, sans graphique ni filigrane."
+          data-ebay-too-large="Cette sortie eBay dépasse 12 Mo. Choisissez JPEG ou réduisez la qualité JPEG/WebP, puis réessayez."
           data-tiktok-note=" TikTok Shop accepte uniquement PNG ou JPEG (10 Mo maximum par image)."
           data-tiktok-disabled="WebP n’est pas accepté par les règles d’image produit de TikTok Shop."
           data-shopee-note=" Recommandation Shopee : 1024 × 1024, PNG ou JPEG, jusqu’à 2 Mo. Utilisez une image principale sur fond blanc simple et faites occuper au produit plus de la moitié du cadre. Les exigences peuvent varier selon le marché."
@@ -958,23 +964,49 @@ let selectedFiles   = [];
   let productOrganizer = null;
   let currentUser     = null;
   let outputSize      = 'original';
+  let outputPlatform  = 'original';
   let renameMode      = 'original';
   let outputFormat    = 'png';
   let outputQuality   = 90;
 
   async function restoreCompositionState(settings = {}) {
-    const validSizes = new Set(['2048', '1000', '500', '600', '1024', 'original']);
+    const platformSizes = {
+      shopify: '2048',
+      amazon: '1600',
+      ebay: '1600',
+      tiktok: '600',
+      shopee: '1024',
+      original: 'original',
+    };
+    const validSizes = new Set(Object.values(platformSizes));
     const validRenameModes = new Set(['original', 'sequence', 'date']);
     const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
     productOrganizer.restore(settings.productFolders);
-    if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
+    if (settings.outputSize === '1000') {
+      outputSize = '1600';
+      outputPlatform = 'amazon';
+    } else if (settings.outputSize === '500') {
+      outputSize = '1600';
+      outputPlatform = 'ebay';
+    } else if (
+      Object.hasOwn(platformSizes, settings.outputPlatform)
+      && platformSizes[settings.outputPlatform] === settings.outputSize
+    ) {
+      outputSize = settings.outputSize;
+      outputPlatform = settings.outputPlatform;
+    } else if (validSizes.has(settings.outputSize)) {
+      outputSize = settings.outputSize;
+      outputPlatform = Object.keys(platformSizes).find(platform => platformSizes[platform] === outputSize) || 'original';
+    }
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
     if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
-    if (['600', '1024'].includes(outputSize) && outputFormat === 'webp') outputFormat = 'jpeg';
+    if (['amazon', 'tiktok', 'shopee'].includes(outputPlatform) && outputFormat === 'webp') outputFormat = 'jpeg';
     outputQuality = Math.min(100, Math.max(50, Number(settings.outputQuality) || 90));
 
-    document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
+    document.querySelectorAll('.size-btn').forEach(button => {
+      button.classList.toggle('active', button.dataset.platform === outputPlatform);
+    });
     document.querySelectorAll('.rename-opt').forEach((option, index) => {
       option.classList.toggle('active', ['original', 'sequence', 'date'][index] === renameMode);
     });
@@ -991,7 +1023,8 @@ let selectedFiles   = [];
 
   function setSize(el, val) {
     outputSize = val;
-    if (['600', '1024'].includes(outputSize) && outputFormat === 'webp') outputFormat = 'jpeg';
+    outputPlatform = el.dataset.platform || 'original';
+    if (['amazon', 'tiktok', 'shopee'].includes(outputPlatform) && outputFormat === 'webp') outputFormat = 'jpeg';
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     renderOutputFormat();
@@ -1007,14 +1040,19 @@ let selectedFiles   = [];
 
   function renderOutputFormat() {
     const encoding = window.ShopBGBackgroundComposer.getOutputEncoding(outputFormat, outputQuality);
-    const isTikTokShop = outputSize === '600';
-    const isShopee = outputSize === '1024';
+    const isShopify = outputPlatform === 'shopify';
+    const isAmazon = outputPlatform === 'amazon';
+    const isEbay = outputPlatform === 'ebay';
+    const isTikTokShop = outputPlatform === 'tiktok';
+    const isShopee = outputPlatform === 'shopee';
     const note = document.getElementById('outputFormatNote');
     document.querySelectorAll('.output-format-btn').forEach(button => {
-      const isUnsupportedWebP = (isTikTokShop || isShopee) && button.dataset.format === 'webp';
+      const isUnsupportedWebP = (isAmazon || isTikTokShop || isShopee) && button.dataset.format === 'webp';
       button.disabled = isUnsupportedWebP;
       button.title = isUnsupportedWebP
-        ? (isShopee ? note.dataset.shopeeDisabled : note.dataset.tiktokDisabled)
+        ? (isAmazon
+          ? note.dataset.amazonDisabled
+          : (isShopee ? note.dataset.shopeeDisabled : note.dataset.tiktokDisabled))
         : '';
       button.classList.toggle('active', button.dataset.format === outputFormat);
     });
@@ -1024,11 +1062,15 @@ let selectedFiles   = [];
     qualityRow.hidden = outputFormat === 'png';
     qualityInput.value = String(outputQuality);
     qualityValue.textContent = `${outputQuality}%`;
-    const platformNote = isTikTokShop
-      ? note.dataset.tiktokNote
-      : (isShopee ? note.dataset.shopeeNote : '');
+    const platformNote = isShopify
+      ? note.dataset.shopifyNote
+      : (isAmazon
+        ? note.dataset.amazonNote
+        : (isEbay
+          ? note.dataset.ebayNote
+          : (isTikTokShop ? note.dataset.tiktokNote : (isShopee ? note.dataset.shopeeNote : ''))));
     note.textContent = `${note.dataset[`${outputFormat}Note`]}${platformNote}`;
-    note.classList.toggle('is-warning', outputFormat === 'jpeg' || isTikTokShop || isShopee);
+    note.classList.toggle('is-warning', outputFormat === 'jpeg' || outputPlatform !== 'original');
     document.querySelectorAll('.rename-eg').forEach(example => {
       if (!example.dataset.baseExample) example.dataset.baseExample = example.textContent;
       example.textContent = example.dataset.baseExample.replace(/\.png/g, `.${encoding.extension}`);
@@ -1036,7 +1078,7 @@ let selectedFiles   = [];
   }
 
   function setOutputFormat(el, format) {
-    if (['600', '1024'].includes(outputSize) && format === 'webp') return;
+    if (['amazon', 'tiktok', 'shopee'].includes(outputPlatform) && format === 'webp') return;
     if (!['png', 'jpeg', 'webp'].includes(format) || outputFormat === format) return;
     outputFormat = format;
     renderOutputFormat();
@@ -1404,11 +1446,29 @@ let selectedFiles   = [];
       format: outputFormat,
       quality: outputQuality,
     });
-    if (outputSize !== '1024') return output;
+    const platformLimit = {
+      shopify: {
+        maxBytes: 20 * 1024 * 1024 - 1,
+        reason: 'shopify_output_too_large',
+        message: 'shopifyTooLarge',
+      },
+      ebay: {
+        maxBytes: 12 * 1024 * 1024,
+        reason: 'ebay_output_too_large',
+        message: 'ebayTooLarge',
+      },
+      shopee: {
+        maxBytes: 2 * 1024 * 1024,
+        reason: 'shopee_output_too_large',
+        message: 'shopeeTooLarge',
+      },
+    }[outputPlatform];
+    if (!platformLimit) return output;
+    const note = document.getElementById('outputFormatNote');
     return window.ShopBGAiWorkflow.enforceOutputMaxBytes(output, {
-      maxBytes: 2 * 1024 * 1024,
-      reason: 'shopee_output_too_large',
-      userMessage: document.getElementById('outputFormatNote').dataset.shopeeTooLarge,
+      maxBytes: platformLimit.maxBytes,
+      reason: platformLimit.reason,
+      userMessage: note.dataset[platformLimit.message],
     });
   }
 
@@ -1530,6 +1590,7 @@ let selectedFiles   = [];
     getCompositionState: () => ({
       ...backgroundComposer.getState(),
       outputSize,
+      outputPlatform,
       renameMode,
       outputFormat,
       outputQuality,
