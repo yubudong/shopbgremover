@@ -8,13 +8,14 @@
     "d1:backup": "bash scripts/backup_d1.sh",
     "d1:migrate:remote": "bash scripts/migrate_d1_remote.sh",
     "benchmark:local-inpaint": "node scripts/benchmark_local_inpaint.mjs",
+    "benchmark:local-inpaint:candidates": "node scripts/compare_local_inpaint_candidates.mjs",
     "pages:build": "node scripts/build_static_pages.mjs",
     "pages:deploy": "npm run pages:build && wrangler pages deploy .pages-dist --project-name shopbgremover --branch main",
     "start": "next start",
     "lint": "next lint",
     "test": "npm run test:backup && npm run test:frontend && npm run test:worker",
     "test:backup": "node --test tests/d1-backup.test.mjs",
-    "test:frontend": "node --test tests/frontend-stage1.test.mjs tests/local-inpaint.test.mjs tests/local-inpaint-quality.test.mjs tests/ai-workflow.test.mjs tests/product-organizer.test.mjs",
+    "test:frontend": "node --test tests/frontend-stage1.test.mjs tests/local-inpaint.test.mjs tests/local-inpaint-quality.test.mjs tests/local-inpaint-candidates.test.mjs tests/ai-workflow.test.mjs tests/product-organizer.test.mjs",
     "test:worker": "vitest run --config vitest.config.mjs"
   },
   "dependencies": {

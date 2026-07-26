@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { dilateMask, inpaintRgba } from '../local-inpaint-core.mjs';
 
-const PRODUCTION_PROFILE = Object.freeze({
+export const PRODUCTION_PROFILE = Object.freeze({
   expansion: 2,
   sampleRadius: 6,
   smoothingPasses: 8,
@@ -141,7 +141,15 @@ function median(values) {
   return percentile(values, 0.5);
 }
 
-function runCase(definition, repetitions) {
+export function runProductionInpaint(rgba, width, height, mask) {
+  return inpaintRgba(rgba, width, height, mask, {
+    expansion: 0,
+    sampleRadius: PRODUCTION_PROFILE.sampleRadius,
+    smoothingPasses: PRODUCTION_PROFILE.smoothingPasses,
+  });
+}
+
+function runCase(definition, repetitions, processor) {
   const clean = createImage(definition.width, definition.height, definition.pixelAt);
   const sourceMask = rectangleMask(definition.width, definition.height, definition.maskRect);
   const evaluatedMask = dilateMask(
@@ -156,14 +164,18 @@ function runCase(definition, repetitions) {
   for (let run = 0; run < repetitions; run += 1) {
     const corrupted = corruptMaskedPixels(clean, sourceMask);
     const started = performance.now();
-    output = inpaintRgba(corrupted, definition.width, definition.height, evaluatedMask, {
-      expansion: 0,
-      sampleRadius: PRODUCTION_PROFILE.sampleRadius,
-      smoothingPasses: PRODUCTION_PROFILE.smoothingPasses,
-    });
+    output = processor(
+      corrupted,
+      definition.width,
+      definition.height,
+      evaluatedMask,
+    );
     timings.push(performance.now() - started);
   }
 
+  if (!(output instanceof Uint8ClampedArray) || output.length !== clean.length) {
+    throw new TypeError('benchmark processor must return a matching Uint8ClampedArray');
+  }
   const metrics = measureQuality(clean, output, evaluatedMask);
   const medianMs = Number(median(timings).toFixed(1));
   const qualityPassed = definition.expectation === 'supported'
@@ -194,10 +206,18 @@ function runCase(definition, repetitions) {
   };
 }
 
-export function runLocalInpaintBenchmark({ repetitions = 3 } = {}) {
+export function runLocalInpaintBenchmark({
+  repetitions = 3,
+  processor = runProductionInpaint,
+  algorithm = 'production-boundary-fill',
+} = {}) {
+  if (typeof processor !== 'function') throw new TypeError('processor must be a function');
   const safeRepetitions = Math.max(1, Math.min(5, Math.round(repetitions)));
-  const cases = buildCases().map((definition) => runCase(definition, safeRepetitions));
+  const cases = buildCases().map(
+    (definition) => runCase(definition, safeRepetitions, processor),
+  );
   return {
+    algorithm,
     profile: PRODUCTION_PROFILE,
     repetitions: safeRepetitions,
     supportedQualityPassed: cases
