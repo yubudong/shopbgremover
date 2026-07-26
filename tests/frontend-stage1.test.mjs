@@ -72,9 +72,9 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage6d-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage6d-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage6d-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage7a-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage7a-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage7a-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -109,6 +109,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/id="outputQuality"/g) || []).length, 1, file);
     assert.equal((html.match(/id="outputFormatNote"/g) || []).length, 1, file);
     assert.equal((html.match(/class="output-format-btn/g) || []).length, 3, file);
+    assert.equal((html.match(/class="size-btn/g) || []).length, 5, file);
     assert.match(html, /id="productScale" type="range" min="50" max="140"/, file);
     assert.match(html, /id="productOffsetX" type="range" min="-40" max="40"/, file);
     assert.match(html, /id="productOffsetY" type="range" min="-40" max="40"/, file);
@@ -116,6 +117,15 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /data-format="png"/, file);
     assert.match(html, /data-format="jpeg"/, file);
     assert.match(html, /data-format="webp"/, file);
+    assert.match(html, /data-sz="600"[\s\S]*TikTok Shop[\s\S]*600 × 600/, file);
+    assert.match(html, /new Set\(\['2048', '1000', '500', '600', 'original'\]\)/, file);
+    assert.match(html, /if \(outputSize === '600' && outputFormat === 'webp'\) outputFormat = 'jpeg'/, file);
+    assert.match(html, /const isTikTokShop = outputSize === '600'/, file);
+    assert.match(html, /button\.disabled = isUnsupportedWebP/, file);
+    assert.match(html, /if \(outputSize === '600' && format === 'webp'\) return/, file);
+    assert.match(html, /data-tiktok-note="[^"]+TikTok Shop[^"]+10 (?:MB|Mo)[^"]*"/i, file);
+    assert.match(html, /data-tiktok-disabled="[^"]*WebP[^"]*"/i, file);
+    assert.match(html, /data-tiktok-disabled="[^"]*TikTok Shop[^"]*"/i, file);
     assert.match(html, /data-jpeg-note="[^"]+(?:white|weiß|blanco|blanc|branco)[^"]*"/i, file);
     assert.match(html, /accept="\.jpg,\.jpeg,\.png,\.webp,image\/jpeg,image\/png,image\/webp"/, file);
     assert.match(html, /validateComposition: \(\{ jobs \}\) => backgroundComposer\.validateJobs\(jobs\)/, file);

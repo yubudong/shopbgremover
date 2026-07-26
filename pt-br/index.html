@@ -52,8 +52,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage6d-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage6d-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage7a-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage7a-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -276,7 +276,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage6d-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7a-v1">
 </head>
 <body>
 
@@ -558,6 +558,9 @@
           <button class="size-btn" data-sz="500" onclick="setSize(this,'500')">
             eBay<span class="size-sub">500 × 500</span>
           </button>
+          <button class="size-btn" data-sz="600" onclick="setSize(this,'600')">
+            TikTok Shop<span class="size-sub">600 × 600</span>
+          </button>
           <button class="size-btn active" data-sz="original" onclick="setSize(this,'original')">
             Original<span class="size-sub">Manter tamanho</span>
           </button>
@@ -579,7 +582,9 @@
         <small class="output-format-note" id="outputFormatNote"
           data-png-note="Saída sem perdas com transparência."
           data-jpeg-note="JPEG não aceita transparência. Fundos transparentes são exportados em branco."
-          data-webp-note="Arquivos menores com suporte a transparência.">Saída sem perdas com transparência.</small>
+          data-webp-note="Arquivos menores com suporte a transparência."
+          data-tiktok-note=" A TikTok Shop aceita apenas PNG ou JPEG (máximo de 10 MB por imagem)."
+          data-tiktok-disabled="WebP não é aceito pelas regras de imagem de produto da TikTok Shop.">Saída sem perdas com transparência.</small>
       </div>
 
       <div class="setting-group">
@@ -903,13 +908,14 @@ let selectedFiles   = [];
   let outputQuality   = 90;
 
   async function restoreCompositionState(settings = {}) {
-    const validSizes = new Set(['2048', '1000', '500', 'original']);
+    const validSizes = new Set(['2048', '1000', '500', '600', 'original']);
     const validRenameModes = new Set(['original', 'sequence', 'date']);
     const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
     if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
+    if (outputSize === '600' && outputFormat === 'webp') outputFormat = 'jpeg';
     outputQuality = Math.min(100, Math.max(50, Number(settings.outputQuality) || 90));
 
     document.querySelectorAll('.size-btn').forEach(button => button.classList.toggle('active', button.dataset.sz === outputSize));
@@ -929,8 +935,10 @@ let selectedFiles   = [];
 
   function setSize(el, val) {
     outputSize = val;
+    if (outputSize === '600' && outputFormat === 'webp') outputFormat = 'jpeg';
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
+    renderOutputFormat();
     aiWorkflow?.markCompositionChanged();
 }
 
@@ -943,18 +951,22 @@ let selectedFiles   = [];
 
   function renderOutputFormat() {
     const encoding = window.ShopBGBackgroundComposer.getOutputEncoding(outputFormat, outputQuality);
+    const isTikTokShop = outputSize === '600';
+    const note = document.getElementById('outputFormatNote');
     document.querySelectorAll('.output-format-btn').forEach(button => {
+      const isUnsupportedWebP = isTikTokShop && button.dataset.format === 'webp';
+      button.disabled = isUnsupportedWebP;
+      button.title = isUnsupportedWebP ? note.dataset.tiktokDisabled : '';
       button.classList.toggle('active', button.dataset.format === outputFormat);
     });
     const qualityRow = document.getElementById('outputQualityRow');
     const qualityInput = document.getElementById('outputQuality');
     const qualityValue = document.getElementById('outputQualityValue');
-    const note = document.getElementById('outputFormatNote');
     qualityRow.hidden = outputFormat === 'png';
     qualityInput.value = String(outputQuality);
     qualityValue.textContent = `${outputQuality}%`;
-    note.textContent = note.dataset[`${outputFormat}Note`];
-    note.classList.toggle('is-warning', outputFormat === 'jpeg');
+    note.textContent = `${note.dataset[`${outputFormat}Note`]}${isTikTokShop ? note.dataset.tiktokNote : ''}`;
+    note.classList.toggle('is-warning', outputFormat === 'jpeg' || isTikTokShop);
     document.querySelectorAll('.rename-eg').forEach(example => {
       if (!example.dataset.baseExample) example.dataset.baseExample = example.textContent;
       example.textContent = example.dataset.baseExample.replace(/\.png/g, `.${encoding.extension}`);
@@ -962,6 +974,7 @@ let selectedFiles   = [];
   }
 
   function setOutputFormat(el, format) {
+    if (outputSize === '600' && format === 'webp') return;
     if (!['png', 'jpeg', 'webp'].includes(format) || outputFormat === format) return;
     outputFormat = format;
     renderOutputFormat();

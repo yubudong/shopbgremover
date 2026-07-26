@@ -159,6 +159,7 @@ div.bg-row.background-mode-grid{display:grid;grid-template-columns:repeat(2,minm
   cursor:pointer;font-size:10px;font-weight:850
 }
 .output-format-btn.active{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}
+.output-format-btn:disabled{cursor:not-allowed;opacity:.45;background:#f8fafc;color:#94a3b8}
 .output-quality-row{
   display:grid;grid-template-columns:70px minmax(0,1fr) 38px;align-items:center;gap:7px;
   margin-top:10px
