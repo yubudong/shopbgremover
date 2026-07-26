@@ -635,6 +635,52 @@ describe('free quota and credit accounting', () => {
     expect(balance).toBe(2);
   });
 
+  it('rejects authenticated AI work with no credits before contacting the provider', async () => {
+    const { cookie, userId } = await createAuthenticatedUser({ credits: 0 });
+    const outboundFetch = vi.fn();
+    vi.stubGlobal('fetch', outboundFetch);
+
+    const check = await exports.default.fetch(authenticatedRequest(
+      '/api/check-credit',
+      cookie,
+    ));
+    expect(check.status).toBe(200);
+    expect(await jsonResponse(check)).toMatchObject({
+      ok: false,
+      reason: 'no_credits',
+    });
+
+    const taskId = 'authenticated-no-credits';
+    const blocked = await exports.default.fetch(removeBackgroundRequest({
+      cookie,
+      taskId,
+    }));
+    expect(blocked.status).toBe(403);
+    expect(await jsonResponse(blocked)).toMatchObject({
+      ok: false,
+      reason: 'no_credits',
+    });
+    expect(outboundFetch).not.toHaveBeenCalled();
+
+    const [credits, task, ledger] = await Promise.all([
+      env.DB.prepare(
+        'SELECT credits, total_used FROM user_credits WHERE user_id = ?'
+      ).bind(userId).first(),
+      env.DB.prepare(
+        'SELECT status, error_code FROM ai_tasks WHERE task_id = ?'
+      ).bind(taskId).first(),
+      env.DB.prepare(
+        'SELECT COUNT(*) AS count FROM credit_ledger WHERE task_id = ?'
+      ).bind(taskId).first('count'),
+    ]);
+    expect(credits).toEqual(expect.objectContaining({ credits: 0, total_used: 0 }));
+    expect(task).toEqual(expect.objectContaining({
+      status: 'failed',
+      error_code: 'no_credits',
+    }));
+    expect(ledger).toBe(0);
+  });
+
   it('does not deduct credit when fal.ai fails', async () => {
     const { cookie, userId } = await createAuthenticatedUser({ credits: 3 });
     const outboundFetch = vi.fn(async () => new Response('upstream unavailable', { status: 503 }));

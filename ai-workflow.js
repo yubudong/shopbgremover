@@ -339,6 +339,7 @@
     const text = panel.dataset;
     const jobs = [];
     const sessionStore = createSessionStore();
+    let starting = false;
     let processing = false;
     let restoring = false;
     let clearing = false;
@@ -412,7 +413,7 @@
     function syncCard(job) {
       if (!job?.control) return;
       job.control.input.checked = Boolean(job.aiRequested);
-      job.control.input.disabled = processing || job.status === 'checking' || job.transparent === true;
+      job.control.input.disabled = starting || processing || job.status === 'checking' || job.transparent === true;
       job.control.state.textContent = jobStateText(job);
       job.control.wrapper.classList.toggle('is-transparent', job.transparent === true);
       job.control.wrapper.classList.toggle('is-off', !job.aiRequested);
@@ -442,10 +443,10 @@
       } else {
         globalToggle.indeterminate = false;
       }
-      globalToggle.disabled = processing || selectable.length === 0;
+      globalToggle.disabled = starting || processing || selectable.length === 0;
       if (clearSessionButton) {
         clearSessionButton.hidden = activeJobs.length === 0;
-        clearSessionButton.disabled = processing;
+        clearSessionButton.disabled = starting || processing;
       }
       activeJobs.forEach(syncCard);
       if (notify) options.onPlanChanged?.(plan);
@@ -666,94 +667,105 @@
 
     async function process() {
       const files = options.getFiles();
-      if (!files.length || processing) return { started: false };
-      await waitForDetection();
-      const plan = sync();
-      if (!await preflight(plan)) return { started: false };
+      if (!files.length || starting || processing) return { started: false };
+      starting = true;
+      try {
+        sync();
+        await waitForDetection();
+        const plan = sync();
+        if (!await preflight(plan)) return { started: false };
 
-      processing = true;
-      sync();
-      options.onStart?.(plan);
-      let errors = 0;
-      let stoppedForCredits = false;
-      let actualAiCalls = 0;
+        starting = false;
+        processing = true;
+        sync();
+        options.onStart?.(plan);
+        let errors = 0;
+        let stoppedForCredits = false;
+        let actualAiCalls = 0;
 
-      for (let index = 0; index < files.length; index += 1) {
-        const job = jobs[index];
-        if (!job) continue;
-        const card = document.getElementById(`card-${index}`);
-        const badge = card?.querySelector('.status-badge');
-        if (badge) badge.textContent = '⏳';
-        options.setStatus(format(text.processing, {
-          current: index + 1,
-          total: files.length,
-          name: files[index].name,
-        }));
-        options.onProgress?.(index, files.length);
+        for (let index = 0; index < files.length; index += 1) {
+          const job = jobs[index];
+          if (!job) continue;
+          const card = document.getElementById(`card-${index}`);
+          const badge = card?.querySelector('.status-badge');
+          if (badge) badge.textContent = '⏳';
+          options.setStatus(format(text.processing, {
+            current: index + 1,
+            total: files.length,
+            name: files[index].name,
+          }));
+          options.onProgress?.(index, files.length);
 
-        try {
-          const source = options.getSourceFile(files[index]);
-          let foreground = source;
-          if (job.aiRequested && job.transparent !== true) {
-            if (job.foregroundBlob && !job.needsReprocess) {
-              foreground = job.foregroundBlob;
-            } else {
-              job.status = 'processing';
-              await persistSession();
-              const aiResult = await requestAi(job, source);
-              foreground = aiResult.blob;
-              if (!aiResult.reused) actualAiCalls += 1;
-              job.foregroundBlob = foreground;
-              job.hadAiResult = true;
-              job.needsReprocess = false;
+          try {
+            const source = options.getSourceFile(files[index]);
+            let foreground = source;
+            if (job.aiRequested && job.transparent !== true) {
+              if (job.foregroundBlob && !job.needsReprocess) {
+                foreground = job.foregroundBlob;
+              } else {
+                job.status = 'processing';
+                await persistSession();
+                const aiResult = await requestAi(job, source);
+                foreground = aiResult.blob;
+                if (!aiResult.reused) actualAiCalls += 1;
+                job.foregroundBlob = foreground;
+                job.hadAiResult = true;
+                job.needsReprocess = false;
+              }
+            }
+
+            const output = await options.applyBackground(foreground, index);
+            if (!output) throw new Error(text.failed);
+            job.outputBlob = output;
+            job.outputName = options.getFileName(files[index].name, index);
+            job.status = 'succeeded';
+            job.error = null;
+            job.userError = null;
+            options.onResult?.(index, output);
+            if (badge) badge.textContent = '✅';
+          } catch (error) {
+            errors += 1;
+            job.status = 'failed';
+            job.error = error.message;
+            job.userError = error.userMessage || null;
+            job.outputBlob = null;
+            job.outputName = null;
+            if (badge) badge.textContent = '❌';
+            if (error.reason === 'free_limit' || error.reason === 'no_credits') {
+              stoppedForCredits = true;
+              if (options.getCurrentUser()) options.showUpgradeModal();
+              else options.showRegisterModal();
+              break;
             }
           }
+        }
 
-          const output = await options.applyBackground(foreground, index);
-          if (!output) throw new Error(text.failed);
-          job.outputBlob = output;
-          job.outputName = options.getFileName(files[index].name, index);
-          job.status = 'succeeded';
-          job.error = null;
-          job.userError = null;
-          options.onResult?.(index, output);
-          if (badge) badge.textContent = '✅';
-        } catch (error) {
-          errors += 1;
-          job.status = 'failed';
-          job.error = error.message;
-          job.userError = error.userMessage || null;
-          job.outputBlob = null;
-          job.outputName = null;
-          if (badge) badge.textContent = '❌';
-          if (error.reason === 'free_limit' || error.reason === 'no_credits') {
-            stoppedForCredits = true;
-            if (options.getCurrentUser()) options.showUpgradeModal();
-            else options.showRegisterModal();
-            break;
-          }
+        processing = false;
+        const outputs = getOutputs();
+        options.onOutputsChanged?.(outputs);
+        sync();
+        await persistSession();
+        options.onComplete?.({
+          outputs,
+          errors,
+          actualAiCalls,
+          stoppedForCredits,
+          plan,
+        });
+        return {
+          started: true,
+          outputs,
+          errors,
+          actualAiCalls,
+          stoppedForCredits,
+        };
+      } finally {
+        if (starting || processing) {
+          starting = false;
+          processing = false;
+          sync();
         }
       }
-
-      processing = false;
-      const outputs = getOutputs();
-      options.onOutputsChanged?.(outputs);
-      sync();
-      await persistSession();
-      options.onComplete?.({
-        outputs,
-        errors,
-        actualAiCalls,
-        stoppedForCredits,
-        plan,
-      });
-      return {
-        started: true,
-        outputs,
-        errors,
-        actualAiCalls,
-        stoppedForCredits,
-      };
     }
 
     async function restoreSession() {

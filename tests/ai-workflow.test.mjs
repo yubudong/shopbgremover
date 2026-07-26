@@ -366,6 +366,23 @@ test('processing-task polling is bounded and surfaces the retryable reason', asy
   assert.deepEqual(waits, [10, 10]);
 });
 
+test('processing claims its preflight lock before awaiting credit checks', async () => {
+  const source = await (await import('node:fs/promises')).readFile(
+    new URL('../ai-workflow.js', import.meta.url),
+    'utf8',
+  );
+  const start = source.indexOf('async function process()');
+  const end = source.indexOf('\n    async function restoreSession()', start);
+  const processSource = source.slice(start, end);
+
+  assert.match(processSource, /if \(!files\.length \|\| starting \|\| processing\)/);
+  assert.ok(
+    processSource.indexOf('starting = true') < processSource.indexOf('await waitForDetection()'),
+    'the single-flight lock must be claimed before the first await',
+  );
+  assert.match(processSource, /finally \{[\s\S]*starting = false;[\s\S]*processing = false;/);
+});
+
 test('meaningful transparency ignores isolated alpha noise and thin semi-transparent edges', () => {
   const makeAlphaData = (width, height, alphaForPixel = () => 255) => {
     const data = new Uint8ClampedArray(width * height * 4);
