@@ -540,6 +540,7 @@ test('credit center is visible from every localized workspace and pricing page',
   const script = await read('credits-center.js');
   assert.match(center, /id="creditApp"/);
   assert.match(center, /id="paypalAction"/);
+  assert.match(center, /credits-center\.js\?v=20260727-credit-center-i18n-v2/);
   assert.match(center, /href="\/redeem\.html"/);
   assert.match(await read('redeem.html'), /href="\/credits\.html\?lang=en"/);
   assert.match(script, /\/api\/credits\/center/);
