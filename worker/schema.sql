@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0009_referral_reward_observation.sql.
+-- Includes tracked migrations through 0010_durable_ai_provider_tasks.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to

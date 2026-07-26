@@ -23,6 +23,8 @@ const {
   TRANSPARENCY_DETECTOR_VERSION,
 } = globalThis.ShopBGAiWorkflow;
 const {
+  getBackgroundBlurPixels,
+  getBackgroundPlacement,
   getForegroundPlacement,
   getImagePlacement,
   getOutputEncoding,
@@ -98,6 +100,33 @@ test('background fit defaults to centered cover and supports contain and stretch
     width: 1000,
     height: 1000,
   });
+});
+
+test('background transform scales, moves, and blurs independently from the product', () => {
+  assert.deepEqual(getBackgroundPlacement(1600, 900, 1000, 1000, {
+    fit: 'contain',
+    backgroundScale: 120,
+    backgroundOffsetX: 10,
+    backgroundOffsetY: -5,
+  }), {
+    x: 0,
+    y: 112.5,
+    width: 1200,
+    height: 675,
+  });
+  assert.deepEqual(getBackgroundPlacement(1000, 1000, 500, 500, {
+    backgroundScale: 20,
+    backgroundOffsetX: 80,
+    backgroundOffsetY: -80,
+  }), {
+    x: 375,
+    y: -125,
+    width: 250,
+    height: 250,
+  });
+  assert.equal(getBackgroundBlurPixels(20, 1000, 800), 16);
+  assert.equal(getBackgroundBlurPixels(50, 1000, 800), 24);
+  assert.equal(getBackgroundBlurPixels(-1, 1000, 800), 0);
 });
 
 test('single-image composition settings override batch defaults by stable index', () => {
@@ -508,6 +537,10 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
     composition: {
       bgMode: 'custom',
       customHex: '#112233',
+      backgroundScale: 125,
+      backgroundOffsetX: 8,
+      backgroundOffsetY: -6,
+      backgroundBlur: 12,
       outputSize: '1000',
       renameMode: 'sequence',
     },
@@ -529,6 +562,10 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
   assert.deepEqual(record.composition, {
     bgMode: 'custom',
     customHex: '#112233',
+    backgroundScale: 125,
+    backgroundOffsetX: 8,
+    backgroundOffsetY: -6,
+    backgroundBlur: 12,
     outputSize: '1000',
     renameMode: 'sequence',
   });

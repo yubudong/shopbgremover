@@ -61,6 +61,51 @@
     };
   }
 
+  function getBackgroundPlacement(
+    imageWidth,
+    imageHeight,
+    canvasWidth,
+    canvasHeight,
+    {
+      fit = 'cover',
+      backgroundScale = 100,
+      backgroundOffsetX = 0,
+      backgroundOffsetY = 0,
+    } = {},
+  ) {
+    const base = getImagePlacement(
+      imageWidth,
+      imageHeight,
+      canvasWidth,
+      canvasHeight,
+      BACKGROUND_FITS.has(fit) ? fit : 'cover',
+    );
+    const scale = clampNumber(backgroundScale, 50, 200, 100) / 100;
+    const width = base.width * scale;
+    const height = base.height * scale;
+    return {
+      x: ((canvasWidth - width) / 2)
+        + (canvasWidth * clampNumber(backgroundOffsetX, -50, 50, 0) / 100),
+      y: ((canvasHeight - height) / 2)
+        + (canvasHeight * clampNumber(backgroundOffsetY, -50, 50, 0) / 100),
+      width,
+      height,
+    };
+  }
+
+  function getBackgroundBlurPixels(strength, canvasWidth, canvasHeight) {
+    if (
+      ![canvasWidth, canvasHeight].every(
+        (value) => Number.isFinite(value) && value > 0,
+      )
+    ) {
+      throw new TypeError('Canvas dimensions must be positive numbers.');
+    }
+    return Math.min(canvasWidth, canvasHeight)
+      * clampNumber(strength, 0, 30, 0)
+      / 1000;
+  }
+
   function getForegroundPlacement(
     imageWidth,
     imageHeight,
@@ -148,6 +193,15 @@
       imageName: document.getElementById('backgroundImageName'),
       imageFit: document.getElementById('backgroundFit'),
       imageRemove: document.getElementById('backgroundImageRemove'),
+      backgroundScale: document.getElementById('backgroundScale'),
+      backgroundScaleValue: document.getElementById('backgroundScaleValue'),
+      backgroundOffsetX: document.getElementById('backgroundOffsetX'),
+      backgroundOffsetXValue: document.getElementById('backgroundOffsetXValue'),
+      backgroundOffsetY: document.getElementById('backgroundOffsetY'),
+      backgroundOffsetYValue: document.getElementById('backgroundOffsetYValue'),
+      backgroundBlur: document.getElementById('backgroundBlur'),
+      backgroundBlurValue: document.getElementById('backgroundBlurValue'),
+      backgroundCenter: document.getElementById('backgroundCenter'),
       productScale: document.getElementById('productScale'),
       productScaleValue: document.getElementById('productScaleValue'),
       productOffsetX: document.getElementById('productOffsetX'),
@@ -167,6 +221,10 @@
       backgroundFit: 'cover',
       backgroundImageBlob: null,
       backgroundImageName: '',
+      backgroundScale: 100,
+      backgroundOffsetX: 0,
+      backgroundOffsetY: 0,
+      backgroundBlur: 0,
       productScale: 100,
       productOffsetX: 0,
       productOffsetY: 0,
@@ -191,6 +249,10 @@
           ? source.backgroundImageBlob
           : null,
         backgroundImageName: String(source.backgroundImageName || ''),
+        backgroundScale: clampNumber(source.backgroundScale, 50, 200, 100),
+        backgroundOffsetX: clampNumber(source.backgroundOffsetX, -50, 50, 0),
+        backgroundOffsetY: clampNumber(source.backgroundOffsetY, -50, 50, 0),
+        backgroundBlur: clampNumber(source.backgroundBlur, 0, 30, 0),
         productScale: clampNumber(source.productScale, 50, 140, 100),
         productOffsetX: clampNumber(source.productOffsetX, -40, 40, 0),
         productOffsetY: clampNumber(source.productOffsetY, -40, 40, 0),
@@ -236,6 +298,30 @@
       if (elements.imageFit) elements.imageFit.value = state.backgroundFit;
       if (elements.imageName) {
         elements.imageName.textContent = state.backgroundImageName || text.emptyName || '';
+      }
+      if (elements.backgroundScale) {
+        elements.backgroundScale.value = String(state.backgroundScale);
+      }
+      if (elements.backgroundScaleValue) {
+        elements.backgroundScaleValue.textContent = `${state.backgroundScale}%`;
+      }
+      if (elements.backgroundOffsetX) {
+        elements.backgroundOffsetX.value = String(state.backgroundOffsetX);
+      }
+      if (elements.backgroundOffsetXValue) {
+        elements.backgroundOffsetXValue.textContent = `${state.backgroundOffsetX}%`;
+      }
+      if (elements.backgroundOffsetY) {
+        elements.backgroundOffsetY.value = String(state.backgroundOffsetY);
+      }
+      if (elements.backgroundOffsetYValue) {
+        elements.backgroundOffsetYValue.textContent = `${state.backgroundOffsetY}%`;
+      }
+      if (elements.backgroundBlur) {
+        elements.backgroundBlur.value = String(state.backgroundBlur);
+      }
+      if (elements.backgroundBlurValue) {
+        elements.backgroundBlurValue.textContent = String(state.backgroundBlur);
       }
       if (elements.productScale) elements.productScale.value = String(state.productScale);
       if (elements.productScaleValue) {
@@ -316,6 +402,10 @@
       if (BACKGROUND_FITS.has(settings.backgroundFit)) {
         state.backgroundFit = settings.backgroundFit;
       }
+      state.backgroundScale = clampNumber(settings.backgroundScale, 50, 200, 100);
+      state.backgroundOffsetX = clampNumber(settings.backgroundOffsetX, -50, 50, 0);
+      state.backgroundOffsetY = clampNumber(settings.backgroundOffsetY, -50, 50, 0);
+      state.backgroundBlur = clampNumber(settings.backgroundBlur, 0, 30, 0);
       state.productScale = clampNumber(settings.productScale, 50, 140, 100);
       state.productOffsetX = clampNumber(settings.productOffsetX, -40, 40, 0);
       state.productOffsetY = clampNumber(settings.productOffsetY, -40, 40, 0);
@@ -464,13 +554,25 @@
         } else {
           decodedBackgroundImage = background;
         }
-        const placement = getImagePlacement(
+        const placement = getBackgroundPlacement(
           background.naturalWidth,
           background.naturalHeight,
           canvasWidth,
           canvasHeight,
-          config.backgroundFit,
+          {
+            fit: config.backgroundFit,
+            backgroundScale: config.backgroundScale,
+            backgroundOffsetX: config.backgroundOffsetX,
+            backgroundOffsetY: config.backgroundOffsetY,
+          },
         );
+        const blurPixels = getBackgroundBlurPixels(
+          config.backgroundBlur,
+          canvasWidth,
+          canvasHeight,
+        );
+        context.save();
+        if (blurPixels > 0) context.filter = `blur(${blurPixels}px)`;
         context.drawImage(
           background,
           placement.x,
@@ -478,6 +580,7 @@
           placement.width,
           placement.height,
         );
+        context.restore();
       } else if (config.bgMode !== 'transparent') {
         context.fillStyle = config.bgMode === 'white' ? '#FFFFFF' : config.customHex;
         context.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -540,6 +643,15 @@
         || itemText.noImageLabel
         || 'No image selected';
       editorElements.fit.value = editorDraft.backgroundFit;
+      editorElements.backgroundTransform.hidden = editorDraft.bgMode !== 'image';
+      editorElements.backgroundScale.value = String(editorDraft.backgroundScale);
+      editorElements.backgroundScaleValue.textContent = `${editorDraft.backgroundScale}%`;
+      editorElements.backgroundOffsetX.value = String(editorDraft.backgroundOffsetX);
+      editorElements.backgroundOffsetXValue.textContent = `${editorDraft.backgroundOffsetX}%`;
+      editorElements.backgroundOffsetY.value = String(editorDraft.backgroundOffsetY);
+      editorElements.backgroundOffsetYValue.textContent = `${editorDraft.backgroundOffsetY}%`;
+      editorElements.backgroundBlur.value = String(editorDraft.backgroundBlur);
+      editorElements.backgroundBlurValue.textContent = String(editorDraft.backgroundBlur);
       editorElements.scale.value = String(editorDraft.productScale);
       editorElements.scaleValue.textContent = `${editorDraft.productScale}%`;
       editorElements.offsetX.value = String(editorDraft.productOffsetX);
@@ -608,6 +720,29 @@
                 <option value="stretch">${itemText.stretchLabel || 'Stretch'}</option>
               </select>
             </label>
+            <div class="background-transform-panel" id="itemOverrideBackgroundTransform">
+              <div class="product-range-row">
+                <label for="itemOverrideBackgroundScale">${itemText.backgroundSizeLabel || 'Background size'}</label>
+                <input id="itemOverrideBackgroundScale" type="range" min="50" max="200" step="1">
+                <output class="product-range-value" id="itemOverrideBackgroundScaleValue"></output>
+              </div>
+              <div class="product-range-row">
+                <label for="itemOverrideBackgroundOffsetX">${itemText.backgroundHorizontalLabel || 'Background X'}</label>
+                <input id="itemOverrideBackgroundOffsetX" type="range" min="-50" max="50" step="1">
+                <output class="product-range-value" id="itemOverrideBackgroundOffsetXValue"></output>
+              </div>
+              <div class="product-range-row">
+                <label for="itemOverrideBackgroundOffsetY">${itemText.backgroundVerticalLabel || 'Background Y'}</label>
+                <input id="itemOverrideBackgroundOffsetY" type="range" min="-50" max="50" step="1">
+                <output class="product-range-value" id="itemOverrideBackgroundOffsetYValue"></output>
+              </div>
+              <div class="product-range-row">
+                <label for="itemOverrideBackgroundBlur">${itemText.backgroundBlurLabel || 'Background blur'}</label>
+                <input id="itemOverrideBackgroundBlur" type="range" min="0" max="30" step="1">
+                <output class="product-range-value" id="itemOverrideBackgroundBlurValue"></output>
+              </div>
+              <button class="product-transform-btn" id="itemOverrideBackgroundCenter" type="button">${itemText.backgroundCenterLabel || 'Center background'}</button>
+            </div>
             <div class="product-transform-panel">
               <div class="product-range-row">
                 <label for="itemOverrideScale">${itemText.sizeLabel || 'Size'}</label>
@@ -653,6 +788,16 @@
         imageInput: editorOverlay.querySelector('#itemOverrideImageInput'),
         imageName: editorOverlay.querySelector('#itemOverrideImageName'),
         fit: editorOverlay.querySelector('#itemOverrideFit'),
+        backgroundTransform: editorOverlay.querySelector('#itemOverrideBackgroundTransform'),
+        backgroundScale: editorOverlay.querySelector('#itemOverrideBackgroundScale'),
+        backgroundScaleValue: editorOverlay.querySelector('#itemOverrideBackgroundScaleValue'),
+        backgroundOffsetX: editorOverlay.querySelector('#itemOverrideBackgroundOffsetX'),
+        backgroundOffsetXValue: editorOverlay.querySelector('#itemOverrideBackgroundOffsetXValue'),
+        backgroundOffsetY: editorOverlay.querySelector('#itemOverrideBackgroundOffsetY'),
+        backgroundOffsetYValue: editorOverlay.querySelector('#itemOverrideBackgroundOffsetYValue'),
+        backgroundBlur: editorOverlay.querySelector('#itemOverrideBackgroundBlur'),
+        backgroundBlurValue: editorOverlay.querySelector('#itemOverrideBackgroundBlurValue'),
+        backgroundCenter: editorOverlay.querySelector('#itemOverrideBackgroundCenter'),
         scale: editorOverlay.querySelector('#itemOverrideScale'),
         scaleValue: editorOverlay.querySelector('#itemOverrideScaleValue'),
         offsetX: editorOverlay.querySelector('#itemOverrideOffsetX'),
@@ -715,6 +860,47 @@
         if (BACKGROUND_FITS.has(editorElements.fit.value)) {
           editorDraft.backgroundFit = editorElements.fit.value;
         }
+      });
+      editorElements.backgroundScale.addEventListener('input', () => {
+        editorDraft.backgroundScale = clampNumber(
+          editorElements.backgroundScale.value,
+          50,
+          200,
+          100,
+        );
+        renderEditor();
+      });
+      editorElements.backgroundOffsetX.addEventListener('input', () => {
+        editorDraft.backgroundOffsetX = clampNumber(
+          editorElements.backgroundOffsetX.value,
+          -50,
+          50,
+          0,
+        );
+        renderEditor();
+      });
+      editorElements.backgroundOffsetY.addEventListener('input', () => {
+        editorDraft.backgroundOffsetY = clampNumber(
+          editorElements.backgroundOffsetY.value,
+          -50,
+          50,
+          0,
+        );
+        renderEditor();
+      });
+      editorElements.backgroundBlur.addEventListener('input', () => {
+        editorDraft.backgroundBlur = clampNumber(
+          editorElements.backgroundBlur.value,
+          0,
+          30,
+          0,
+        );
+        renderEditor();
+      });
+      editorElements.backgroundCenter.addEventListener('click', () => {
+        editorDraft.backgroundOffsetX = 0;
+        editorDraft.backgroundOffsetY = 0;
+        renderEditor();
       });
       editorElements.scale.addEventListener('input', () => {
         editorDraft.productScale = clampNumber(editorElements.scale.value, 50, 140, 100);
@@ -827,6 +1013,32 @@
       state.backgroundFit = elements.imageFit.value;
       notifyChanged();
     });
+    elements.backgroundScale?.addEventListener('input', () => {
+      state.backgroundScale = clampNumber(elements.backgroundScale.value, 50, 200, 100);
+      render();
+      notifyChanged();
+    });
+    elements.backgroundOffsetX?.addEventListener('input', () => {
+      state.backgroundOffsetX = clampNumber(elements.backgroundOffsetX.value, -50, 50, 0);
+      render();
+      notifyChanged();
+    });
+    elements.backgroundOffsetY?.addEventListener('input', () => {
+      state.backgroundOffsetY = clampNumber(elements.backgroundOffsetY.value, -50, 50, 0);
+      render();
+      notifyChanged();
+    });
+    elements.backgroundBlur?.addEventListener('input', () => {
+      state.backgroundBlur = clampNumber(elements.backgroundBlur.value, 0, 30, 0);
+      render();
+      notifyChanged();
+    });
+    elements.backgroundCenter?.addEventListener('click', () => {
+      state.backgroundOffsetX = 0;
+      state.backgroundOffsetY = 0;
+      render();
+      notifyChanged();
+    });
     elements.imageRemove?.addEventListener('click', () => {
       state.backgroundImageBlob = null;
       state.backgroundImageName = '';
@@ -888,6 +1100,8 @@
   globalThis.ShopBGBackgroundComposer = {
     create,
     format,
+    getBackgroundBlurPixels,
+    getBackgroundPlacement,
     getForegroundPlacement,
     getImagePlacement,
     getOutputEncoding,

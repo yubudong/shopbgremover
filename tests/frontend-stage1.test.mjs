@@ -79,10 +79,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage8b-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage8b-v1"/, file);
-    assert.match(html, /src="\/product-organizer\.js\?v=20260726-ai-stage8b-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage8b-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-bg-controls-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-bg-controls-v1"/, file);
+    assert.match(html, /src="\/product-organizer\.js\?v=20260726-bg-controls-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-bg-controls-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -116,6 +116,11 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/id="bgImage"/g) || []).length, 1, file);
     assert.equal((html.match(/id="backgroundImageInput"/g) || []).length, 1, file);
     assert.equal((html.match(/id="backgroundFit"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundScale"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundOffsetX"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundOffsetY"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundBlur"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="backgroundCenter"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productScale"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productOffsetX"/g) || []).length, 1, file);
     assert.equal((html.match(/id="productOffsetY"/g) || []).length, 1, file);
@@ -128,6 +133,12 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.equal((html.match(/class="output-format-btn/g) || []).length, 3, file);
     assert.equal((html.match(/class="size-btn/g) || []).length, 6, file);
     assert.match(html, /id="productScale" type="range" min="50" max="140"/, file);
+    assert.match(html, /id="backgroundScale" type="range" min="50" max="200"/, file);
+    assert.match(html, /id="backgroundOffsetX" type="range" min="-50" max="50"/, file);
+    assert.match(html, /id="backgroundOffsetY" type="range" min="-50" max="50"/, file);
+    assert.match(html, /id="backgroundBlur" type="range" min="0" max="30"/, file);
+    assert.match(html, /data-background-size-label=/, file);
+    assert.match(html, /data-background-blur-label=/, file);
     assert.match(html, /id="productOffsetX" type="range" min="-40" max="40"/, file);
     assert.match(html, /id="productOffsetY" type="range" min="-40" max="40"/, file);
     assert.match(html, /id="outputQuality" type="range" min="50" max="100"/, file);

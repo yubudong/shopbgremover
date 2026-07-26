@@ -52,9 +52,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage8b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage8b-v1"></script>
-<script src="/product-organizer.js?v=20260726-ai-stage8b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-bg-controls-v1"></script>
+<script src="/background-composer.js?v=20260726-bg-controls-v1"></script>
+<script src="/product-organizer.js?v=20260726-bg-controls-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -810,7 +810,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage8b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-bg-controls-v1">
 </head>
 <body>
 
@@ -1026,6 +1026,29 @@
               <option value="stretch">Estirar</option>
             </select>
           </div>
+          <div class="background-transform-panel">
+            <div class="product-range-row">
+              <label for="backgroundScale">Tamaño</label>
+              <input id="backgroundScale" type="range" min="50" max="200" step="1" value="100">
+              <output class="product-range-value" id="backgroundScaleValue" for="backgroundScale">100%</output>
+            </div>
+            <div class="product-range-row">
+              <label for="backgroundOffsetX">Horizontal</label>
+              <input id="backgroundOffsetX" type="range" min="-50" max="50" step="1" value="0">
+              <output class="product-range-value" id="backgroundOffsetXValue" for="backgroundOffsetX">0%</output>
+            </div>
+            <div class="product-range-row">
+              <label for="backgroundOffsetY">Vertical</label>
+              <input id="backgroundOffsetY" type="range" min="-50" max="50" step="1" value="0">
+              <output class="product-range-value" id="backgroundOffsetYValue" for="backgroundOffsetY">0%</output>
+            </div>
+            <div class="product-range-row">
+              <label for="backgroundBlur">Desenfoque</label>
+              <input id="backgroundBlur" type="range" min="0" max="30" step="1" value="0">
+              <output class="product-range-value" id="backgroundBlurValue" for="backgroundBlur">0</output>
+            </div>
+            <button class="product-transform-btn" id="backgroundCenter" type="button">Centrar fondo</button>
+          </div>
           <small class="background-local-note">Guardado solo en este navegador hasta 24 horas · máximo 20 MB</small>
         </div>
       </div>
@@ -1076,6 +1099,11 @@
         data-cover-label="Rellenar y recortar"
         data-contain-label="Mostrar completa"
         data-stretch-label="Estirar"
+        data-background-size-label="Tamaño del fondo"
+        data-background-horizontal-label="Fondo horizontal"
+        data-background-vertical-label="Fondo vertical"
+        data-background-blur-label="Desenfoque del fondo"
+        data-background-center-label="Centrar fondo"
         data-size-label="Tamaño"
         data-horizontal-label="Horizontal"
         data-vertical-label="Vertical"
