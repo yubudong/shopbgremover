@@ -8,15 +8,11 @@
   <meta name="description" content="View your ShopBG Remover credit balance, top-up orders, and transaction history.">
   <link rel="icon" href="/favicon.svg">
   <link rel="stylesheet" href="/credits-center.css?v=20260725-credit-center-v1">
+  <link rel="stylesheet" href="/account-nav.css?v=20260727-account-nav-v1">
+  <script src="/account-nav.js?v=20260727-account-nav-v1" defer></script>
 </head>
 <body>
-  <header class="cc-nav">
-    <a class="cc-brand" href="/">ShopBG Remover</a>
-    <nav class="cc-navlinks">
-      <a id="homeLink" href="/" data-i18n="home">Back to workspace</a>
-      <a id="pricingLink" href="/pricing" data-i18n="pricing">Pricing</a>
-    </nav>
-  </header>
+  <nav class="account-navbar" data-account-nav data-account-page="credits" aria-label="Account navigation"></nav>
   <main class="cc-shell">
     <div class="cc-hero">
       <div>
@@ -44,7 +40,7 @@
 
       <section class="cc-actions">
         <a class="cc-action" id="paypalAction" href="/pricing#plans"><span class="cc-action-icon">💳</span><strong data-i18n="paypal">Buy with PayPal</strong><span data-i18n="paypalDesc">100, 300, or 1000 permanent credits in USD.</span></a>
-        <a class="cc-action" href="/redeem.html"><span class="cc-action-icon">🎟️</span><strong data-i18n="voucher">Redeem a voucher</strong><span data-i18n="voucherDesc">Enter a one-time code purchased through Xianyu.</span></a>
+        <a class="cc-action" id="voucherAction" href="/redeem.html?lang=en"><span class="cc-action-icon">🎟️</span><strong data-i18n="voucher">Redeem a voucher</strong><span data-i18n="voucherDesc">Enter a one-time code purchased through Xianyu.</span></a>
         <a class="cc-action" id="referralAction" href="/referrals"><span class="cc-action-icon">🎁</span><strong data-i18n="referral">Referral center</strong><span data-i18n="referralDesc">View your referral code and pending rewards.</span></a>
       </section>
 
@@ -62,6 +58,6 @@
       </section>
     </div>
   </main>
-  <script src="/credits-center.js?v=20260727-credit-center-i18n-v2"></script>
+  <script src="/credits-center.js?v=20260727-account-nav-v3"></script>
 </body>
 </html>

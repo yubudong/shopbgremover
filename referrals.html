@@ -1,239 +1,89 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>推荐中心 · ShopBG Remover</title>
-  <meta name="description" content="查看 ShopBG Remover 推荐码、推荐链接和邀请数据。">
+  <title>Referral center · ShopBG Remover</title>
+  <meta name="description" content="Manage your ShopBG Remover referral code, referral link, and rewards.">
+  <link rel="canonical" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
+  <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
+  <link rel="alternate" hreflang="es" href="https://www.shopbgremover.com/es/referrals">
+  <link rel="alternate" hreflang="fr" href="https://www.shopbgremover.com/fr/referrals">
+  <link rel="alternate" hreflang="pt-BR" href="https://www.shopbgremover.com/pt-br/referrals">
+  <link rel="alternate" hreflang="zh-CN" href="https://www.shopbgremover.com/zh-cn/referrals">
+  <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
   <link rel="icon" href="/favicon.svg">
-  <style>
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07111f;color:#e5edf7}
-    a{color:inherit}.top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #223047;background:#0b1728}
-    .brand{font-size:19px;font-weight:800;text-decoration:none}.back{font-size:14px;color:#a7b6ca;text-decoration:none}
-    main{width:min(980px,calc(100% - 32px));margin:64px auto}.eyebrow{color:#60a5fa;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-    h1{font-size:clamp(32px,7vw,48px);line-height:1.08;margin:12px 0 14px}.lead{color:#a7b6ca;line-height:1.7;margin:0 0 28px}
-    .card{background:#101d30;border:1px solid #2a3a52;border-radius:18px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-    .label{font-size:13px;color:#91a4bc;margin-bottom:8px}.code{font:800 30px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}
-    .linkrow{display:flex;gap:10px;margin-top:20px}.linkrow input{flex:1;min-width:0;border:1px solid #3a4c66;border-radius:10px;background:#081321;color:#dbeafe;padding:12px}
-    button,.signin{border:0;border-radius:10px;background:#2563eb;color:#fff;padding:12px 16px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center}
-    .signin{display:block;margin-top:14px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:24px}.stat{background:#0a1626;border-radius:12px;padding:16px}.num{font-size:26px;font-weight:850}.name{font-size:12px;color:#91a4bc;margin-top:4px}
-    .status{margin-top:18px;padding:12px 14px;border-radius:10px;background:#10233a;color:#bfdbfe;font-size:13px;line-height:1.6}.error{background:#3b1720;color:#fecdd3}
-    .reward-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}.section{margin-top:30px;padding-top:24px;border-top:1px solid #2a3a52}.section h2{font-size:18px;margin:0 0 6px}.section-note{color:#91a4bc;font-size:12px;line-height:1.6;margin:0 0 14px}
-    .table-wrap{overflow:auto;border:1px solid #263750;border-radius:12px}table{width:100%;border-collapse:collapse;min-width:680px;font-size:12px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #213149;vertical-align:top}th{color:#91a4bc;background:#0a1626;font-size:11px}tr:last-child td{border-bottom:0}
-    .pill{display:inline-block;border-radius:999px;background:#162a43;color:#bfdbfe;padding:3px 7px;font-weight:800}.positive{color:#86efac}.negative{color:#fda4af}.empty{color:#91a4bc;padding:14px 0;font-size:13px}
-    .rules{margin:22px 0 0;padding-left:20px;color:#91a4bc;font-size:13px;line-height:1.8}
-    @media(max-width:720px){.reward-stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.stats,.reward-stats{grid-template-columns:1fr}.linkrow{flex-direction:column}}
-  </style>
+  <link rel="stylesheet" href="/account-nav.css?v=20260727-account-nav-v1">
+  <link rel="stylesheet" href="/referrals-localized.css?v=20260727-account-nav-v1">
+  <script src="/account-nav.js?v=20260727-account-nav-v1" defer></script>
+  <script src="/referrals-localized.js?v=20260727-account-nav-v1" defer></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/">ShopBG Remover</a>
-    <a class="back" href="/pricing">积分价格 · Pricing</a>
-  </header>
+  <nav class="account-navbar" data-account-nav data-account-page="referrals" aria-label="Account navigation"></nav>
   <main>
-    <div class="eyebrow">Referral center</div>
-    <h1>推荐中心</h1>
-    <p class="lead">分享你的专属链接。推荐人完成过真实充值后，符合条件的被推荐用户首充可为双方带来积分奖励。</p>
+    <div class="eyebrow">Referral program</div>
+    <h1>Referral center</h1>
+    <p class="lead">Share your personal link. After you have bought credits at least once, qualified purchases can earn bonus credits for both of you.</p>
     <section class="card">
-      <div id="loading">正在加载推荐数据…</div>
+      <div id="loading">Loading referral data…</div>
       <div id="content" hidden>
-        <div class="label">我的推荐码 · My referral code</div>
+        <div class="label">My referral code</div>
         <div class="code" id="code"></div>
         <div class="linkrow">
           <input id="link" readonly aria-label="Referral link">
-          <button id="copyButton" type="button">复制链接</button>
+          <button id="copyButton" type="button">Copy link</button>
         </div>
         <div class="status" id="eligibility"></div>
         <div class="stats">
-          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">已邀请注册</div></div>
-          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">已完成充值</div></div>
-          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">风险审核中</div></div>
+          <div class="stat"><div class="num" id="registeredCount">0</div><div class="name">Registered referrals</div></div>
+          <div class="stat"><div class="num" id="paidCount">0</div><div class="name">Referrals with a purchase</div></div>
+          <div class="stat"><div class="num" id="reviewCount">0</div><div class="name">In risk review</div></div>
         </div>
         <div class="section">
-          <h2>奖励积分 · Reward credits</h2>
+          <h2>Reward credits</h2>
           <p class="section-note" id="rewardPolicy"></p>
           <div class="reward-stats">
-            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">当前可用</div></div>
-            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">待生效</div></div>
-            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">累计发放</div></div>
-            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">累计冲正</div></div>
+            <div class="stat"><div class="num" id="availableRewards">0</div><div class="name">Available</div></div>
+            <div class="stat"><div class="num" id="pendingRewards">0</div><div class="name">Pending</div></div>
+            <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">Total awarded</div></div>
+            <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">Total reversed</div></div>
           </div>
           <div class="status" id="expiryStatus"></div>
         </div>
         <div class="section">
-          <h2>奖励流水 · Reward history</h2>
-          <p class="section-note">显示最近 50 条推荐奖励发放、使用和冲正记录。</p>
+          <h2>Reward history</h2>
+          <p class="section-note">Shows the latest 50 referral reward grants, uses, and reversals.</p>
           <div class="table-wrap" id="rewardTableWrap">
             <table>
-              <thead><tr><th>时间</th><th>变化</th><th>原因</th><th>被推荐账号</th><th>有效期</th><th>状态</th></tr></thead>
+              <thead><tr><th>Time</th><th>Change</th><th>Reason</th><th>Referred account</th><th>Expires</th><th>Status</th></tr></thead>
               <tbody id="rewardRows"></tbody>
             </table>
           </div>
-          <div class="empty" id="rewardEmpty" hidden>暂无推荐奖励流水。</div>
+          <div class="empty" id="rewardEmpty" hidden>No reward transactions yet.</div>
         </div>
         <div class="section">
-          <h2>邀请明细 · Invited users</h2>
-          <p class="section-note">账号只显示脱敏邮箱；风险审核不会仅凭相同 IP 自动封禁。</p>
+          <h2>Invited users</h2>
+          <p class="section-note">Accounts use masked email addresses. A shared IP address alone does not cause a rejection.</p>
           <div class="table-wrap" id="inviteeTableWrap">
             <table>
-              <thead><tr><th>账号</th><th>绑定时间</th><th>首充时间</th><th>关系状态</th><th>风险状态</th></tr></thead>
+              <thead><tr><th>Account</th><th>Linked</th><th>First purchase</th><th>Relationship</th><th>Risk status</th></tr></thead>
               <tbody id="inviteeRows"></tbody>
             </table>
           </div>
-          <div class="empty" id="inviteeEmpty" hidden>暂无邀请记录。</div>
+          <div class="empty" id="inviteeEmpty" hidden>No invitations yet.</div>
         </div>
       </div>
-      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>登录后查看 · Sign in</a>
+      <a class="signin" id="signIn" href="https://api.shopbgremover.com/auth/login" hidden>Sign in to view</a>
       <div class="status error" id="error" hidden></div>
       <ul class="rules">
-        <li>首笔有效充值奖励为基础积分的 15%，后续充值为 10%。</li>
-        <li>被推荐用户首次充值 300 或 1000 基础积分，额外获得 30 积分。</li>
-        <li>推荐奖励积分有效期为 90 天，不可提现或转让。</li>
-        <li>退款、拒付、同一付款账户或异常邀请不会产生有效奖励。</li>
+        <li>The first qualified purchase awards 15% of base credits; later purchases award 10%.</li>
+        <li>An invited user receives 30 extra credits on a qualified first purchase of 300 or 1000 base credits.</li>
+        <li>Referral reward credits expire after 90 days and cannot be withdrawn or transferred.</li>
+        <li>Refunds, chargebacks, the same payer account, or suspicious invitations do not create valid rewards.</li>
       </ul>
     </section>
   </main>
-  <script>
-    const API = 'https://api.shopbgremover.com';
-    const loading = document.getElementById('loading');
-    const content = document.getElementById('content');
-    const signIn = document.getElementById('signIn');
-    const error = document.getElementById('error');
-    function getOrCreateDeviceId() {
-      let id = localStorage.getItem('sbgrDeviceId');
-      if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('sbgrDeviceId', id);
-      }
-      document.cookie = `sbgr_device=${encodeURIComponent(id)}; Path=/; Domain=.shopbgremover.com; Max-Age=31536000; Secure; SameSite=Lax`;
-      return id;
-    }
-    const deviceId = getOrCreateDeviceId();
-
-    function formatTime(value) {
-      return value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
-    }
-    function rewardReason(reason) {
-      const labels = {
-        referral_first_purchase: '首充 15% 奖励',
-        referral_repeat_purchase: '后续充值 10% 奖励',
-        ai_background_removal: 'AI 去背景消耗',
-        paypal_refund_referral: 'PayPal 退款冲正',
-        voucher_dispute_referral: '卡密争议冲正',
-      };
-      return labels[reason] || reason;
-    }
-    function rewardStatus(status) {
-      const labels = {
-        available: '可用',
-        used: '已使用',
-        expired: '已过期',
-        reversed: '已冲正',
-        reversal: '冲正流水',
-      };
-      return labels[status] || status;
-    }
-    function appendCell(row, text, className = '') {
-      const cell = document.createElement('td');
-      cell.textContent = text;
-      if (className) cell.className = className;
-      row.append(cell);
-      return cell;
-    }
-    function renderRewardHistory(entries) {
-      const rows = document.getElementById('rewardRows');
-      rows.replaceChildren();
-      document.getElementById('rewardTableWrap').hidden = entries.length === 0;
-      document.getElementById('rewardEmpty').hidden = entries.length !== 0;
-      for (const entry of entries) {
-        const row = document.createElement('tr');
-        appendCell(row, formatTime(entry.created_at));
-        appendCell(
-          row,
-          `${entry.delta > 0 ? '+' : ''}${entry.delta}`,
-          entry.delta > 0 ? 'positive' : 'negative',
-        );
-        appendCell(row, rewardReason(entry.reason));
-        appendCell(row, entry.related_email || '—');
-        appendCell(row, formatTime(entry.expires_at));
-        const statusCell = appendCell(row, '');
-        const pill = document.createElement('span');
-        pill.className = 'pill';
-        pill.textContent = rewardStatus(entry.status);
-        statusCell.append(pill);
-        rows.append(row);
-      }
-    }
-    function renderInvitees(invitees) {
-      const rows = document.getElementById('inviteeRows');
-      rows.replaceChildren();
-      document.getElementById('inviteeTableWrap').hidden = invitees.length === 0;
-      document.getElementById('inviteeEmpty').hidden = invitees.length !== 0;
-      for (const invitee of invitees) {
-        const row = document.createElement('tr');
-        appendCell(row, invitee.email || '—');
-        appendCell(row, formatTime(invitee.bound_at));
-        appendCell(row, formatTime(invitee.first_paid_at));
-        appendCell(row, invitee.status);
-        appendCell(row, invitee.risk_status);
-        rows.append(row);
-      }
-    }
-
-    async function loadReferralCenter() {
-      try {
-        const response = await fetch(`${API}/api/referrals/me`, {
-          credentials: 'include',
-          headers: { 'X-Device-ID': deviceId },
-        });
-        if (response.status === 401) {
-          loading.hidden = true;
-          signIn.hidden = false;
-          return;
-        }
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Unable to load referral data.');
-        document.getElementById('code').textContent = data.code;
-        document.getElementById('link').value = data.link;
-        document.getElementById('registeredCount').textContent = data.registered_count;
-        document.getElementById('paidCount').textContent = data.paid_count;
-        document.getElementById('reviewCount').textContent = data.review_count;
-        document.getElementById('availableRewards').textContent = data.available_reward_credits;
-        document.getElementById('pendingRewards').textContent = data.pending_reward_credits;
-        document.getElementById('totalRewards').textContent = data.total_reward_credits;
-        document.getElementById('reversedRewards').textContent = data.reversed_reward_credits;
-        document.getElementById('rewardPolicy').textContent = data.review_count > 0
-          ? '部分卡密邀请正在人工审核；审核通过后仍需满足 7 天观察期，购买积分不受影响。'
-          : data.next_pending_release_at
-            ? `奖励采用 7 天观察期，预计下一批于 ${formatTime(data.next_pending_release_at)} 转为可用。`
-            : '奖励采用 7 天观察期；期内发生退款、争议或拒付将取消奖励。';
-        document.getElementById('expiryStatus').textContent = data.next_reward_expiry_at
-          ? `最近一批可用奖励将在 ${formatTime(data.next_reward_expiry_at)} 到期；已过期未使用：${data.expired_reward_credits}。`
-          : `当前没有待到期的可用奖励；已过期未使用：${data.expired_reward_credits}。`;
-        renderRewardHistory(data.reward_history || []);
-        renderInvitees(data.invitees || []);
-        document.getElementById('eligibility').textContent = data.reward_eligible
-          ? '推荐奖励资格已生效 · Reward eligibility active'
-          : '完成首次真实充值后，推荐奖励资格才会生效。';
-        loading.hidden = true;
-        content.hidden = false;
-      } catch (cause) {
-        loading.hidden = true;
-        error.textContent = cause.message;
-        error.hidden = false;
-      }
-    }
-
-    document.getElementById('copyButton').addEventListener('click', async () => {
-      const button = document.getElementById('copyButton');
-      await navigator.clipboard.writeText(document.getElementById('link').value);
-      button.textContent = '已复制';
-      setTimeout(() => { button.textContent = '复制链接'; }, 1500);
-    });
-
-    loadReferralCenter();
-  </script>
 </body>
 </html>

@@ -1,0 +1,131 @@
+*{box-sizing:border-box}
+.account-navbar{
+  position:sticky;
+  top:0;
+  z-index:100;
+  height:64px;
+  padding:0 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  background:#0b0b0c;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  color:#fff;
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.account-nav-brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex:0 0 auto;
+  color:#fff;
+  text-decoration:none;
+  font-size:15px;
+  font-weight:750;
+  letter-spacing:-.02em;
+}
+.account-nav-brand img{width:auto;height:32px;display:block}
+.account-nav-brand-accent{color:#60a5fa}
+.account-nav-links{display:flex;align-items:center;gap:28px;margin-right:auto}
+.account-nav-links a{
+  color:#9ca3af;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
+  white-space:nowrap;
+  transition:color .2s;
+}
+.account-nav-links a:hover{color:#fff}
+.account-nav-right{display:flex;align-items:center;gap:12px;min-width:0}
+.account-nav-credits{
+  display:none;
+  align-items:center;
+  flex:0 0 auto;
+  padding:5px 14px;
+  border:1px solid rgba(59,130,246,.25);
+  border-radius:20px;
+  background:rgba(59,130,246,.12);
+  color:#60a5fa;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.account-nav-credits.show{display:flex}
+.account-nav-credits-add{margin-left:9px;padding-left:9px;border-left:1px solid rgba(96,165,250,.45)}
+.account-nav-user{
+  max-width:150px;
+  overflow:hidden;
+  color:#d1d5db;
+  font-size:13px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.account-nav-language{position:relative;flex:0 0 auto}
+.account-nav-language-button,.account-nav-auth{
+  min-height:34px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;
+  background:rgba(255,255,255,.08);
+  color:#e5e7eb;
+  font-size:13px;
+  font-weight:650;
+  cursor:pointer;
+}
+.account-nav-language-button{
+  padding:7px 12px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.account-nav-language-button:hover,.account-nav-auth:hover{background:rgba(255,255,255,.14)}
+.account-nav-language-caret{font-size:10px;opacity:.7}
+.account-nav-language-menu{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  z-index:110;
+  display:none;
+  min-width:200px;
+  margin:0;
+  padding:6px 0;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  background:#1f2937;
+  box-shadow:0 10px 32px rgba(0,0,0,.4);
+  list-style:none;
+}
+.account-nav-language-menu.open{display:block}
+.account-nav-language-menu a{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:9px 16px;
+  color:#d1d5db;
+  text-decoration:none;
+  font-size:13px;
+}
+.account-nav-language-menu a:hover{background:rgba(255,255,255,.08);color:#fff}
+.account-nav-language-menu a.active{color:#60a5fa;font-weight:750}
+.account-nav-language-code{margin-left:12px;color:#6b7280;font-size:11px;font-weight:650;letter-spacing:.05em}
+.account-nav-language-menu a.active .account-nav-language-code{color:#60a5fa}
+.account-nav-auth{flex:0 0 auto;padding:8px 18px}
+.account-nav-auth.signin{border-color:#2563eb;background:#2563eb;color:#fff}
+.account-nav-auth.signin:hover{background:#1d4ed8}
+@media(max-width:1040px){
+  .account-nav-links{display:none}
+  .account-nav-user{max-width:110px}
+}
+@media(max-width:680px){
+  .account-navbar{height:60px;padding:0 12px;gap:8px}
+  .account-nav-brand img{height:28px}
+  .account-nav-brand{font-size:0;gap:0}
+  .account-nav-brand-text{display:none}
+  .account-nav-right{gap:6px}
+  .account-nav-user{display:none}
+  .account-nav-credits{padding:5px 9px;font-size:12px}
+  .account-nav-credits-add{display:none}
+  .account-nav-language-button{padding:7px 9px}
+  .account-nav-auth{padding:7px 10px;font-size:12px}
+}

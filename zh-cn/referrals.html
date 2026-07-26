@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
   <title>推荐中心 · ShopBG Remover</title>
-  <meta name="description" content="Gerencie seu código, link e recompensas por indicação do ShopBG Remover.">
+  <meta name="description" content="管理你的 ShopBG Remover 推荐码、推荐链接和奖励。">
   <link rel="canonical" href="https://www.shopbgremover.com/zh-cn/referrals">
   <link rel="alternate" hreflang="en" href="https://www.shopbgremover.com/referrals">
   <link rel="alternate" hreflang="de" href="https://www.shopbgremover.com/de/referrals">
@@ -15,24 +15,13 @@
   <link rel="alternate" hreflang="zh-CN" href="https://www.shopbgremover.com/zh-cn/referrals">
   <link rel="alternate" hreflang="x-default" href="https://www.shopbgremover.com/referrals">
   <link rel="icon" href="/favicon.svg">
-  <link rel="stylesheet" href="/referrals-localized.css">
-  <script src="/referrals-localized.js" defer></script>
+  <link rel="stylesheet" href="/account-nav.css?v=20260727-account-nav-v1">
+  <link rel="stylesheet" href="/referrals-localized.css?v=20260727-account-nav-v1">
+  <script src="/account-nav.js?v=20260727-account-nav-v1" defer></script>
+  <script src="/referrals-localized.js?v=20260727-account-nav-v1" defer></script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/zh-cn/">ShopBG Remover</a>
-    <nav class="nav" aria-label="Navegação da página">
-      <a class="back" href="/zh-cn/pricing">价格</a>
-      <div class="languages" aria-label="Idioma">
-        <a href="/referrals" hreflang="en" lang="en">EN</a>
-        <a href="/de/referrals" hreflang="de" lang="de">DE</a>
-        <a href="/es/referrals" hreflang="es" lang="es">ES</a>
-        <a href="/fr/referrals" hreflang="fr" lang="fr">FR</a>
-        <a href="/pt-br/referrals" hreflang="pt-BR" lang="pt-BR">PT</a>
-        <a href="/zh-cn/referrals" hreflang="zh-CN" lang="zh-CN" aria-current="page">简中</a>
-      </div>
-    </nav>
-  </header>
+  <nav class="account-navbar" data-account-nav data-account-page="referrals" aria-label="账户导航"></nav>
   <main>
     <div class="eyebrow">推荐计划</div>
     <h1>推荐中心</h1>
@@ -43,7 +32,7 @@
         <div class="label">我的推荐码</div>
         <div class="code" id="code"></div>
         <div class="linkrow">
-          <input id="link" readonly aria-label="Link de indicação">
+          <input id="link" readonly aria-label="推荐链接">
           <button id="copyButton" type="button">复制链接</button>
         </div>
         <div class="status" id="eligibility"></div>
@@ -61,7 +50,7 @@
             <div class="stat"><div class="num" id="totalRewards">0</div><div class="name">累计发放</div></div>
             <div class="stat"><div class="num" id="reversedRewards">0</div><div class="name">累计冲正</div></div>
           </div>
-          <div class="status" id="expiry状态"></div>
+          <div class="status" id="expiryStatus"></div>
         </div>
         <div class="section">
           <h2>奖励流水</h2>

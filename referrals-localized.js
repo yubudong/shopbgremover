@@ -4,6 +4,29 @@
   const API = 'https://api.shopbgremover.com';
   const language = document.documentElement.lang;
   const translations = {
+    en: {
+      locale: 'en-US',
+      copied: 'Copied',
+      copy: 'Copy link',
+      loadError: 'Unable to load referral data.',
+      eligible: 'Your referral reward eligibility is active.',
+      ineligible: 'Eligibility activates after your first real credit purchase.',
+      reviewPolicy: 'Some voucher referrals are under manual review. After approval, the 7-day observation period still applies; purchased credits are unaffected.',
+      pendingPolicy: (time) => `Referral rewards have a 7-day observation period. The next batch is expected to become available on ${time}.`,
+      defaultPolicy: 'Referral rewards have a 7-day observation period. A refund, dispute, or chargeback during that period cancels the reward.',
+      nextExpiry: (time, expired) => `The next available reward expires on ${time}; unused expired credits: ${expired}.`,
+      noExpiry: (expired) => `No available reward credits are close to expiry; unused expired credits: ${expired}.`,
+      reasons: {
+        referral_first_purchase: 'First-purchase referral reward (15%)',
+        referral_repeat_purchase: 'Repeat-purchase referral reward (10%)',
+        ai_background_removal: 'AI background removal',
+        paypal_refund_referral: 'PayPal refund reversal',
+        voucher_dispute_referral: 'Voucher dispute reversal',
+      },
+      rewardStatuses: { available: 'Available', used: 'Used', expired: 'Expired', reversed: 'Reversed', reversal: 'Reversal entry' },
+      relationshipStatuses: { bound: 'Linked', qualified: 'Qualified', rejected: 'Rejected', reversed: 'Reversed' },
+      riskStatuses: { normal: 'Normal', review: 'In review', rejected: 'Rejected' },
+    },
     'zh-CN': {
       locale: 'zh-CN',
       copied: '已复制',

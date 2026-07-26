@@ -442,7 +442,7 @@ test('Simplified Chinese locale covers the public site and six-language SEO grap
     assert.match(html, /<html lang="zh-CN">/, file);
     assert.match(html, /[\u3400-\u9fff]/, file);
     assert.match(html, /hreflang="zh-CN"/, file);
-    assert.match(html, /href="\/zh-cn(?:\/|\/[^"]*)"/, file);
+    assert.match(html, /href="\/zh-cn(?:\/|\/[^"]*)"|data-account-page="referrals"/, file);
   }
 
   const chineseHome = await read('zh-cn/index.html');
@@ -477,9 +477,12 @@ test('Pages build contains only the canonical static site', async () => {
     'credits.html',
     'credits-center.css',
     'credits-center.js',
+    'account-nav.css',
+    'account-nav.js',
     'background-composer.js',
     'product-organizer.js',
     'redeem.html',
+    'redeem-localized.js',
     'referrals.html',
     'referrals-localized.css',
     'referrals-localized.js',
@@ -514,14 +517,17 @@ test('Pages build contains only the canonical static site', async () => {
 });
 
 test('pricing links to the server-backed Xianyu voucher redemption page', async () => {
-  for (const file of pricingFiles) {
-    const html = await read(file);
-    assert.match(html, /href="\/redeem\.html"/, file);
+  const languageParams = ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn'];
+  for (let index = 0; index < pricingFiles.length; index += 1) {
+    const html = await read(pricingFiles[index]);
+    assert.ok(html.includes(`href="/redeem.html?lang=${languageParams[index]}"`), pricingFiles[index]);
   }
   const redeem = await read('redeem.html');
-  assert.match(redeem, /\/api\/vouchers\/redeem/);
-  assert.match(redeem, /'X-Device-ID': deviceId/);
-  assert.doesNotMatch(redeem, /localStorage.*voucher|voucher.*localStorage/i);
+  const redeemScript = await read('redeem-localized.js');
+  assert.match(redeem, /data-account-page="redeem"/);
+  assert.match(redeemScript, /\/api\/vouchers\/redeem/);
+  assert.match(redeemScript, /'X-Device-ID': deviceId/);
+  assert.doesNotMatch(redeemScript, /localStorage.*voucher|voucher.*localStorage/i);
 });
 
 test('credit center is visible from every localized workspace and pricing page', async () => {
@@ -533,15 +539,15 @@ test('credit center is visible from every localized workspace and pricing page',
     assert.ok(home.includes(`href="${target}"`), indexFiles[index]);
     assert.ok(pricing.includes(`href="${target}"`), pricingFiles[index]);
     assert.match(pricing, /credit-shortcuts/, pricingFiles[index]);
-    assert.match(pricing, /href="\/redeem\.html"/, pricingFiles[index]);
+    assert.ok(pricing.includes(`href="/redeem.html?lang=${languageParams[index]}"`), pricingFiles[index]);
   }
 
   const center = await read('credits.html');
   const script = await read('credits-center.js');
   assert.match(center, /id="creditApp"/);
   assert.match(center, /id="paypalAction"/);
-  assert.match(center, /credits-center\.js\?v=20260727-credit-center-i18n-v2/);
-  assert.match(center, /href="\/redeem\.html"/);
+  assert.match(center, /credits-center\.js\?v=20260727-account-nav-v3/);
+  assert.match(center, /id="voucherAction" href="\/redeem\.html\?lang=en"/);
   assert.match(await read('redeem.html'), /href="\/credits\.html\?lang=en"/);
   assert.match(script, /\/api\/credits\/center/);
   assert.match(script, /credentials:\s*'include'/);
@@ -579,26 +585,30 @@ test('localized low-credit prompts no longer advertise subscriptions or fake dis
 });
 
 test('voucher redemption and referral center use server-backed referral APIs', async () => {
-  const redeem = await read('redeem.html');
+  const redeemHtml = await read('redeem.html');
+  const redeem = await read('redeem-localized.js');
   const referrals = await read('referrals.html');
-  assert.match(redeem, /id="referralCode"/);
+  const referralScript = await read('referrals-localized.js');
+  assert.match(redeemHtml, /id="referralCode"/);
   assert.match(redeem, /referral_code:\s*referralCode/);
   assert.match(redeem, /不能再补填推荐人/);
-  assert.match(referrals, /\/api\/referrals\/me/);
-  assert.match(referrals, /credentials:\s*'include'/);
-  assert.match(referrals, /available_reward_credits/);
-  assert.match(referrals, /pending_reward_credits/);
-  assert.match(referrals, /next_pending_release_at/);
-  assert.match(referrals, /'X-Device-ID': deviceId/);
-  assert.match(referrals, /reward_history/);
-  assert.match(referrals, /renderInvitees\(data\.invitees/);
-  assert.match(referrals, /7 天观察期/);
-  assert.doesNotMatch(referrals, /\.innerHTML\s*=/);
-  assert.doesNotMatch(referrals, /localStorage.*referral/i);
+  assert.match(referrals, /data-account-page="referrals"/);
+  assert.match(referralScript, /\/api\/referrals\/me/);
+  assert.match(referralScript, /credentials:\s*'include'/);
+  assert.match(referralScript, /available_reward_credits/);
+  assert.match(referralScript, /pending_reward_credits/);
+  assert.match(referralScript, /next_pending_release_at/);
+  assert.match(referralScript, /'X-Device-ID': deviceId/);
+  assert.match(referralScript, /reward_history/);
+  assert.match(referralScript, /renderInvitees\(data\.invitees/);
+  assert.match(referralScript, /7 天观察期/);
+  assert.doesNotMatch(referralScript, /\.innerHTML\s*=/);
+  assert.doesNotMatch(referralScript, /localStorage.*referral/i);
 });
 
 test('localized referral centers fully translate static and dynamic states', async () => {
   const expectations = [
+    ['referrals.html', 'en', 'Referral center', '7-day observation period', 'en-US'],
     ['de/referrals.html', 'de', 'Empfehlungszentrum', '7-tägige Beobachtungsfrist', 'de-DE'],
     ['es/referrals.html', 'es', 'Centro de referidos', 'período de observación de 7 días', 'es-ES'],
     ['fr/referrals.html', 'fr', 'Centre de parrainage', 'période d’observation de 7 jours', 'fr-FR'],
@@ -620,17 +630,57 @@ test('localized referral centers fully translate static and dynamic states', asy
     const html = await read(file);
     assert.match(html, new RegExp(`<html lang="${language}">`), file);
     assert.match(html, new RegExp(`<h1>${heading}</h1>`), file);
-    assert.match(html, /href="\/referrals-localized\.css"/, file);
-    assert.match(html, /src="\/referrals-localized\.js"/, file);
+    assert.match(html, /href="\/referrals-localized\.css\?v=20260727-account-nav-v1"/, file);
+    assert.match(html, /src="\/referrals-localized\.js\?v=20260727-account-nav-v1"/, file);
     assert.match(html, /hreflang="en"/, file);
     assert.match(html, /hreflang="de"/, file);
     assert.match(html, /hreflang="es"/, file);
     assert.match(html, /hreflang="fr"/, file);
     assert.match(html, /hreflang="pt-BR"/, file);
     assert.match(html, /hreflang="zh-CN"/, file);
+    assert.match(html, /id="expiryStatus"/, file);
     assert.ok(sharedScript.includes(observationCopy), file);
     assert.ok(sharedScript.includes(`locale: '${locale}'`), file);
   }
+});
+
+test('account pages share one authenticated header and preserve all six locales', async () => {
+  const navScript = await read('account-nav.js');
+  const navStyles = await read('account-nav.css');
+  const accountPages = [
+    'credits.html',
+    'redeem.html',
+    'referrals.html',
+    ...localizedReferralFiles,
+  ];
+  for (const file of accountPages) {
+    const html = await read(file);
+    assert.match(html, /href="\/account-nav\.css\?v=20260727-account-nav-v1"/, file);
+    assert.match(html, /src="\/account-nav\.js\?v=20260727-account-nav-v1"/, file);
+    assert.match(html, /class="account-navbar" data-account-nav data-account-page="(?:credits|redeem|referrals)"/, file);
+  }
+
+  assert.match(navScript, /\/api\/me/);
+  assert.match(navScript, /credentials:\s*'include'/);
+  assert.match(navScript, /\/auth\/login/);
+  assert.match(navScript, /\/auth\/logout/);
+  assert.match(navScript, /page === 'credits'/);
+  assert.match(navScript, /page === 'redeem'/);
+  assert.match(navScript, /page === 'referrals'/);
+  assert.match(navStyles, /@media\(max-width:680px\)/);
+  assert.match(navStyles, /\.account-nav-links\{display:none\}/);
+  assert.match(navStyles, /\.account-nav-user\{display:none\}/);
+  assert.match(navStyles, /\.account-nav-credits-add\{display:none\}/);
+  for (const locale of ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn']) {
+    assert.ok(navScript.includes(`${locale}: {`) || navScript.includes(`'${locale}': {`), locale);
+  }
+
+  const redeemScript = await read('redeem-localized.js');
+  assert.match(redeemScript, /new URLSearchParams\(location\.search\)\.get\('lang'\)/);
+  assert.match(redeemScript, /`\/credits\.html\?lang=\$\{locale\}`/);
+  assert.match(redeemScript, /text\.referrals/);
+  assert.match(await read('referrals.html'), /<html lang="en">/);
+  assert.doesNotMatch(await read('referrals.html'), /<h1>推荐中心<\/h1>/);
 });
 
 test('referral review admin uses masked risk queue and explicit decisions', async () => {

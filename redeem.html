@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>卡密充值 · ShopBG Remover</title>
-  <meta name="description" content="登录 ShopBG Remover 后兑换闲鱼购买的一次性积分卡。">
+  <title>Redeem voucher · ShopBG Remover</title>
+  <meta name="description" content="Redeem a one-time ShopBG Remover credit voucher purchased through Xianyu.">
   <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/account-nav.css?v=20260727-account-nav-v1">
+  <script src="/account-nav.js?v=20260727-account-nav-v1" defer></script>
   <style>
     *{box-sizing:border-box}
     body{margin:0;min-height:100vh;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07111f;color:#e5edf7}
     a{color:inherit}
-    .top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #223047;background:#0b1728}
-    .brand{font-size:19px;font-weight:800;text-decoration:none}.back{font-size:14px;color:#a7b6ca;text-decoration:none}
     main{width:min(620px,calc(100% - 32px));margin:64px auto}
     .eyebrow{color:#60a5fa;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
     h1{font-size:clamp(32px,7vw,48px);line-height:1.08;margin:12px 0 14px}
@@ -22,139 +22,44 @@
     .field+.field{margin-top:18px}.hint{margin:7px 0 0;color:#7f93ad;font-size:12px;line-height:1.55}
     input{width:100%;border:1px solid #3a4c66;border-radius:11px;background:#081321;color:#fff;padding:15px 16px;font:600 17px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;outline:none}
     input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.14)}
-    button,.signin{width:100%;margin-top:14px;border:0;border-radius:11px;background:#2563eb;color:#fff;padding:14px 18px;font-size:15px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center;display:block}
-    button:disabled{opacity:.55;cursor:not-allowed}
+    main button,main .signin{width:100%;margin-top:14px;border:0;border-radius:11px;background:#2563eb;color:#fff;padding:14px 18px;font-size:15px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center;display:block}
+    main button:disabled{opacity:.55;cursor:not-allowed}
     .account{font-size:13px;color:#91a4bc;margin:0 0 18px}
     .message{display:none;margin-top:16px;padding:13px 14px;border-radius:10px;font-size:14px;line-height:1.55}
     .message.show{display:block}.message.error{background:#3b1720;color:#fecdd3}.message.success{background:#0d3329;color:#a7f3d0}
     .rules{margin:22px 0 0;padding-left:20px;color:#91a4bc;font-size:13px;line-height:1.8}
     .foot{margin-top:22px;color:#667a94;font-size:12px;line-height:1.6}
+    @media(max-width:560px){main{margin:40px auto}.card{padding:20px}}
   </style>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/">ShopBG Remover</a>
-    <a class="back" href="/pricing">查看积分价格 · Pricing</a>
-  </header>
+  <nav class="account-navbar" data-account-nav data-account-page="redeem" aria-label="Account navigation"></nav>
   <main>
-    <div class="eyebrow">Xianyu voucher</div>
-    <h1>卡密充值</h1>
-    <p class="lead">在闲鱼购买积分卡后，请登录购买时准备使用的 ShopBG Remover 账号，再输入收到的一次性卡密。积分兑换后永久有效。</p>
+    <div class="eyebrow" id="eyebrow">Xianyu voucher</div>
+    <h1 id="heading">Redeem voucher</h1>
+    <p class="lead" id="lead">Sign in to the ShopBG Remover account that should receive the credits, then enter the one-time voucher purchased through Xianyu.</p>
     <section class="card">
-      <p class="account" id="accountText">正在检查登录状态…</p>
+      <p class="account" id="accountText">Checking sign-in status…</p>
       <form id="redeemForm" hidden>
         <div class="field">
-          <label for="voucherCode">卡密 / Voucher code</label>
+          <label for="voucherCode" id="voucherLabel">Voucher code</label>
           <input id="voucherCode" name="code" maxlength="27" autocomplete="off" spellcheck="false" placeholder="SBG-XXXX-XXXX-XXXX-XXXX" required>
         </div>
         <div class="field">
-          <label for="referralCode">推荐码 / Referral code（如有 · optional）</label>
+          <label for="referralCode" id="referralLabel">Referral code (optional)</label>
           <input id="referralCode" name="referral_code" maxlength="8" autocomplete="off" spellcheck="false" placeholder="K7M4P9Q2">
-          <p class="hint">仅可在首次充值时绑定；绑定后不能修改。300/1000 积分首充满足条件可额外获得 30 积分。</p>
+          <p class="hint" id="referralHint">A referral can only be linked with the first top-up and cannot be changed later. Eligible first purchases of 300 or 1000 credits receive 30 bonus credits.</p>
         </div>
-        <button id="redeemButton" type="submit">立即兑换 · Redeem</button>
+        <button id="redeemButton" type="submit">Redeem now</button>
       </form>
-      <a class="signin" id="signInButton" href="https://api.shopbgremover.com/auth/login" hidden>登录后兑换 · Sign in</a>
+      <a class="signin" id="signInButton" href="https://api.shopbgremover.com/auth/login" hidden>Sign in to redeem</a>
       <div class="message" id="message" role="status"></div>
-      <ul class="rules">
-        <li>一张卡密只能成功兑换一次。</li>
-        <li>兑换成功后，积分进入当前登录账号。</li>
-        <li>请勿把完整卡密转发给其他人。</li>
-        <li>推荐码只能在首次充值时填写，绑定后不能修改。</li>
-        <li>不填写推荐码继续兑换后，不能再补填推荐人。</li>
-      </ul>
-      <p class="foot"><a href="/credits.html?lang=en">查看余额、订单与积分流水 · Credit center</a></p>
-      <p class="foot"><a href="/referrals">查看我的推荐码与邀请数据 · Referral center</a></p>
-      <p class="foot">需要帮助？请保留闲鱼订单号，并联系 yubudong2023@gmail.com。客服只会核对卡密前缀和末四位，不会要求你公开发送完整卡密。</p>
+      <ul class="rules" id="rules"></ul>
+      <p class="foot"><a id="creditCenterLink" href="/credits.html?lang=en">View balance, orders, and credit history</a></p>
+      <p class="foot"><a id="referralCenterLink" href="/referrals">View my referral code and invitations</a></p>
+      <p class="foot" id="helpText">Need help? Keep your Xianyu order number and contact yubudong2023@gmail.com. Support will only verify the voucher prefix and last four characters, never the full code.</p>
     </section>
   </main>
-  <script>
-    const API = 'https://api.shopbgremover.com';
-    const accountText = document.getElementById('accountText');
-    const form = document.getElementById('redeemForm');
-    const signInButton = document.getElementById('signInButton');
-    const button = document.getElementById('redeemButton');
-    const message = document.getElementById('message');
-
-    function getOrCreateDeviceId() {
-      let id = localStorage.getItem('sbgrDeviceId');
-      if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('sbgrDeviceId', id);
-      }
-      document.cookie = `sbgr_device=${encodeURIComponent(id)}; Path=/; Domain=.shopbgremover.com; Max-Age=31536000; Secure; SameSite=Lax`;
-      return id;
-    }
-    const deviceId = getOrCreateDeviceId();
-
-    function showMessage(text, type) {
-      message.textContent = text;
-      message.className = `message show ${type}`;
-    }
-
-    async function loadUser() {
-      try {
-        const response = await fetch(`${API}/api/me`, {
-          credentials: 'include',
-          headers: { 'X-Device-ID': deviceId },
-        });
-        const data = await response.json();
-        if (data.user) {
-          accountText.textContent = `当前账号：${data.user.email}`;
-          form.hidden = false;
-          return;
-        }
-      } catch {}
-      accountText.textContent = '请先登录 ShopBG Remover，再兑换卡密。';
-      signInButton.hidden = false;
-    }
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      message.className = 'message';
-      const referralCode = document.getElementById('referralCode').value.trim();
-      if (
-        !referralCode
-        && !window.confirm('本次未填写推荐码。充值成功后将不能再补填推荐人，也不会获得被推荐用户首充奖励。是否继续？')
-      ) {
-        return;
-      }
-      button.disabled = true;
-      button.textContent = '正在兑换…';
-      try {
-        const response = await fetch(`${API}/api/vouchers/redeem`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Device-ID': deviceId,
-          },
-          body: JSON.stringify({
-            code: document.getElementById('voucherCode').value,
-            ...(referralCode ? { referral_code: referralCode } : {}),
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || '兑换失败，请稍后重试。');
-        const balance = data.balance?.credits;
-        const suffix = balance == null ? '' : ` 当前总余额：${balance}。`;
-        showMessage(
-          data.already_redeemed
-            ? `这张卡已兑换到当前账号。${suffix}`
-            : `兑换成功，已到账 ${data.credits_added} 积分。${suffix}`,
-          'success',
-        );
-        document.getElementById('voucherCode').value = '';
-        document.getElementById('referralCode').value = '';
-      } catch (error) {
-        showMessage(error.message, 'error');
-      } finally {
-        button.disabled = false;
-        button.textContent = '立即兑换 · Redeem';
-      }
-    });
-
-    loadUser();
-  </script>
+  <script src="/redeem-localized.js?v=20260727-account-nav-v1"></script>
 </body>
 </html>

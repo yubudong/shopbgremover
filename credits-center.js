@@ -127,9 +127,8 @@
     const value = t[node.dataset.i18n];
     if (value) node.textContent = value;
   });
-  document.getElementById('homeLink').href = config.home;
-  document.getElementById('pricingLink').href = config.pricing;
   document.getElementById('paypalAction').href = `${config.pricing}#plans`;
+  document.getElementById('voucherAction').href = `/redeem.html?lang=${locale}`;
   document.getElementById('referralAction').href = config.referrals;
 
   const formatDate = (value) => value
