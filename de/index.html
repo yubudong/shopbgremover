@@ -52,8 +52,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage7b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage7b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage7c-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage7c-v1"></script>
+<script src="/product-organizer.js?v=20260726-ai-stage7c-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -276,7 +277,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7c-v1">
 </head>
 <body>
 
@@ -435,6 +436,25 @@
           <span class="ai-session-note">Nur in diesem Browser für 24 Stunden gespeichert.</span>
           <button class="ai-session-clear" id="aiSessionClear" type="button" hidden>Gespeicherten Arbeitsbereich löschen</button>
         </div>
+      </div>
+
+      <div class="setting-group product-organizer-panel" id="productOrganizerPanel"
+        data-summary-empty="Noch keine Produktordner zugewiesen."
+        data-summary-grouped="{count} von {total} Bild(ern) sind Produktordnern zugewiesen."
+        data-dialog-title="ZIP nach Produkt / SKU organisieren"
+        data-dialog-subtitle="Bilder mit derselben SKU werden im selben ZIP-Ordner abgelegt. Alles bleibt im Browser und Bilder werden nicht neu verarbeitet."
+        data-input-placeholder="Optionale Produkt-ID oder SKU"
+        data-input-aria="Produkt-ID oder SKU für {name}"
+        data-root-preview="ZIP-Stammverzeichnis (kein Ordner)"
+        data-close-label="Produktorganisation schließen"
+        data-clear-label="Alle Ordner löschen"
+        data-done-label="Fertig"
+        data-saved-status="Produktordner lokal gespeichert. Lade die ZIP-Datei herunter, um sie anzuwenden."
+        data-cleared-status="Produktordner gelöscht. Ausgaben bleiben im ZIP-Stammverzeichnis.">
+        <span class="setting-label">ZIP-Produktordner</span>
+        <p>Gruppiere optional mehrere Bilder unter derselben Produkt-ID oder SKU. Das ändert nur ZIP-Pfade und verbraucht keine KI-Credits.</p>
+        <button class="product-organizer-open" id="productOrganizerOpen" type="button" disabled>Produktordner zuweisen</button>
+        <small class="product-organizer-summary" id="productOrganizerSummary">Noch keine Produktordner zugewiesen.</small>
       </div>
 
       <div class="setting-group">
@@ -907,6 +927,7 @@ let selectedFiles   = [];
   let processedResults = [];
   let aiWorkflow = null;
   let backgroundComposer = null;
+  let productOrganizer = null;
   let currentUser     = null;
   let outputSize      = 'original';
   let renameMode      = 'original';
@@ -918,6 +939,7 @@ let selectedFiles   = [];
     const validRenameModes = new Set(['original', 'sequence', 'date']);
     const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
+    productOrganizer.restore(settings.productFolders);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
     if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
@@ -1292,6 +1314,7 @@ let selectedFiles   = [];
         }
       });
       grid.appendChild(card);
+      productOrganizer?.register(file, i);
       aiWorkflow?.register(file, i, card, restoredItem?.job || null);
     });
 
@@ -1390,7 +1413,7 @@ let selectedFiles   = [];
     btn.textContent = "Komprimiere…";
 
     const zip = new JSZip();
-    processedResults.forEach(result => zip.file(result.name, result.blob));
+    productOrganizer.buildEntries(processedResults).forEach(result => zip.file(result.name, result.blob));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1460,6 +1483,11 @@ let selectedFiles   = [];
     }
   });
 
+  productOrganizer = window.ShopBGProductOrganizer.create({
+    onChanged: () => aiWorkflow?.persistSession(),
+    onStatus: setStatus,
+  });
+
   backgroundComposer = window.ShopBGBackgroundComposer.create({
     onChanged: index => aiWorkflow?.markCompositionChanged(index),
     onStatus: setStatus,
@@ -1477,6 +1505,7 @@ let selectedFiles   = [];
       renameMode,
       outputFormat,
       outputQuality,
+      productFolders: productOrganizer.getState(),
     }),
     restoreFiles: async (items, composition) => {
       await restoreCompositionState(composition);

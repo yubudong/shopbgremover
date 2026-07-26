@@ -52,8 +52,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260726-ai-stage7b-v1"></script>
-<script src="/background-composer.js?v=20260726-ai-stage7b-v1"></script>
+<script src="/ai-workflow.js?v=20260726-ai-stage7c-v1"></script>
+<script src="/background-composer.js?v=20260726-ai-stage7c-v1"></script>
+<script src="/product-organizer.js?v=20260726-ai-stage7c-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -809,7 +810,7 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7b-v1">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260726-ai-stage7c-v1">
 </head>
 <body>
 
@@ -1135,6 +1136,25 @@
           data-shopee-note=" Recomendación de Shopee: 1024 × 1024, PNG o JPEG, hasta 2 MB. Usa una imagen principal con fondo blanco sencillo y haz que el producto ocupe más de la mitad del encuadre. Los requisitos pueden variar según el mercado."
           data-shopee-disabled="WebP no está entre los formatos de imagen de producto verificados para Shopee."
           data-shopee-too-large="Esta salida de Shopee supera los 2 MB. Elige JPEG o reduce la calidad JPEG y vuelve a intentarlo.">Salida sin pérdida con transparencia.</small>
+      </div>
+
+      <div class="setting-group product-organizer-panel" id="productOrganizerPanel"
+        data-summary-empty="Aún no hay carpetas de producto asignadas."
+        data-summary-grouped="{count} de {total} imagen(es) asignada(s) a carpetas de producto."
+        data-dialog-title="Organizar ZIP por producto / SKU"
+        data-dialog-subtitle="Las imágenes con el mismo SKU se guardan en la misma carpeta del ZIP. Todo permanece en tu navegador y no se reprocesan imágenes."
+        data-input-placeholder="ID de producto o SKU opcional"
+        data-input-aria="ID de producto o SKU para {name}"
+        data-root-preview="Raíz del ZIP (sin carpeta)"
+        data-close-label="Cerrar organizador de productos"
+        data-clear-label="Borrar todas las carpetas"
+        data-done-label="Listo"
+        data-saved-status="Carpetas de producto guardadas localmente. Descarga el ZIP para aplicarlas."
+        data-cleared-status="Carpetas de producto borradas. Los archivos quedarán en la raíz del ZIP.">
+        <span class="setting-label">Carpetas de producto en ZIP</span>
+        <p>Agrupa opcionalmente varias imágenes con el mismo ID de producto o SKU. Solo cambia las rutas del ZIP y no usa créditos de IA.</p>
+        <button class="product-organizer-open" id="productOrganizerOpen" type="button" disabled>Asignar carpetas de producto</button>
+        <small class="product-organizer-summary" id="productOrganizerSummary">Aún no hay carpetas de producto asignadas.</small>
       </div>
 
       <!-- Rename Template -->
@@ -1478,6 +1498,7 @@ let selectedFiles   = [];
   let processedResults = [];
   let aiWorkflow = null;
   let backgroundComposer = null;
+  let productOrganizer = null;
   let currentUser     = null;
   let outputSize      = 'original';   // '2048' | '1000' | '500' | 'original'
   let renameMode      = 'original';   // 'original' | 'sequence' | 'date'
@@ -1489,6 +1510,7 @@ let selectedFiles   = [];
     const validRenameModes = new Set(['original', 'sequence', 'date']);
     const validFormats = new Set(['png', 'jpeg', 'webp']);
     await backgroundComposer.restore(settings);
+    productOrganizer.restore(settings.productFolders);
     if (validSizes.has(settings.outputSize)) outputSize = settings.outputSize;
     if (validRenameModes.has(settings.renameMode)) renameMode = settings.renameMode;
     if (validFormats.has(settings.outputFormat)) outputFormat = settings.outputFormat;
@@ -1875,6 +1897,7 @@ let selectedFiles   = [];
         }
       });
       grid.appendChild(card);
+      productOrganizer?.register(file, i);
       aiWorkflow?.register(file, i, card, restoredItem?.job || null);
     });
 
@@ -1985,7 +2008,7 @@ let selectedFiles   = [];
     btn.textContent = "Comprimiendo…";
 
     const zip = new JSZip();
-    processedResults.forEach(result => zip.file(result.name, result.blob));
+    productOrganizer.buildEntries(processedResults).forEach(result => zip.file(result.name, result.blob));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2060,6 +2083,11 @@ let selectedFiles   = [];
   });
 
   // ── Init ──────────────────────────────────────────────────
+  productOrganizer = window.ShopBGProductOrganizer.create({
+    onChanged: () => aiWorkflow?.persistSession(),
+    onStatus: setStatus,
+  });
+
   backgroundComposer = window.ShopBGBackgroundComposer.create({
     onChanged: index => aiWorkflow?.markCompositionChanged(index),
     onStatus: setStatus,
@@ -2077,6 +2105,7 @@ let selectedFiles   = [];
       renameMode,
       outputFormat,
       outputQuality,
+      productFolders: productOrganizer.getState(),
     }),
     restoreFiles: async (items, composition) => {
       await restoreCompositionState(composition);

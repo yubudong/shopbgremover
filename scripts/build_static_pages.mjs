@@ -26,6 +26,7 @@ const rootFiles = [
   'local-inpaint-core.mjs',
   'pricing.html',
   'privacy.html',
+  'product-organizer.js',
   'redeem.html',
   'referrals-localized.css',
   'referrals-localized.js',

@@ -79,9 +79,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage7b-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage7b-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage7b-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-ai-stage7c-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260726-ai-stage7c-v1"/, file);
+    assert.match(html, /src="\/product-organizer\.js\?v=20260726-ai-stage7c-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-ai-stage7c-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -93,6 +94,15 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /data-session-restored=/, file);
     assert.match(html, /getSessionOwner: \(\) => currentUser\?\.id/, file);
     assert.match(html, /getCompositionState: \(\) => \(\{[\s\S]*outputFormat,[\s\S]*outputQuality,[\s\S]*\}\)/, file);
+    assert.match(html, /productFolders: productOrganizer\.getState\(\)/, file);
+    assert.match(html, /productOrganizer\.restore\(settings\.productFolders\)/, file);
+    assert.match(html, /productOrganizer\?\.register\(file, i\)/, file);
+    assert.match(html, /productOrganizer\.buildEntries\(processedResults\)/, file);
+    assert.equal((html.match(/id="productOrganizerPanel"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="productOrganizerOpen"/g) || []).length, 1, file);
+    assert.equal((html.match(/id="productOrganizerSummary"/g) || []).length, 1, file);
+    assert.match(html, /data-dialog-subtitle="[^"]+(?:browser|Browser|navegador|navigateur)[^"]*"/i, file);
+    assert.match(html, /data-root-preview=/, file);
     assert.match(html, /restoreFiles: async \(items, composition\)/, file);
     assert.match(html, /handleFiles\(files, \{ restoredItems = \[\] \} = \{\}\)/, file);
     assert.match(html, /initialSource: restoredItem\?\.sourceBlob \|\| null/, file);
@@ -359,6 +369,7 @@ test('Pages build contains only the canonical static site', async () => {
     'credits-center.css',
     'credits-center.js',
     'background-composer.js',
+    'product-organizer.js',
     'redeem.html',
     'referrals.html',
     'referrals-localized.css',

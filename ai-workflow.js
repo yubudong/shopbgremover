@@ -595,7 +595,7 @@
       return jobs
         .filter((job) => job?.outputBlob)
         .sort((left, right) => left.index - right.index)
-        .map((job) => ({ name: job.outputName, blob: job.outputBlob }));
+        .map((job) => ({ index: job.index, name: job.outputName, blob: job.outputBlob }));
     }
 
     async function waitForDetection() {
