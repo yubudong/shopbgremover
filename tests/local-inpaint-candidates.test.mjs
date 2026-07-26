@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  evaluatePeriodicTextureStrategy,
   inpaintAxisInterpolationRgba,
   inpaintPeriodicExtrapolationRgba,
 } from '../local-inpaint-candidates.mjs';
@@ -86,4 +87,57 @@ test('candidate algorithms keep every unmasked pixel exact for a non-rectangular
       );
     }
   }
+});
+
+test('periodic texture strategy accepts repeatable texture and rejects aperiodic noise', () => {
+  const width = 96;
+  const height = 80;
+  const mask = new Uint8Array(width * height);
+  for (let y = 24; y < 56; y += 1) {
+    for (let x = 30; x < 66; x += 1) mask[y * width + x] = 1;
+  }
+  const periodic = new Uint8ClampedArray(width * height * 4);
+  const aperiodic = new Uint8ClampedArray(width * height * 4);
+  let seed = 0x12345678;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const stripe = Math.floor(x / 6) % 2 ? 210 : 35;
+      periodic.set([stripe, 180, 230 - stripe / 2, 255], offset);
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      aperiodic.set([
+        seed & 255,
+        (seed >>> 8) & 255,
+        (seed >>> 16) & 255,
+        255,
+      ], offset);
+    }
+  }
+
+  const periodicDecision = evaluatePeriodicTextureStrategy(periodic, width, height, mask);
+  const aperiodicDecision = evaluatePeriodicTextureStrategy(aperiodic, width, height, mask);
+  assert.equal(periodicDecision.usePeriodic, true);
+  assert.ok(periodicDecision.best.error <= periodicDecision.maxPeriodError);
+  assert.equal(aperiodicDecision.usePeriodic, false);
+  assert.ok(aperiodicDecision.best.error > aperiodicDecision.maxPeriodError);
+});
+
+test('periodic texture strategy rejects a one-pixel smooth-gradient false positive', () => {
+  const width = 96;
+  const height = 80;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  const mask = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      pixels.set([80 + x, 70 + y, 160, Math.min(255, 40 + x * 2)], offset);
+      if (x >= 30 && x < 66 && y >= 24 && y < 56) mask[y * width + x] = 1;
+    }
+  }
+
+  const decision = evaluatePeriodicTextureStrategy(pixels, width, height, mask);
+  assert.equal(decision.best.period, 1);
+  assert.ok(decision.best.error <= decision.maxPeriodError);
+  assert.equal(decision.usePeriodic, false);
+  assert.equal(decision.reason, 'period-too-short');
 });

@@ -237,6 +237,42 @@ export function detectTexturePeriods(rgba, width, height, mask, { maxPeriod = 64
   ));
 }
 
+export function evaluatePeriodicTextureStrategy(
+  rgba,
+  width,
+  height,
+  mask,
+  { maxPeriod = 64, minPeriod = 4, maxPeriodError = 6 } = {},
+) {
+  const periods = detectTexturePeriods(rgba, width, height, mask, { maxPeriod });
+  const safeMinPeriod = Number.isFinite(minPeriod)
+    ? Math.max(1, Math.round(minPeriod))
+    : 4;
+  const safeMaxPeriodError = Number.isFinite(maxPeriodError)
+    ? Math.max(0, maxPeriodError)
+    : 6;
+  const best = periods.find((period) => period.period >= safeMinPeriod) ?? periods[0];
+  const hasUsablePeriod = Boolean(
+    best
+    && Number.isFinite(best.error)
+    && best.period >= safeMinPeriod
+    && best.error <= safeMaxPeriodError
+  );
+  let reason = 'accepted';
+  if (!best || !Number.isFinite(best.error)) reason = 'no-period';
+  else if (best.period < safeMinPeriod) reason = 'period-too-short';
+  else if (best.error > safeMaxPeriodError) reason = 'period-error';
+
+  return {
+    usePeriodic: hasUsablePeriod,
+    reason,
+    minPeriod: safeMinPeriod,
+    maxPeriodError: safeMaxPeriodError,
+    best: best ?? null,
+    periods,
+  };
+}
+
 export function inpaintPeriodicExtrapolationRgba(rgba, width, height, mask, options = {}) {
   assertInputs(rgba, width, height, mask);
   const { maskedPixels, firstKnownIndex } = inspectMask(mask);
