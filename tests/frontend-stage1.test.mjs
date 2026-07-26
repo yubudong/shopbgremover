@@ -676,6 +676,8 @@ test('account pages share one authenticated header and preserve all six locales'
   }
 
   const redeemScript = await read('redeem-localized.js');
+  assert.match(await read('redeem.html'), /main \.signin\[hidden\]\{display:none\}/);
+  assert.match(await read('referrals-localized.css'), /main \.signin\[hidden\]\{display:none\}/);
   assert.match(redeemScript, /new URLSearchParams\(location\.search\)\.get\('lang'\)/);
   assert.match(redeemScript, /`\/credits\.html\?lang=\$\{locale\}`/);
   assert.match(redeemScript, /text\.referrals/);
