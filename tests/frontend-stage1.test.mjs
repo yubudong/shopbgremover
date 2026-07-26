@@ -535,6 +535,7 @@ test('referral review admin uses masked risk queue and explicit decisions', asyn
   assert.match(admin, /\/\$\{decision\}/);
   assert.match(admin, /same_device/);
   assert.match(admin, /审核说明必须为 3–500 个字符/);
+  assert.match(admin, /rows\.append\(row\)/);
   assert.doesNotMatch(admin, /\.innerHTML\s*=/);
 });
 

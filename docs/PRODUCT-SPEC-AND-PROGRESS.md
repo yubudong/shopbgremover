@@ -1172,7 +1172,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 
 ### 阶段 8：完整测试和部署
 
-状态：🟡 除真实推荐订单、PayPal 退款和真实卡密争议外，产品、计费、故障、恢复、多语言和部署清单均已有自动化或生产证据。真实资金/推荐余额闭环会改变外部资金或用户余额，尚未获得独立授权并实际验收，因此阶段 8 整体不能标记完成。
+状态：🟡 除真实推荐卡密与争议冲正、PayPal 退款外，产品、计费、故障、恢复、多语言和部署清单均已有自动化或生产证据。真实推荐卡密闭环已经获得独立授权并执行到风险审核，尚未完成审核、争议冲正和最终余额复核；真实 PayPal 退款仍未执行，因此阶段 8 整体不能标记完成。
 
 - ✅ 单张流程：真实 AI、透明图零 AI、缓存重合成和本地合成都有生产证据
 - ✅ 批量流程：登录 5 图混合、6 图部分成功/恢复和 18 图本地工作区已有生产证据
@@ -1183,7 +1183,7 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
 - ✅ 重复点击：前端预检前单飞锁已部署，Worker 顺序/并发同任务和唯一扣费回归继续作为最终边界
 - ✅ ZIP 下载：单图、5 图、部分 5 图、完整 6 图、18 图商品目录和真实重名保护均已验证
 - ✅ 大图和多图压力测试：超高图、局部清理性能上限、6 图收费恢复和 18 图/35.2 MB ZIP 已验证
-- 🟡 推荐奖励和退款：自动化、生产 D1/Worker/Cron/管理界面已完成；真实推荐订单、PayPal 退款和卡密争议生产写入未执行
+- 🟡 推荐奖励和退款：自动化、生产 D1/Worker/Cron/管理界面已完成；真实推荐卡密已完成绑定、300 基础积分兑换并进入风险审核，审核、观察期、卡密争议冲正和最终余额复核尚未完成；PayPal 退款未执行
 - ✅ 多语言文案：英语、德语、西班牙语、法语和巴西葡萄牙语桌面/移动端及共享资源边界已验证
 - ✅ 生产部署：阶段 8 第二部分 Pages `71bab47c-8118-4b2f-808e-660088e8d576` 已部署，Worker 保持 `482eb5f9-c817-4d97-aaa0-ed3d591824a4`
 - ✅ 部署后真实余额验证：测试账号保持 `1185` 积分、`total_used 207`，AI 任务 13、扣费流水 12
@@ -3637,8 +3637,29 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 可行的无付费降级方案是把生产 `RESEND_FROM` 改为现有已验证域名下的地址，但会改变生产 Worker secret、Worker 版本和用户看到的发件域名，执行前需要独立确认
   - 用户确认 `ecomsellerkit.com` 已不再需要登录邮件，并授权从 Resend 永久移除旧域名、释放免费域名名额后切换到 `shopbgremover.com`
   - Resend 中的 `ecomsellerkit.com` 已永久删除；没有删除或修改该域名的任何 DNS 记录
-  - `shopbgremover.com` 已成功添加到 Resend，区域为东京 `ap-northeast-1`，当前等待 DKIM/SPF/MX DNS 验证
-  - Resend 的 Cloudflare Domain Connect 自动配置已打开；Cloudflare 尚未登录，Google 账号选择页正在等待用户确认使用 `yubudong2023@gmail.com`，因此尚未新增任何 DNS 记录
-- 当前状态：🟡 测试卡生成和 Resend 域名换位已完成，真实推荐闭环正在等待 Cloudflare 登录及 DNS 验证；卡片保持 `reserved`，未兑换、未发积分、未产生推荐关系
-- 是否部署：无需部署；当前 Pages 和 Worker 版本均未变化
-- 下一步：用户确认 Google 账号后完成 Cloudflare 登录，只新增 Domain Connect 展示的 Resend DNS 记录；等待 Resend 验证并重发验证码，随后继续兑换、审核和争议冲正
+  - `shopbgremover.com` 最初以东京 `ap-northeast-1` 添加；用户随后明确授权选择 `yubudong2023@gmail.com` 登录 Cloudflare，并只允许新增该域名所需的 DKIM/SPF/MX，禁止删除或修改现有记录
+  - 第一次 Cloudflare Domain Connect 授权页除新增东京区记录外，还明确计划删除现有美国东部区 MX 和 SPF；没有点击 `Authorize`，已取消该授权
+  - 为保留现有 DNS，只删除了尚未验证、尚未生效的东京区 Resend 域名配置，没有触碰 Cloudflare DNS；随后将同一域名按现有 MX 所属的 North Virginia `us-east-1` 区域重新创建
+  - 第二次 Domain Connect 的 MX 已与现有记录一致，但仍计划先删除再重建内容相同、仅 TTL 不同的 SPF；再次取消最终授权，没有批准任何删除
+  - Domain Connect 在最终删除确认前已经新增了新 DKIM 和一条同内容 SPF；Cloudflare 控制台保留原有 MX/SPF，没有删除或修改现有记录。公共 DNS 查询只返回一组有效值：DKIM、`v=spf1 include:amazonses.com ~all` 和优先级 10 的 `feedback-smtp.us-east-1.amazonses.com`
+  - Resend 域名 `shopbgremover.com` 已于 2026-07-26 18:28（Asia/Shanghai）验证成功，状态为 `verified`，区域为 `us-east-1`；没有购买套餐、没有创建付费团队、没有修改 Worker secret 或部署 Worker
+- 邮箱登录、兑换与风险审核：
+  - 域名验证后，生产页面已成功向 `yubudong@protonmail.com` 发送验证码；验证码由用户从真实邮箱提供，未读取生产 D1 验证码、未绕过邮箱所有权验证
+  - 邮箱登录成功，页面在兑换前确认账号为 55 积分、`total_used 0`
+  - 使用唯一 300 积分测试卡和推荐码 `NLD8UHZJ` 完成生产兑换；完整卡密只在受控会话使用，兑换后已从页面输入框清除，未写入代码、状态文档或 Git
+  - 兑换成功后测试账号余额 `55 → 355`，基础积分 300 立即到账，卡片 `reserved → redeemed`，对应 voucher 订单为 `completed`、`is_first_qualified_purchase=1`
+  - 推荐关系已以 `source='voucher'` 绑定到当前推荐人，关系状态为 `bound`；同一 IP 短期绑定触发 `same_ip_recent_binding`，风险分 65、`risk_status='review'`
+  - 风险审核记录为 `pending`，待发首充奖励 30、待发推荐奖励 45；尚无 `referral_reward_holds`，两项奖励均未发放、未进入 7 天观察期，推荐人余额仍保持 1185
+  - 只读生产 D1 复核为 `changed_db=false`、`rows_written=0`；测试账号 `total_used` 仍为 0，没有执行 AI 或 PayPal
+- 新发现阻塞：
+  - 生产管理总览正确显示“待审核推荐 1”，生产 D1 按审核接口的完整 JOIN 查询也返回唯一待审核记录
+  - `admin-referrals` 页面完成管理员鉴权和接口请求后却不显示记录；定位为前端脚本创建 `<tr>` 并填充所有单元格后漏掉 `rows.append(row)`，因此 `data.reviews.length=1` 但表格行数仍为 0
+  - 该问题阻止通过受控管理员界面点击批准；没有绕过界面直接写 D1，尚未批准审核、创建观察期 hold 或执行争议冲正
+- 本地修复与测试：
+  - `admin-referrals.html` 已在每条审核记录构造完成后执行 `rows.append(row)`；不改变接口、Worker、D1 schema、积分规则、风控规则或管理员授权边界
+  - `tests/frontend-stage1.test.mjs` 增加审核行必须追加到表格的静态回归断言
+  - 定向运行时，3 项备份测试和 56 项前端测试先通过；随后 Worker 测试因沙箱禁止本地监听端口及写 Wrangler 日志而停止，不是代码失败
+  - 使用允许本地测试运行时后完整 `npm test` 通过：备份 3、前端 56、Worker 47，共 106 项通过、0 失败
+- 当前状态：🟡 Resend 域名、真实邮箱登录、推荐绑定和 300 基础积分兑换已完成；生产审核页缺陷已本地修复并通过 106 项测试，但尚未推送、未通过 CI、未部署 Pages。卡片已 `redeemed`、争议状态仍为 `none`，奖励未发放，测试积分未消费
+- 是否部署：未部署本次审核页修复；当前生产 Pages 和 Worker 版本均未变化
+- 下一步：提交并推送审核页修复与本文档，等待 CI 通过后只部署 Pages；随后由管理员批准唯一风险审核，确认 30/45 奖励进入 7 天观察期但尚未释放，再对订单 `TEST-20260726-REFERRAL-E2E-01` 执行争议冲正。最终必须确认测试账号回到 55、推荐人回到 1185、hold 取消、关系/订单/卡片/争议/流水审计一致后，才能标记本部分完成

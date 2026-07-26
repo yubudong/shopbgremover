@@ -122,6 +122,7 @@
             reject.addEventListener('click', () => decide(review.id, 'reject', reject));
             actions.append(approve, reject);
           }
+          rows.append(row);
         }
       } catch (cause) {
         document.getElementById('authStatus').textContent = '无法加载审核队列。';
