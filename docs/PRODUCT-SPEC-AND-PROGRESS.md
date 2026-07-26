@@ -3635,6 +3635,10 @@ AI 生成背景未来需要单独定义积分价格，不能包含在 1 积分�
   - 用户授权新增并验证 `shopbgremover.com` 及只新增 Resend DNS 记录后，Resend 页面显示当前套餐仅含 1 个域名且名额已被 `ecomsellerkit.com` 使用；新增第二域名要求升级到 `$20/月`
   - Resend 的新建团队入口同样明确标记为付费功能；未点击升级、未购买、未创建团队、未新增域名、未改 DNS
   - 可行的无付费降级方案是把生产 `RESEND_FROM` 改为现有已验证域名下的地址，但会改变生产 Worker secret、Worker 版本和用户看到的发件域名，执行前需要独立确认
-- 当前状态：🟡 测试卡生成子阶段已完成，真实推荐闭环被生产邮件域名未验证和测试邮箱并非全新账号共同阻塞；卡片保持 `reserved`，未兑换、未发积分、未产生推荐关系
+  - 用户确认 `ecomsellerkit.com` 已不再需要登录邮件，并授权从 Resend 永久移除旧域名、释放免费域名名额后切换到 `shopbgremover.com`
+  - Resend 中的 `ecomsellerkit.com` 已永久删除；没有删除或修改该域名的任何 DNS 记录
+  - `shopbgremover.com` 已成功添加到 Resend，区域为东京 `ap-northeast-1`，当前等待 DKIM/SPF/MX DNS 验证
+  - Resend 的 Cloudflare Domain Connect 自动配置已打开；Cloudflare 尚未登录，Google 账号选择页正在等待用户确认使用 `yubudong2023@gmail.com`，因此尚未新增任何 DNS 记录
+- 当前状态：🟡 测试卡生成和 Resend 域名换位已完成，真实推荐闭环正在等待 Cloudflare 登录及 DNS 验证；卡片保持 `reserved`，未兑换、未发积分、未产生推荐关系
 - 是否部署：无需部署；当前 Pages 和 Worker 版本均未变化
-- 下一步：由用户决定是授权 `$20/月` Resend 升级后验证品牌域名，还是授权把生产 `RESEND_FROM` 改为 `ShopBG Remover <login@ecomsellerkit.com>` 的无付费降级方案。邮件可交付后再继续兑换、审核和争议冲正
+- 下一步：用户确认 Google 账号后完成 Cloudflare 登录，只新增 Domain Connect 展示的 Resend DNS 记录；等待 Resend 验证并重发验证码，随后继续兑换、审核和争议冲正
