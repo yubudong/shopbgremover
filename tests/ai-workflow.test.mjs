@@ -23,14 +23,18 @@ const {
   TRANSPARENCY_DETECTOR_VERSION,
 } = globalThis.ShopBGAiWorkflow;
 const {
+  backgroundTemplateByteSize,
   getBackgroundBlurPixels,
   getBackgroundPlacement,
   getForegroundPlacement,
   getImagePlacement,
   getOutputEncoding,
+  normalizeBackgroundTemplate,
   resolveCompositionConfig,
   validateBackgroundFile,
   MAX_BACKGROUND_BYTES,
+  MAX_BACKGROUND_TEMPLATES,
+  MAX_BACKGROUND_TEMPLATE_BYTES,
 } = globalThis.ShopBGBackgroundComposer;
 
 test('uploaded background files accept only JPG, PNG, or WebP up to 20 MB', () => {
@@ -55,6 +59,44 @@ test('uploaded background files accept only JPG, PNG, or WebP up to 20 MB', () =
   });
   Object.defineProperty(oversized, 'name', { value: 'large.jpg' });
   assert.equal(validateBackgroundFile(oversized), 'size');
+});
+
+test('browser background templates preserve only reusable background settings', () => {
+  const imageBlob = new Blob(['template'], { type: 'image/png' });
+  const template = normalizeBackgroundTemplate({
+    id: 'template-1',
+    name: ' Summer shelf ',
+    imageBlob,
+    backgroundImageName: 'summer.png',
+    backgroundFit: 'contain',
+    backgroundScale: 240,
+    backgroundOffsetX: -80,
+    backgroundOffsetY: 12,
+    backgroundBlur: 9,
+    productScale: 55,
+    productShadow: true,
+  }, 1234);
+
+  assert.deepEqual(template, {
+    id: 'template-1',
+    name: 'Summer shelf',
+    imageBlob,
+    backgroundImageName: 'summer.png',
+    backgroundFit: 'contain',
+    backgroundScale: 200,
+    backgroundOffsetX: -50,
+    backgroundOffsetY: 12,
+    backgroundBlur: 9,
+    createdAt: 1234,
+    updatedAt: 1234,
+  });
+  assert.equal(backgroundTemplateByteSize(template), imageBlob.size);
+  assert.equal(MAX_BACKGROUND_TEMPLATES, 8);
+  assert.equal(MAX_BACKGROUND_TEMPLATE_BYTES, 80 * 1024 * 1024);
+  assert.throws(
+    () => normalizeBackgroundTemplate({ imageBlob: new Blob(['svg'], { type: 'image/svg+xml' }) }),
+    /invalid_background_template/,
+  );
 });
 
 test('platform output size enforcement accepts 2 MB exactly and rejects one byte over', () => {

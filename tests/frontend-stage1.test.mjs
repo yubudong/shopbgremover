@@ -88,10 +88,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260726-bg-controls-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260726-bg-controls-v1"/, file);
-    assert.match(html, /src="\/product-organizer\.js\?v=20260726-bg-controls-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260726-bg-controls-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260727-bg-template-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260727-bg-template-v1"/, file);
+    assert.match(html, /src="\/product-organizer\.js\?v=20260727-bg-template-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260727-bg-template-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -334,6 +334,15 @@ test('uploaded background validation and composition stay browser-local', async 
   assert.match(composer, /context\.fillStyle = '#FFFFFF'/);
   assert.match(composer, /canvas\.toBlob\(encoded, encoding\.mime, encoding\.quality\)/);
   assert.match(composer, /blob\.type !== encoding\.mime/);
+  assert.match(composer, /BACKGROUND_TEMPLATE_DB_NAME = 'shopbgremover-background-templates'/);
+  assert.match(composer, /MAX_BACKGROUND_TEMPLATES = 8/);
+  assert.match(composer, /MAX_BACKGROUND_TEMPLATE_BYTES = 80 \* 1024 \* 1024/);
+  assert.match(composer, /function createBackgroundTemplateLibrary\(\)/);
+  assert.match(composer, /function saveCurrentBackgroundTemplate\(\)/);
+  assert.match(composer, /async function applyBackgroundTemplate\(template\)/);
+  assert.match(composer, /async function requestDeleteBackgroundTemplate\(id\)/);
+  assert.match(composer, /globalThis\.indexedDB/);
+  assert.match(composer, /'zh-cn': Object\.freeze\(\{/);
   assert.doesNotMatch(composer, /\bfetch\s*\(/);
   assert.doesNotMatch(composer, /\/api\/|https?:\/\//);
 });

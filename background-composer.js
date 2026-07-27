@@ -1,5 +1,9 @@
 (function () {
   const MAX_BACKGROUND_BYTES = 20 * 1024 * 1024;
+  const MAX_BACKGROUND_TEMPLATES = 8;
+  const MAX_BACKGROUND_TEMPLATE_BYTES = 80 * 1024 * 1024;
+  const BACKGROUND_TEMPLATE_DB_NAME = 'shopbgremover-background-templates';
+  const BACKGROUND_TEMPLATE_STORE_NAME = 'templates';
   const ACCEPTED_BACKGROUND_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
   const ACCEPTED_BACKGROUND_EXTENSIONS = /\.(?:jpe?g|png|webp)$/i;
   const BACKGROUND_MODES = new Set(['white', 'transparent', 'custom', 'image']);
@@ -9,6 +13,122 @@
     png: Object.freeze({ extension: 'png', mime: 'image/png', supportsAlpha: true }),
     jpeg: Object.freeze({ extension: 'jpg', mime: 'image/jpeg', supportsAlpha: false }),
     webp: Object.freeze({ extension: 'webp', mime: 'image/webp', supportsAlpha: true }),
+  });
+  const BACKGROUND_TEMPLATE_COPY = Object.freeze({
+    en: Object.freeze({
+      title: 'My background templates',
+      note: 'Saved only in this browser until you delete them · Up to 8 templates / 80 MB total',
+      upload: 'Upload template',
+      save: 'Save current background',
+      update: 'Update current template',
+      empty: 'No saved templates yet.',
+      apply: 'Apply',
+      delete: 'Delete',
+      confirmDelete: 'Delete now',
+      saved: 'Background template “{name}” saved in this browser.',
+      updated: 'Background template “{name}” updated.',
+      applied: 'Background template “{name}” applied locally.',
+      deleted: 'Background template deleted from this browser.',
+      unavailable: 'Background templates are unavailable in this browser. Current work is still available.',
+      limit: 'You can save up to 8 background templates. Delete one before saving another.',
+      totalSize: 'Saved background templates can use up to 80 MB in this browser.',
+      storage: 'This browser could not save the background template. Free some storage and try again.',
+    }),
+    de: Object.freeze({
+      title: 'Meine Hintergrundvorlagen',
+      note: 'Nur in diesem Browser gespeichert, bis du sie löschst · Bis zu 8 Vorlagen / insgesamt 80 MB',
+      upload: 'Vorlage hochladen',
+      save: 'Aktuellen Hintergrund speichern',
+      update: 'Aktuelle Vorlage aktualisieren',
+      empty: 'Noch keine Vorlagen gespeichert.',
+      apply: 'Anwenden',
+      delete: 'Löschen',
+      confirmDelete: 'Jetzt löschen',
+      saved: 'Hintergrundvorlage „{name}“ wurde in diesem Browser gespeichert.',
+      updated: 'Hintergrundvorlage „{name}“ wurde aktualisiert.',
+      applied: 'Hintergrundvorlage „{name}“ wurde lokal angewendet.',
+      deleted: 'Hintergrundvorlage wurde aus diesem Browser gelöscht.',
+      unavailable: 'Hintergrundvorlagen sind in diesem Browser nicht verfügbar. Die aktuelle Arbeit bleibt erhalten.',
+      limit: 'Du kannst bis zu 8 Hintergrundvorlagen speichern. Lösche zuerst eine Vorlage.',
+      totalSize: 'Gespeicherte Hintergrundvorlagen können in diesem Browser bis zu 80 MB belegen.',
+      storage: 'Der Browser konnte die Hintergrundvorlage nicht speichern. Gib Speicherplatz frei und versuche es erneut.',
+    }),
+    es: Object.freeze({
+      title: 'Mis plantillas de fondo',
+      note: 'Guardadas solo en este navegador hasta que las elimines · Hasta 8 plantillas / 80 MB en total',
+      upload: 'Subir plantilla',
+      save: 'Guardar fondo actual',
+      update: 'Actualizar plantilla actual',
+      empty: 'Aún no hay plantillas guardadas.',
+      apply: 'Aplicar',
+      delete: 'Eliminar',
+      confirmDelete: 'Eliminar ahora',
+      saved: 'La plantilla de fondo «{name}» se guardó en este navegador.',
+      updated: 'La plantilla de fondo «{name}» se actualizó.',
+      applied: 'La plantilla de fondo «{name}» se aplicó localmente.',
+      deleted: 'La plantilla de fondo se eliminó de este navegador.',
+      unavailable: 'Las plantillas de fondo no están disponibles en este navegador. El trabajo actual sigue disponible.',
+      limit: 'Puedes guardar hasta 8 plantillas de fondo. Elimina una antes de guardar otra.',
+      totalSize: 'Las plantillas de fondo guardadas pueden usar hasta 80 MB en este navegador.',
+      storage: 'El navegador no pudo guardar la plantilla de fondo. Libera espacio e inténtalo de nuevo.',
+    }),
+    fr: Object.freeze({
+      title: 'Mes modèles d’arrière-plan',
+      note: 'Enregistrés uniquement dans ce navigateur jusqu’à leur suppression · Jusqu’à 8 modèles / 80 Mo au total',
+      upload: 'Importer un modèle',
+      save: 'Enregistrer l’arrière-plan actuel',
+      update: 'Mettre à jour le modèle actuel',
+      empty: 'Aucun modèle enregistré.',
+      apply: 'Appliquer',
+      delete: 'Supprimer',
+      confirmDelete: 'Supprimer maintenant',
+      saved: 'Le modèle d’arrière-plan « {name} » a été enregistré dans ce navigateur.',
+      updated: 'Le modèle d’arrière-plan « {name} » a été mis à jour.',
+      applied: 'Le modèle d’arrière-plan « {name} » a été appliqué localement.',
+      deleted: 'Le modèle d’arrière-plan a été supprimé de ce navigateur.',
+      unavailable: 'Les modèles d’arrière-plan ne sont pas disponibles dans ce navigateur. Le travail actuel reste disponible.',
+      limit: 'Vous pouvez enregistrer jusqu’à 8 modèles d’arrière-plan. Supprimez-en un avant d’en ajouter un autre.',
+      totalSize: 'Les modèles enregistrés peuvent utiliser jusqu’à 80 Mo dans ce navigateur.',
+      storage: 'Le navigateur n’a pas pu enregistrer le modèle. Libérez de l’espace puis réessayez.',
+    }),
+    'pt-br': Object.freeze({
+      title: 'Meus modelos de fundo',
+      note: 'Salvos apenas neste navegador até você excluí-los · Até 8 modelos / 80 MB no total',
+      upload: 'Enviar modelo',
+      save: 'Salvar fundo atual',
+      update: 'Atualizar modelo atual',
+      empty: 'Nenhum modelo salvo ainda.',
+      apply: 'Aplicar',
+      delete: 'Excluir',
+      confirmDelete: 'Excluir agora',
+      saved: 'O modelo de fundo “{name}” foi salvo neste navegador.',
+      updated: 'O modelo de fundo “{name}” foi atualizado.',
+      applied: 'O modelo de fundo “{name}” foi aplicado localmente.',
+      deleted: 'O modelo de fundo foi excluído deste navegador.',
+      unavailable: 'Os modelos de fundo não estão disponíveis neste navegador. O trabalho atual continua disponível.',
+      limit: 'Você pode salvar até 8 modelos de fundo. Exclua um antes de salvar outro.',
+      totalSize: 'Os modelos de fundo salvos podem usar até 80 MB neste navegador.',
+      storage: 'O navegador não conseguiu salvar o modelo de fundo. Libere espaço e tente novamente.',
+    }),
+    'zh-cn': Object.freeze({
+      title: '我的背景模板',
+      note: '仅保存在当前浏览器，主动删除前持续保留 · 最多 8 个模板 / 合计 80 MB',
+      upload: '上传模板',
+      save: '保存当前背景',
+      update: '更新当前模板',
+      empty: '还没有保存的模板。',
+      apply: '应用',
+      delete: '删除',
+      confirmDelete: '确认删除',
+      saved: '背景模板“{name}”已保存在当前浏览器。',
+      updated: '背景模板“{name}”已更新。',
+      applied: '背景模板“{name}”已在本地应用。',
+      deleted: '背景模板已从当前浏览器删除。',
+      unavailable: '当前浏览器无法使用背景模板库，当前工作不受影响。',
+      limit: '最多可保存 8 个背景模板，请先删除一个再保存。',
+      totalSize: '当前浏览器中的背景模板合计最多可占用 80 MB。',
+      storage: '浏览器无法保存背景模板，请释放存储空间后重试。',
+    }),
   });
 
   function clampNumber(value, minimum, maximum, fallback) {
@@ -32,6 +152,125 @@
     if (file.size > MAX_BACKGROUND_BYTES) return 'size';
     if (file.size <= 0) return 'decode';
     return null;
+  }
+
+  function getBackgroundTemplateLocale() {
+    const language = String(globalThis.document?.documentElement?.lang || 'en').toLowerCase();
+    if (language.startsWith('zh')) return 'zh-cn';
+    if (language.startsWith('pt')) return 'pt-br';
+    if (language.startsWith('de')) return 'de';
+    if (language.startsWith('es')) return 'es';
+    if (language.startsWith('fr')) return 'fr';
+    return 'en';
+  }
+
+  function normalizeBackgroundTemplate(input = {}, timestamp = Date.now()) {
+    const imageBlob = input.imageBlob || input.backgroundImageBlob;
+    if (validateBackgroundFile(imageBlob)) {
+      throw new TypeError('invalid_background_template');
+    }
+    const fallbackName = input.backgroundImageName || imageBlob.name || 'Background template';
+    return {
+      id: String(input.id || globalThis.crypto?.randomUUID?.()
+        || `${timestamp}-${Math.random().toString(36).slice(2)}`),
+      name: String(input.name || fallbackName).trim().slice(0, 120) || 'Background template',
+      imageBlob,
+      backgroundImageName: String(input.backgroundImageName || fallbackName).slice(0, 255),
+      backgroundFit: BACKGROUND_FITS.has(input.backgroundFit) ? input.backgroundFit : 'cover',
+      backgroundScale: clampNumber(input.backgroundScale, 50, 200, 100),
+      backgroundOffsetX: clampNumber(input.backgroundOffsetX, -50, 50, 0),
+      backgroundOffsetY: clampNumber(input.backgroundOffsetY, -50, 50, 0),
+      backgroundBlur: clampNumber(input.backgroundBlur, 0, 30, 0),
+      createdAt: Number.isFinite(Number(input.createdAt)) ? Number(input.createdAt) : timestamp,
+      updatedAt: timestamp,
+    };
+  }
+
+  function backgroundTemplateByteSize(template) {
+    return template?.imageBlob instanceof Blob ? template.imageBlob.size : 0;
+  }
+
+  function openBackgroundTemplateDb(indexedDb = globalThis.indexedDB) {
+    if (!indexedDb) return Promise.reject(new Error('unavailable'));
+    return new Promise((resolve, reject) => {
+      const request = indexedDb.open(BACKGROUND_TEMPLATE_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains(BACKGROUND_TEMPLATE_STORE_NAME)) {
+          database.createObjectStore(BACKGROUND_TEMPLATE_STORE_NAME, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('unavailable'));
+      request.onblocked = () => reject(new Error('unavailable'));
+    });
+  }
+
+  async function listBackgroundTemplates(indexedDb = globalThis.indexedDB) {
+    const database = await openBackgroundTemplateDb(indexedDb);
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = database
+          .transaction(BACKGROUND_TEMPLATE_STORE_NAME, 'readonly')
+          .objectStore(BACKGROUND_TEMPLATE_STORE_NAME)
+          .getAll();
+        request.onsuccess = () => resolve(
+          request.result.sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt)),
+        );
+        request.onerror = () => reject(request.error || new Error('storage'));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
+  async function saveBackgroundTemplate(input, indexedDb = globalThis.indexedDB) {
+    const existing = await listBackgroundTemplates(indexedDb);
+    const previous = existing.find((template) => template.id === input.id);
+    if (!previous && existing.length >= MAX_BACKGROUND_TEMPLATES) {
+      throw new Error('limit');
+    }
+    const template = normalizeBackgroundTemplate({
+      ...input,
+      createdAt: previous?.createdAt || input.createdAt,
+    });
+    const otherBytes = existing.reduce(
+      (total, saved) => total + (saved.id === template.id ? 0 : backgroundTemplateByteSize(saved)),
+      0,
+    );
+    if (otherBytes + backgroundTemplateByteSize(template) > MAX_BACKGROUND_TEMPLATE_BYTES) {
+      throw new Error('totalSize');
+    }
+    const database = await openBackgroundTemplateDb(indexedDb);
+    try {
+      await new Promise((resolve, reject) => {
+        const request = database
+          .transaction(BACKGROUND_TEMPLATE_STORE_NAME, 'readwrite')
+          .objectStore(BACKGROUND_TEMPLATE_STORE_NAME)
+          .put(template);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error || new Error('storage'));
+      });
+    } finally {
+      database.close();
+    }
+    return template;
+  }
+
+  async function deleteBackgroundTemplate(id, indexedDb = globalThis.indexedDB) {
+    const database = await openBackgroundTemplateDb(indexedDb);
+    try {
+      await new Promise((resolve, reject) => {
+        const request = database
+          .transaction(BACKGROUND_TEMPLATE_STORE_NAME, 'readwrite')
+          .objectStore(BACKGROUND_TEMPLATE_STORE_NAME)
+          .delete(String(id));
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error || new Error('storage'));
+      });
+    } finally {
+      database.close();
+    }
   }
 
   function getImagePlacement(imageWidth, imageHeight, canvasWidth, canvasHeight, fit = 'cover') {
@@ -232,9 +471,16 @@
       productShadow: false,
     };
     let decodedBackgroundImage = null;
+    let currentTemplateId = null;
+    let backgroundTemplates = [];
+    let templateDeleteId = null;
+    let templateDeleteTimer = null;
     const itemOverrides = new Map();
     const decodedOverrideBackgrounds = new Map();
     const overrideCardButtons = new Map();
+    const templateCopy = BACKGROUND_TEMPLATE_COPY[getBackgroundTemplateLocale()];
+    const templatePreviewUrls = new Set();
+    const templateElements = {};
 
     function snapshotConfig(source = state) {
       return {
@@ -281,6 +527,228 @@
     function notifyChanged(message, index = null) {
       options.onChanged?.(index);
       if (message) options.onStatus?.(message);
+    }
+
+    function createBackgroundTemplateLibrary() {
+      if (!elements.imagePanel || document.getElementById('backgroundTemplateLibrary')) return;
+      const section = document.createElement('section');
+      section.className = 'background-template-library';
+      section.id = 'backgroundTemplateLibrary';
+
+      const head = document.createElement('div');
+      head.className = 'background-template-head';
+      const title = document.createElement('strong');
+      title.textContent = templateCopy.title;
+      const actions = document.createElement('div');
+      actions.className = 'background-template-actions';
+
+      const upload = document.createElement('button');
+      upload.type = 'button';
+      upload.className = 'background-template-action';
+      upload.textContent = templateCopy.upload;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp';
+      input.hidden = true;
+
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'background-template-action primary';
+      save.textContent = templateCopy.save;
+      save.disabled = true;
+      actions.append(upload, save);
+      head.append(title, actions);
+
+      const list = document.createElement('div');
+      list.className = 'background-template-list';
+      list.setAttribute('aria-live', 'polite');
+      const note = document.createElement('small');
+      note.className = 'background-template-note';
+      note.textContent = templateCopy.note;
+      section.append(head, input, list, note);
+      elements.imagePanel.after(section);
+
+      Object.assign(templateElements, {
+        section,
+        upload,
+        input,
+        save,
+        list,
+      });
+      upload.addEventListener('click', () => input.click());
+      input.addEventListener('change', async () => {
+        const [file] = input.files || [];
+        input.value = '';
+        if (!file) return;
+        currentTemplateId = null;
+        const accepted = await acceptBackgroundFile(file);
+        if (accepted) await saveCurrentBackgroundTemplate();
+      });
+      save.addEventListener('click', saveCurrentBackgroundTemplate);
+    }
+
+    function clearTemplatePreviewUrls() {
+      for (const url of templatePreviewUrls) URL.revokeObjectURL(url);
+      templatePreviewUrls.clear();
+    }
+
+    function syncBackgroundTemplateLibrary() {
+      if (!templateElements.list) return;
+      templateElements.save.disabled = !state.backgroundImageBlob;
+      templateElements.save.textContent = currentTemplateId
+        ? templateCopy.update
+        : templateCopy.save;
+      for (const card of templateElements.list.querySelectorAll('.background-template-card')) {
+        card.classList.toggle('active', card.dataset.templateId === currentTemplateId);
+      }
+    }
+
+    function renderBackgroundTemplateLibrary() {
+      if (!templateElements.list) return;
+      clearTemplatePreviewUrls();
+      templateElements.list.replaceChildren();
+      syncBackgroundTemplateLibrary();
+
+      if (!backgroundTemplates.length) {
+        const empty = document.createElement('span');
+        empty.className = 'background-template-empty';
+        empty.textContent = templateCopy.empty;
+        templateElements.list.append(empty);
+        return;
+      }
+
+      for (const template of backgroundTemplates) {
+        const card = document.createElement('article');
+        card.className = 'background-template-card';
+        card.dataset.templateId = template.id;
+        card.classList.toggle('active', template.id === currentTemplateId);
+
+        const preview = document.createElement('div');
+        preview.className = 'background-template-preview';
+        const previewUrl = URL.createObjectURL(template.imageBlob);
+        templatePreviewUrls.add(previewUrl);
+        preview.style.backgroundImage = `url("${previewUrl}")`;
+
+        const details = document.createElement('div');
+        details.className = 'background-template-details';
+        const name = document.createElement('span');
+        name.className = 'background-template-name';
+        name.textContent = template.name;
+        name.title = template.name;
+        const buttons = document.createElement('div');
+        buttons.className = 'background-template-buttons';
+        const apply = document.createElement('button');
+        apply.type = 'button';
+        apply.className = 'background-template-apply';
+        apply.textContent = templateCopy.apply;
+        apply.addEventListener('click', () => applyBackgroundTemplate(template));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'background-template-delete';
+        remove.textContent = templateDeleteId === template.id
+          ? templateCopy.confirmDelete
+          : templateCopy.delete;
+        remove.addEventListener('click', () => requestDeleteBackgroundTemplate(template.id));
+        buttons.append(apply, remove);
+        details.append(name, buttons);
+        card.append(preview, details);
+        templateElements.list.append(card);
+      }
+    }
+
+    async function refreshBackgroundTemplates() {
+      try {
+        backgroundTemplates = await listBackgroundTemplates();
+        renderBackgroundTemplateLibrary();
+      } catch {
+        templateElements.upload.disabled = true;
+        templateElements.save.disabled = true;
+        templateElements.list.textContent = templateCopy.unavailable;
+        notifyChanged(templateCopy.unavailable);
+      }
+    }
+
+    function templateStorageMessage(error) {
+      if (error?.message === 'limit') return templateCopy.limit;
+      if (error?.message === 'totalSize') return templateCopy.totalSize;
+      if (error?.name === 'QuotaExceededError') return templateCopy.storage;
+      return templateCopy.storage;
+    }
+
+    async function saveCurrentBackgroundTemplate() {
+      if (!state.backgroundImageBlob) return false;
+      const previous = backgroundTemplates.find((template) => template.id === currentTemplateId);
+      try {
+        const saved = await saveBackgroundTemplate({
+          id: currentTemplateId || undefined,
+          name: previous?.name || state.backgroundImageName,
+          imageBlob: state.backgroundImageBlob,
+          backgroundImageName: state.backgroundImageName,
+          backgroundFit: state.backgroundFit,
+          backgroundScale: state.backgroundScale,
+          backgroundOffsetX: state.backgroundOffsetX,
+          backgroundOffsetY: state.backgroundOffsetY,
+          backgroundBlur: state.backgroundBlur,
+          createdAt: previous?.createdAt,
+        });
+        const updated = Boolean(previous);
+        currentTemplateId = saved.id;
+        await refreshBackgroundTemplates();
+        notifyChanged(format(updated ? templateCopy.updated : templateCopy.saved, {
+          name: saved.name,
+        }));
+        return true;
+      } catch (error) {
+        notifyChanged(templateStorageMessage(error));
+        return false;
+      }
+    }
+
+    async function applyBackgroundTemplate(template) {
+      let decodedImage;
+      try {
+        const normalized = normalizeBackgroundTemplate(template, Number(template.updatedAt));
+        decodedImage = await loadBlobImage(normalized.imageBlob);
+        state.backgroundImageBlob = normalized.imageBlob;
+        state.backgroundImageName = normalized.backgroundImageName;
+        state.backgroundFit = normalized.backgroundFit;
+        state.backgroundScale = normalized.backgroundScale;
+        state.backgroundOffsetX = normalized.backgroundOffsetX;
+        state.backgroundOffsetY = normalized.backgroundOffsetY;
+        state.backgroundBlur = normalized.backgroundBlur;
+        state.bgMode = 'image';
+        decodedBackgroundImage = decodedImage;
+        currentTemplateId = normalized.id;
+        render();
+        notifyChanged(format(templateCopy.applied, { name: normalized.name }));
+        return true;
+      } catch {
+        notifyChanged(text.decodeError);
+        return false;
+      }
+    }
+
+    async function requestDeleteBackgroundTemplate(id) {
+      if (templateDeleteId !== id) {
+        templateDeleteId = id;
+        clearTimeout(templateDeleteTimer);
+        templateDeleteTimer = setTimeout(() => {
+          templateDeleteId = null;
+          renderBackgroundTemplateLibrary();
+        }, 4000);
+        renderBackgroundTemplateLibrary();
+        return;
+      }
+      clearTimeout(templateDeleteTimer);
+      templateDeleteId = null;
+      try {
+        await deleteBackgroundTemplate(id);
+        if (currentTemplateId === id) currentTemplateId = null;
+        await refreshBackgroundTemplates();
+        notifyChanged(templateCopy.deleted);
+      } catch (error) {
+        notifyChanged(templateStorageMessage(error));
+      }
     }
 
     function render() {
@@ -340,6 +808,7 @@
       elements.productCenter?.classList.toggle('active', state.productAlign === 'center');
       elements.productBottom?.classList.toggle('active', state.productAlign === 'bottom');
       if (elements.productShadow) elements.productShadow.checked = state.productShadow;
+      syncBackgroundTemplateLibrary();
     }
 
     async function acceptBackgroundFile(file, { restored = false } = {}) {
@@ -359,6 +828,7 @@
       state.backgroundImageBlob = file;
       state.backgroundImageName = file.name || text.restoredName || 'Background image';
       decodedBackgroundImage = decodedImage;
+      currentTemplateId = null;
       state.bgMode = 'image';
       state.backgroundFit = BACKGROUND_FITS.has(state.backgroundFit) ? state.backgroundFit : 'cover';
       render();
@@ -396,6 +866,7 @@
       state.backgroundImageBlob = null;
       state.backgroundImageName = '';
       decodedBackgroundImage = null;
+      currentTemplateId = null;
       if (/^#[0-9A-Fa-f]{6}$/.test(settings.customHex || '')) {
         state.customHex = settings.customHex;
       }
@@ -1043,6 +1514,7 @@
       state.backgroundImageBlob = null;
       state.backgroundImageName = '';
       decodedBackgroundImage = null;
+      currentTemplateId = null;
       if (state.bgMode === 'image') state.bgMode = 'white';
       render();
       notifyChanged(text.removed);
@@ -1084,13 +1556,19 @@
       notifyChanged();
     });
 
+    createBackgroundTemplateLibrary();
     render();
+    refreshBackgroundTemplates();
+    globalThis.addEventListener?.('pagehide', clearTemplatePreviewUrls, { once: true });
     return {
       acceptBackgroundFile,
+      applyBackgroundTemplate,
       compose,
       decorateCard,
       getState,
+      refreshBackgroundTemplates,
       restore,
+      saveCurrentBackgroundTemplate,
       setMode,
       syncColor,
       validateJobs,
@@ -1106,7 +1584,14 @@
     getImagePlacement,
     getOutputEncoding,
     resolveCompositionConfig,
+    backgroundTemplateByteSize,
+    deleteBackgroundTemplate,
+    listBackgroundTemplates,
+    normalizeBackgroundTemplate,
+    saveBackgroundTemplate,
     validateBackgroundFile,
     MAX_BACKGROUND_BYTES,
+    MAX_BACKGROUND_TEMPLATES,
+    MAX_BACKGROUND_TEMPLATE_BYTES,
   };
 })();
