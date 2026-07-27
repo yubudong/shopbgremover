@@ -53,8 +53,10 @@ async function makeCover({ credits, price, filename, audience }) {
     <rect width="1080" height="1080" fill="url(#topFade)"/>
     ${brandHeader()}
     <text x="62" y="218" font-family="${font}" font-size="32" font-weight="700" fill="#225DE8">电商图片处理服务</text>
-    <text x="58" y="348" font-family="${font}" font-size="126" font-weight="900" fill="#0B1F3A">${credits}</text>
-    <text x="${credits.length === 4 ? 340 : 280}" y="338" font-family="${font}" font-size="50" font-weight="900" fill="#225DE8">积分</text>
+    <text x="58" y="348" font-family="${font}">
+      <tspan font-size="126" font-weight="900" fill="#0B1F3A">${credits}</tspan>
+      <tspan dx="26" dy="-14" font-size="50" font-weight="900" fill="#225DE8">积分</tspan>
+    </text>
     <rect x="62" y="380" width="298" height="60" rx="30" fill="#0B1F3A"/>
     <text x="211" y="420" text-anchor="middle" font-family="${font}" font-size="26" font-weight="800" fill="#FFFFFF">一次性兑换码</text>
     <rect x="62" y="464" width="256" height="104" rx="28" fill="#FFD600" filter="url(#shadow)"/>
