@@ -524,21 +524,31 @@ test('localized workspaces share the compact progressive UI without network beha
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-workspace-ui-v1"/, file);
-    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-workspace-ui-v1"/, file);
+    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-workspace-ui-v2"/, file);
+    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-workspace-ui-v2"/, file);
   }
 
   assert.match(styles, /\.canvas-area \.tool-features\{flex:none\}/);
   assert.match(styles, /grid-template-columns:minmax\(0,1fr\) 370px/);
   assert.match(styles, /max-height:calc\(100vh - 88px\)/);
   assert.match(styles, /\.workspace-has-images \.tool-features\{display:none\}/);
+  assert.match(styles, /grid-auto-flow:column/);
+  assert.match(styles, /grid-auto-columns:132px/);
+  assert.match(styles, /\.workspace-preview-stage\{[\s\S]*height:clamp\(330px,48vh,520px\)/);
+  assert.match(styles, /\.image-card\.preview-active\{/);
   assert.match(styles, /\.workspace-section\.collapsed \.workspace-section-body\{display:none\}/);
   assert.match(styles, /@media\(max-width:1100px\)/);
   assert.match(styles, /@media\(max-width:520px\)/);
   assert.match(script, /new MutationObserver\(update\)/);
+  assert.match(script, /requestAnimationFrame\(\(\) => \{/);
+  assert.match(script, /grid\.querySelector\(':scope > \.image-card'\)\?\.click\(\)/);
+  assert.match(script, /workspace-gallery-shell/);
   assert.match(script, /group\.querySelector\('\.background-mode-grid'\)/);
   assert.match(script, /group\.querySelector\('\.size-grid'\)/);
   for (const copy of ['Choose images', 'Bilder auswählen', 'Elegir imágenes', 'Choisir des images', 'Escolher imagens', '选择图片']) {
+    assert.ok(script.includes(copy), copy);
+  }
+  for (const copy of ['Add images', 'Bilder hinzufügen', 'Añadir imágenes', 'Ajouter des images', 'Adicionar imagens', '添加图片']) {
     assert.ok(script.includes(copy), copy);
   }
   assert.doesNotMatch(script, /\bfetch\s*\(|XMLHttpRequest|\/api\//);
