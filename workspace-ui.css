@@ -253,6 +253,16 @@ body{background:var(--workspace-bg);color:var(--workspace-text)}
   border-color:var(--workspace-blue);
   box-shadow:0 0 0 3px rgba(37,99,235,.18),0 5px 14px rgba(15,23,42,.08)
 }
+.image-remove-btn{
+  position:absolute;top:6px;right:6px;z-index:7;display:grid;width:26px;height:26px;
+  place-items:center;padding:0;border:1px solid rgba(254,202,202,.92);border-radius:999px;
+  background:rgba(255,255,255,.96);color:#b91c1c;box-shadow:0 2px 8px rgba(15,23,42,.14);
+  cursor:pointer;font-size:17px;font-weight:700;line-height:1
+}
+.image-remove-btn:hover{border-color:#f87171;background:#fef2f2;color:#991b1b}
+.image-remove-btn:focus-visible{outline:3px solid rgba(239,68,68,.25);outline-offset:2px}
+.image-remove-btn:disabled{cursor:not-allowed;opacity:.55}
+.image-card .status-badge{top:38px;right:8px}
 .settings-panel{
   width:auto;
   max-height:calc(100vh - 88px);

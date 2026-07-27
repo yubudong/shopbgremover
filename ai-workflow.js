@@ -122,6 +122,17 @@
     return job;
   }
 
+  function removeJobAtIndex(jobs, index) {
+    if (!Array.isArray(jobs) || !Number.isInteger(index) || index < 0 || !jobs[index]) {
+      return null;
+    }
+    const [removedJob] = jobs.splice(index, 1);
+    for (let nextIndex = index; nextIndex < jobs.length; nextIndex += 1) {
+      if (jobs[nextIndex]) jobs[nextIndex].index = nextIndex;
+    }
+    return removedJob;
+  }
+
   function storedJobState(job) {
     return {
       taskId: job.taskId,
@@ -592,6 +603,36 @@
       schedulePersist();
     }
 
+    function canRemove() {
+      return !starting && !processing && !restoring && !clearing;
+    }
+
+    function remove(index) {
+      if (!canRemove() || !Number.isInteger(index) || !jobs[index]) return null;
+      const removedJob = removeJobAtIndex(jobs, index);
+      removedJob.detectionToken = Symbol('removed');
+      clearTimeout(persistTimer);
+      persistTimer = null;
+      persistenceDisabled = false;
+      options.onOutputsChanged?.(getOutputs());
+      sync({ notify: true });
+      return removedJob;
+    }
+
+    function restoreRemoved(index, job) {
+      if (!job || !Number.isInteger(index) || index < 0) return false;
+      jobs.splice(index, 0, job);
+      for (let nextIndex = index; nextIndex < jobs.length; nextIndex += 1) {
+        if (jobs[nextIndex]) jobs[nextIndex].index = nextIndex;
+      }
+      options.onOutputsChanged?.(getOutputs());
+      sync({ notify: true });
+      if (job.status === 'checking') {
+        refreshTransparency(job, options.getSourceFile(job.file));
+      }
+      return true;
+    }
+
     function getOutputs() {
       return jobs
         .filter((job) => job?.outputBlob)
@@ -836,6 +877,9 @@
     sync();
     return {
       register,
+      canRemove,
+      remove,
+      restoreRemoved,
       markSourceChanged,
       markCompositionChanged,
       getOutputs,
@@ -856,6 +900,7 @@
     isPng,
     planJobs,
     resetJobForSource,
+    removeJobAtIndex,
     fetchAiResult,
     buildSessionRecord,
     sessionByteSize,

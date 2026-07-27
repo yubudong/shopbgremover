@@ -238,6 +238,14 @@
       renderSummary();
     }
 
+    function remove(index) {
+      if (!Number.isInteger(index) || index < 0 || index >= files.length) return false;
+      files.splice(index, 1);
+      productFolders.splice(index, 1);
+      renderSummary();
+      return true;
+    }
+
     function getState() {
       return productFolders.slice(0, files.length);
     }
@@ -251,6 +259,7 @@
 
     return {
       register,
+      remove,
       restore,
       getState,
       buildEntries,

@@ -943,6 +943,25 @@
       };
     }
 
+    function removeIndexedEntry(map, index) {
+      map.delete(index);
+      const shifted = Array.from(map.entries())
+        .filter(([entryIndex]) => entryIndex > index)
+        .sort(([left], [right]) => left - right);
+      for (const [entryIndex, value] of shifted) {
+        map.delete(entryIndex);
+        map.set(entryIndex - 1, value);
+      }
+    }
+
+    function removeItem(index) {
+      if (!Number.isInteger(index) || index < 0) return false;
+      removeIndexedEntry(itemOverrides, index);
+      removeIndexedEntry(decodedOverrideBackgrounds, index);
+      removeIndexedEntry(overrideCardButtons, index);
+      return true;
+    }
+
     function validateJobs(jobs = []) {
       let blocked = 0;
       for (const job of jobs) {
@@ -1567,6 +1586,7 @@
       decorateCard,
       getState,
       refreshBackgroundTemplates,
+      removeItem,
       restore,
       saveCurrentBackgroundTemplate,
       setMode,

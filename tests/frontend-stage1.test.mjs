@@ -88,10 +88,10 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260727-bg-template-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260727-bg-template-v1"/, file);
-    assert.match(html, /src="\/product-organizer\.js\?v=20260727-bg-template-v1"/, file);
-    assert.match(html, /href="\/ai-workflow\.css\?v=20260727-bg-template-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /src="\/product-organizer\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /href="\/ai-workflow\.css\?v=20260727-image-delete-v1"/, file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -235,7 +235,7 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   for (const file of indexFiles) {
     const html = await read(file);
     assert.match(html, /href="\/local-cleaner\.css\?v=20260725-credit-center-v4"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260725-ai-stage5b-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260727-image-delete-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
@@ -296,6 +296,38 @@ test('workspace preview and columns share a responsive aligned layout', async ()
   assert.match(css, /\.workspace-preview\.visible\{display:block\}/);
   assert.match(css, /\.workspace-preview-stage\{/);
   assert.match(css, /object-fit:contain/);
+});
+
+test('each uploaded image can be removed locally without calling AI', async () => {
+  const workflow = await read('ai-workflow.js');
+  const composer = await read('background-composer.js');
+  const organizer = await read('product-organizer.js');
+  const styles = await read('workspace-ui.css');
+
+  assert.match(workflow, /function canRemove\(\)/);
+  assert.match(workflow, /function remove\(index\)/);
+  assert.match(workflow, /function restoreRemoved\(index, job\)/);
+  assert.match(workflow, /jobs\.splice\(index, 1\)/);
+  assert.match(composer, /function removeItem\(index\)/);
+  assert.match(composer, /removeIndexedEntry\(itemOverrides, index\)/);
+  assert.match(organizer, /productFolders\.splice\(index, 1\)/);
+  assert.match(styles, /\.image-remove-btn\{/);
+  assert.match(styles, /\.image-card \.status-badge\{top:38px/);
+
+  for (const file of indexFiles) {
+    const html = await read(file);
+    const removal = extractFunction(html, 'async function removeSelectedImage(index, event)');
+    assert.equal((html.match(/data-remove-label=/g) || []).length, 1, file);
+    assert.match(html, /removeButton\.className = 'image-remove-btn'/, file);
+    assert.match(html, /removeSelectedImage\(i, event\)/, file);
+    assert.match(removal, /selectedFiles\.splice\(index, 1\)/, file);
+    assert.match(removal, /productOrganizer\.remove\(index\)/, file);
+    assert.match(removal, /backgroundComposer\.removeItem\(index\)/, file);
+    assert.match(removal, /aiWorkflow\.remove\(index\)/, file);
+    assert.match(removal, /await aiWorkflow\.persistSession\(\)/, file);
+    assert.match(removal, /window\.location\.reload\(\)/, file);
+    assert.doesNotMatch(removal, /\bfetch\s*\(|\/api\/|https?:\/\//, file);
+  }
 });
 
 test('signed-in mobile navigation stays within the viewport', async () => {
@@ -533,8 +565,8 @@ test('localized workspaces share the compact progressive UI without network beha
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-workspace-ui-v2"/, file);
-    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-workspace-ui-v2"/, file);
+    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-image-delete-v1"/, file);
   }
 
   assert.match(styles, /\.canvas-area \.tool-features\{flex:none\}/);

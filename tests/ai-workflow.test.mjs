@@ -13,6 +13,7 @@ const {
   hasMeaningfulTransparency,
   isPng,
   planJobs,
+  removeJobAtIndex,
   resetJobForSource,
   sessionByteSize,
   storedJobState,
@@ -288,6 +289,26 @@ test('source edits invalidate only that job and create a new stable task identit
   // the same task id and let the Worker reuse or retry the existing task.
   job.status = 'failed';
   assert.equal(job.taskId, 'task-new');
+});
+
+test('removing a middle image preserves remaining jobs and closes the index gap', () => {
+  const jobs = [
+    { index: 0, file: 'first.png', outputName: 'first-output.png' },
+    { index: 1, file: 'wrong.png', outputName: 'wrong-output.png' },
+    { index: 2, file: 'third.png', outputName: 'third-output.png' },
+  ];
+
+  const removed = removeJobAtIndex(jobs, 1);
+  assert.equal(removed.file, 'wrong.png');
+  assert.deepEqual(
+    jobs.map((job) => ({ index: job.index, file: job.file, outputName: job.outputName })),
+    [
+      { index: 0, file: 'first.png', outputName: 'first-output.png' },
+      { index: 1, file: 'third.png', outputName: 'third-output.png' },
+    ],
+  );
+  assert.equal(removeJobAtIndex(jobs, 5), null);
+  assert.equal(jobs.length, 2);
 });
 
 test('source edits reset transparency detection and restore the default AI choice', () => {

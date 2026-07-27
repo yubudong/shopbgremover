@@ -49,9 +49,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/ai-workflow.js?v=20260727-bg-template-v1"></script>
-<script src="/background-composer.js?v=20260727-bg-template-v1"></script>
-<script src="/product-organizer.js?v=20260727-bg-template-v1"></script>
+<script src="/ai-workflow.js?v=20260727-image-delete-v1"></script>
+<script src="/background-composer.js?v=20260727-image-delete-v1"></script>
+<script src="/product-organizer.js?v=20260727-image-delete-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -807,8 +807,8 @@
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
-<link rel="stylesheet" href="/ai-workflow.css?v=20260727-bg-template-v1">
-<link rel="stylesheet" href="/workspace-ui.css?v=20260727-workspace-ui-v2">
+<link rel="stylesheet" href="/ai-workflow.css?v=20260727-image-delete-v1">
+<link rel="stylesheet" href="/workspace-ui.css?v=20260727-image-delete-v1">
 </head>
 <body>
 
@@ -888,7 +888,10 @@
           <p class="workspace-preview-help">Click another thumbnail below to switch the preview.</p>
         </div>
       </div>
-      <div class="image-grid" id="imageGrid"></div>
+      <div class="image-grid" id="imageGrid"
+        data-remove-label="Remove {name}"
+        data-remove-busy="Images cannot be removed while processing."
+        data-remove-failed="This image could not be removed from the saved workspace. Your current work is still open."></div>
 
       <!-- Feature highlights below upload zone -->
       <div class="tool-features">
@@ -1893,6 +1896,46 @@ let selectedFiles   = [];
     fileInput.value = '';
   });
 
+  async function removeSelectedImage(index, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const grid = document.getElementById('imageGrid');
+    if (!aiWorkflow?.canRemove()) {
+      setStatus(grid.dataset.removeBusy);
+      return;
+    }
+    const file = selectedFiles[index];
+    if (!file) return;
+    const organizerState = productOrganizer.getState();
+    const compositionState = backgroundComposer.getState();
+    const button = event.currentTarget;
+    button.disabled = true;
+    selectedFiles.splice(index, 1);
+    productOrganizer.remove(index);
+    backgroundComposer.removeItem(index);
+    const removedJob = aiWorkflow.remove(index);
+    if (!removedJob) {
+      selectedFiles.splice(index, 0, file);
+      productOrganizer.restore(organizerState);
+      await backgroundComposer.restore(compositionState);
+      button.disabled = false;
+      setStatus(grid.dataset.removeBusy);
+      return;
+    }
+    hideWorkspacePreview();
+    const persisted = await aiWorkflow.persistSession();
+    if (!persisted) {
+      selectedFiles.splice(index, 0, file);
+      productOrganizer.restore(organizerState);
+      await backgroundComposer.restore(compositionState);
+      aiWorkflow.restoreRemoved(index, removedJob);
+      button.disabled = false;
+      setStatus(grid.dataset.removeFailed);
+      return;
+    }
+    window.location.reload();
+  }
+
   function handleFiles(files, { restoredItems = [] } = {}) {
     const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
     const limit = currentUser ? 50 : 1;
@@ -1939,8 +1982,18 @@ let selectedFiles   = [];
           : restoredItem?.sourceBlob
             ? '✏️'
             : '⏳';
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'image-remove-btn';
+      removeButton.textContent = '×';
+      removeButton.setAttribute('aria-label', window.ShopBGAiWorkflow.format(
+        grid.dataset.removeLabel,
+        { name: file.name },
+      ));
+      removeButton.addEventListener('click', event => removeSelectedImage(i, event));
       card.appendChild(img);
       card.appendChild(badge);
+      card.appendChild(removeButton);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
         initialSource: restoredItem?.sourceBlob || null,
         onApply: ({ previewUrl, restored }) => {
@@ -2289,7 +2342,7 @@ let selectedFiles   = [];
   });
 </script>
 
-<script src="/local-cleaner.js?v=20260725-ai-stage5b-v1"></script>
-<script src="/workspace-ui.js?v=20260727-workspace-ui-v2"></script>
+<script src="/local-cleaner.js?v=20260727-image-delete-v1"></script>
+<script src="/workspace-ui.js?v=20260727-image-delete-v1"></script>
 </body>
 </html>
