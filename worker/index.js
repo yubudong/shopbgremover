@@ -21,6 +21,13 @@ const VOUCHER_PACKS = Object.freeze({
 const VOUCHER_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const VOUCHER_ACCOUNT_FAILURE_LIMIT = 5;
 const VOUCHER_IP_FAILURE_LIMIT = 20;
+const XIANYU_PURCHASE_SETTING_KEY = 'xianyu_purchase';
+const XIANYU_ALLOWED_HOST_SUFFIXES = Object.freeze([
+  'goofish.com',
+  'taobao.com',
+  'tb.cn',
+  'xianyu.com',
+]);
 const REFERRAL_CODE_LENGTH = 8;
 const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 const REFERRAL_REWARD_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -147,6 +154,87 @@ function generateVoucherCode() {
   crypto.getRandomValues(bytes);
   const body = Array.from(bytes, (byte) => VOUCHER_ALPHABET[byte & 31]).join('');
   return `SBG-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}-${body.slice(12, 16)}`;
+}
+
+function emptyXianyuPurchaseConfig() {
+  return {
+    enabled: false,
+    default_url: '',
+    package_urls: {
+      100: '',
+      300: '',
+      1000: '',
+    },
+  };
+}
+
+function parseXianyuPurchaseConfig(value) {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object') return emptyXianyuPurchaseConfig();
+    return {
+      enabled: parsed.enabled === true,
+      default_url: typeof parsed.default_url === 'string' ? parsed.default_url : '',
+      package_urls: {
+        100: typeof parsed.package_urls?.[100] === 'string' ? parsed.package_urls[100] : '',
+        300: typeof parsed.package_urls?.[300] === 'string' ? parsed.package_urls[300] : '',
+        1000: typeof parsed.package_urls?.[1000] === 'string' ? parsed.package_urls[1000] : '',
+      },
+    };
+  } catch {
+    return emptyXianyuPurchaseConfig();
+  }
+}
+
+function normalizeXianyuPurchaseUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length > 2048) throw new Error('Xianyu links must be 2048 characters or fewer');
+
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new Error('Enter a valid Xianyu or Taobao URL');
+  }
+  const hostname = url.hostname.toLowerCase();
+  const allowed = XIANYU_ALLOWED_HOST_SUFFIXES.some(
+    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
+  );
+  if (url.protocol !== 'https:' || url.username || url.password || !allowed) {
+    throw new Error('Only HTTPS links on approved Xianyu or Taobao domains are allowed');
+  }
+  return url.toString();
+}
+
+function normalizeXianyuPurchaseConfig(value) {
+  if (!value || typeof value !== 'object' || typeof value.enabled !== 'boolean') {
+    throw new Error('Enabled must be true or false');
+  }
+  const config = {
+    enabled: value.enabled,
+    default_url: normalizeXianyuPurchaseUrl(value.default_url),
+    package_urls: {
+      100: normalizeXianyuPurchaseUrl(value.package_urls?.[100]),
+      300: normalizeXianyuPurchaseUrl(value.package_urls?.[300]),
+      1000: normalizeXianyuPurchaseUrl(value.package_urls?.[1000]),
+    },
+  };
+  if (
+    config.enabled
+    && !config.default_url
+    && !Object.values(config.package_urls).some(Boolean)
+  ) {
+    throw new Error('Add at least one Xianyu product link before enabling the purchase entry');
+  }
+  return config;
+}
+
+async function readXianyuPurchaseConfig(env) {
+  const row = await env.DB.prepare(
+    'SELECT value_json FROM site_settings WHERE key = ? LIMIT 1'
+  ).bind(XIANYU_PURCHASE_SETTING_KEY).first();
+  return parseXianyuPurchaseConfig(row?.value_json);
 }
 
 async function hashVoucherCode(code, env) {
@@ -1938,6 +2026,102 @@ export default {
         `INSERT INTO processing_history (id, user_id, file_count, settings_json) VALUES (?, ?, ?, ?)`
       ).bind(id, user.sub, body.file_count, JSON.stringify(body.settings || {})).run();
       return json({ ok: true, id }, 200, origin);
+    }
+
+    // GET /api/public/xianyu-purchase → public, non-secret purchase links.
+    // Disabled settings never expose retained draft URLs.
+    if (url.pathname === '/api/public/xianyu-purchase' && request.method === 'GET') {
+      const config = await readXianyuPurchaseConfig(env);
+      return privateJson({
+        enabled: config.enabled,
+        links: config.enabled
+          ? {
+              default: config.default_url,
+              100: config.package_urls[100],
+              300: config.package_urls[300],
+              1000: config.package_urls[1000],
+            }
+          : { default: '', 100: '', 300: '', 1000: '' },
+      }, 200, origin);
+    }
+
+    // GET /api/admin/settings/xianyu → full administrator-owned configuration.
+    if (url.pathname === '/api/admin/settings/xianyu' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const row = await env.DB.prepare(
+        `SELECT s.value_json, s.updated_at, u.email AS updated_by_email
+         FROM site_settings s
+         LEFT JOIN users u ON u.id = s.updated_by
+         WHERE s.key = ?
+         LIMIT 1`
+      ).bind(XIANYU_PURCHASE_SETTING_KEY).first();
+      return privateJson({
+        setting: parseXianyuPurchaseConfig(row?.value_json),
+        updated_at: row?.updated_at || null,
+        updated_by_email: row?.updated_by_email || null,
+      }, 200, origin);
+    }
+
+    // POST /api/admin/settings/xianyu → validate, audit, and atomically replace.
+    if (url.pathname === '/api/admin/settings/xianyu' && request.method === 'POST') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const body = await request.json().catch(() => null);
+      let setting;
+      try {
+        setting = normalizeXianyuPurchaseConfig(body);
+      } catch (error) {
+        return privateJson({ error: error.message }, 400, origin);
+      }
+
+      const valueJson = JSON.stringify(setting);
+      const current = await env.DB.prepare(
+        'SELECT value_json FROM site_settings WHERE key = ? LIMIT 1'
+      ).bind(XIANYU_PURCHASE_SETTING_KEY).first();
+      if (current?.value_json === valueJson) {
+        return privateJson({
+          ok: true,
+          unchanged: true,
+          setting,
+          updated_at: null,
+        }, 200, origin);
+      }
+
+      const auditId = crypto.randomUUID();
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO site_setting_audit
+           (id, setting_key, previous_value_json, new_value_json, admin_user_id)
+           VALUES (?, ?, (
+             SELECT value_json FROM site_settings WHERE key = ? LIMIT 1
+           ), ?, ?)`
+        ).bind(
+          auditId,
+          XIANYU_PURCHASE_SETTING_KEY,
+          XIANYU_PURCHASE_SETTING_KEY,
+          valueJson,
+          admin.sub,
+        ),
+        env.DB.prepare(
+          `INSERT INTO site_settings (key, value_json, updated_by, updated_at)
+           VALUES (?, ?, ?, unixepoch())
+           ON CONFLICT(key) DO UPDATE SET
+             value_json = excluded.value_json,
+             updated_by = excluded.updated_by,
+             updated_at = excluded.updated_at`
+        ).bind(XIANYU_PURCHASE_SETTING_KEY, valueJson, admin.sub),
+      ]);
+      const updatedAt = await env.DB.prepare(
+        'SELECT updated_at FROM site_settings WHERE key = ? LIMIT 1'
+      ).bind(XIANYU_PURCHASE_SETTING_KEY).first('updated_at');
+      return privateJson({
+        ok: true,
+        unchanged: false,
+        setting,
+        updated_at: updatedAt,
+        updated_by_email: admin.email,
+      }, 200, origin);
     }
 
     // GET /api/admin/overview → read-only billing and credit operations summary.

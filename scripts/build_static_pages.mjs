@@ -40,6 +40,7 @@ const rootFiles = [
   'terms.html',
   'workspace-ui.css',
   'workspace-ui.js',
+  'xianyu-purchase.js',
 ];
 
 const publicAssets = [

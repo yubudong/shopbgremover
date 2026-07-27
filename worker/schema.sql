@@ -247,6 +247,27 @@ CREATE TABLE IF NOT EXISTS user_free_entitlements (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_by TEXT NOT NULL,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS site_setting_audit (
+  id TEXT PRIMARY KEY,
+  setting_key TEXT NOT NULL,
+  previous_value_json TEXT,
+  new_value_json TEXT NOT NULL,
+  admin_user_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  FOREIGN KEY (admin_user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_setting_audit_key_created
+ON site_setting_audit(setting_key, created_at);
+
 CREATE TABLE IF NOT EXISTS voucher_batches (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

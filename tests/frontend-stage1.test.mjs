@@ -518,6 +518,7 @@ test('Pages build contains only the canonical static site', async () => {
     'credits.html',
     'credits-center.css',
     'credits-center.js',
+    'xianyu-purchase.js',
     'account-nav.css',
     'account-nav.js',
     'background-composer.js',
@@ -609,6 +610,48 @@ test('pricing links to the server-backed Xianyu voucher redemption page', async 
   assert.doesNotMatch(redeemScript, /localStorage.*voucher|voucher.*localStorage/i);
 });
 
+test('administrator-managed Xianyu purchase links are Chinese-only and fail closed', async () => {
+  const purchaseScript = await read('xianyu-purchase.js');
+  const credits = await read('credits.html');
+  const chinesePricing = await read('zh-cn/pricing.html');
+  const admin = await read('admin-vouchers.html');
+
+  assert.match(purchaseScript, /entry\.hidden = true/);
+  assert.match(purchaseScript, /entry\.removeAttribute\('href'\)/);
+  assert.match(purchaseScript, /requested === 'zh-cn' \|\| pageLanguage === 'zh-cn'/);
+  assert.match(purchaseScript, /if \(!isSimplifiedChinese\) return/);
+  assert.match(purchaseScript, /\/api\/public\/xianyu-purchase/);
+  assert.match(purchaseScript, /credentials: 'omit'/);
+  assert.match(purchaseScript, /cache: 'no-store'/);
+  assert.match(purchaseScript, /data\.links\[credits\] \|\| data\.links\.default/);
+  assert.match(purchaseScript, /entry\.target = '_blank'/);
+  assert.match(purchaseScript, /entry\.rel = 'noopener noreferrer'/);
+  assert.doesNotMatch(purchaseScript, /credentials: 'include'/);
+
+  assert.match(credits, /data-xianyu-purchase data-xianyu-credits="default" hidden/);
+  assert.match(credits, /src="\/xianyu-purchase\.js\?v=20260727-xianyu-link-v1"/);
+  assert.equal((chinesePricing.match(/data-xianyu-purchase(?:\s|=)/g) || []).length, 4);
+  for (const [creditsValue, price] of [['100', '22'], ['300', '60'], ['1000', '160']]) {
+    assert.match(
+      chinesePricing,
+      new RegExp(`data-xianyu-credits="${creditsValue}" hidden>¥${price} · 去闲鱼购买`),
+    );
+  }
+  assert.match(chinesePricing, /src="\/xianyu-purchase\.js\?v=20260727-xianyu-link-v1"/);
+
+  for (const file of pricingFiles.slice(0, -1)) {
+    assert.doesNotMatch(await read(file), /data-xianyu-purchase|xianyu-purchase\.js/, file);
+  }
+
+  assert.match(admin, /id="xianyuSettingsForm"/);
+  assert.match(admin, /id="xianyuEnabled"/);
+  assert.match(admin, /id="xianyuDefaultUrl"/);
+  assert.match(admin, /id="xianyu100Url"/);
+  assert.match(admin, /id="xianyu300Url"/);
+  assert.match(admin, /id="xianyu1000Url"/);
+  assert.equal((admin.match(/\/api\/admin\/settings\/xianyu/g) || []).length, 2);
+});
+
 test('credit center is visible from every localized workspace and pricing page', async () => {
   const languageParams = ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn'];
   for (let index = 0; index < indexFiles.length; index += 1) {
@@ -625,7 +668,7 @@ test('credit center is visible from every localized workspace and pricing page',
   const script = await read('credits-center.js');
   assert.match(center, /id="creditApp"/);
   assert.match(center, /id="paypalAction"/);
-  assert.match(center, /credits-center\.js\?v=20260727-account-nav-v3/);
+  assert.match(center, /credits-center\.js\?v=20260727-xianyu-link-v1/);
   assert.match(center, /id="voucherAction" href="\/redeem\.html\?lang=en"/);
   assert.match(await read('redeem.html'), /href="\/credits\.html\?lang=en"/);
   assert.match(script, /\/api\/credits\/center/);

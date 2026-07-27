@@ -600,6 +600,28 @@ function applyPairs(source, pairs) {
   return output;
 }
 
+function addChineseXianyuPurchase(source) {
+  const styles = `
+    .xianyu-plan-cta{display:block;margin:-8px 0 20px;padding:11px 12px;border:1px solid #f59e0b;border-radius:var(--r-sm);background:#fffbeb;color:#92400e;text-align:center;text-decoration:none;font-size:13px;font-weight:800;transition:all .15s}
+    .xianyu-plan-cta:hover{background:#fef3c7;border-color:#d97706}
+    [data-xianyu-purchase][hidden]{display:none!important}`;
+  source = source.replace('</style>', `${styles}\n  </style>`);
+  source = source.replace(
+    '<div class="credit-shortcuts"><a href="/credits.html?lang=zh-cn">我的积分与记录</a><a href="/redeem.html?lang=zh-cn">兑换闲鱼卡密</a></div>',
+    '<div class="credit-shortcuts"><a href="/credits.html?lang=zh-cn">我的积分与记录</a><a data-xianyu-purchase data-xianyu-credits="default" hidden>去闲鱼购买卡密</a><a href="/redeem.html?lang=zh-cn">兑换闲鱼卡密</a></div>',
+  );
+  for (const [credits, price] of [[100, 22], [300, 60], [1000, 160]]) {
+    source = source.replace(
+      `<div class="paypal-wrap" id="pp-${credits}"></div>`,
+      `<div class="paypal-wrap" id="pp-${credits}"></div>\n    <a class="xianyu-plan-cta" data-xianyu-purchase data-xianyu-credits="${credits}" hidden>¥${price} · 去闲鱼购买</a>`,
+    );
+  }
+  return source.replace(
+    '</body>',
+    '<script src="/xianyu-purchase.js?v=20260727-xianyu-link-v1"></script>\n</body>',
+  );
+}
+
 function addChineseAlternativeLines(source, slug) {
   const lines = source.split('\n');
   const result = [];
@@ -649,6 +671,7 @@ async function localizeFile(file, slug, pairs) {
     .replace("locale: 'pt-BR'", "locale: 'zh-CN'")
     .replace('🌐 PT-BR', '🌐 简中');
   source = applyPairs(source, pairs);
+  if (file === 'pricing.html') source = addChineseXianyuPurchase(source);
   await writeFile(path.join(outputDir, file), source, 'utf8');
 }
 

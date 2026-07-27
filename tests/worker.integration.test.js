@@ -16,6 +16,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM site_setting_audit;
+    DELETE FROM site_settings;
     DELETE FROM guest_ai_charges;
     DELETE FROM ai_tasks;
     DELETE FROM credit_ledger;
@@ -290,6 +292,8 @@ describe('production schema baseline', () => {
       'referral_reward_holds',
       'referral_reward_reviews',
       'referrals',
+      'site_setting_audit',
+      'site_settings',
       'sso_codes',
       'subscriptions',
       'user_credits',
@@ -1074,6 +1078,157 @@ describe('credit center and administrator overview', () => {
     }));
     expect(body.recent_ledger).toHaveLength(2);
     expect(body.recent_orders).toEqual([]);
+  });
+});
+
+describe('administrator-managed Xianyu purchase links', () => {
+  it('fails closed for the public before an administrator enables links', async () => {
+    const response = await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/public/xianyu-purchase`,
+    ));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await jsonResponse(response)).toEqual({
+      enabled: false,
+      links: { default: '', 100: '', 300: '', 1000: '' },
+    });
+  });
+
+  it('restricts full settings to administrators and audits enabled and disabled changes', async () => {
+    const regular = await createAuthenticatedUser({
+      email: 'xianyu-settings-regular@example.com',
+      credits: 0,
+    });
+    const forbiddenRead = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      regular.cookie,
+    ));
+    expect(forbiddenRead.status).toBe(403);
+    const forbiddenWrite = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      regular.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({ enabled: false }),
+      },
+    ));
+    expect(forbiddenWrite.status).toBe(403);
+
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+      deviceId: 'xianyu-settings-admin',
+    });
+    const initial = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      admin.cookie,
+    ));
+    expect(initial.status).toBe(200);
+    expect((await jsonResponse(initial)).setting.enabled).toBe(false);
+
+    const enabled = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      admin.cookie,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          enabled: true,
+          default_url: 'https://m.tb.cn/h.test-default',
+          package_urls: {
+            100: '',
+            300: 'https://www.goofish.com/item?id=300',
+            1000: '',
+          },
+        }),
+      },
+    ));
+    expect(enabled.status).toBe(200);
+    const enabledBody = await jsonResponse(enabled);
+    expect(enabledBody).toMatchObject({
+      ok: true,
+      unchanged: false,
+      updated_by_email: 'admin@example.com',
+      setting: {
+        enabled: true,
+        default_url: 'https://m.tb.cn/h.test-default',
+        package_urls: {
+          100: '',
+          300: 'https://www.goofish.com/item?id=300',
+          1000: '',
+        },
+      },
+    });
+    expect(enabledBody.updated_at).toBeTypeOf('number');
+
+    const publicEnabled = await jsonResponse(await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/public/xianyu-purchase`,
+    )));
+    expect(publicEnabled).toEqual({
+      enabled: true,
+      links: {
+        default: 'https://m.tb.cn/h.test-default',
+        100: '',
+        300: 'https://www.goofish.com/item?id=300',
+        1000: '',
+      },
+    });
+
+    const disabledPayload = {
+      enabled: false,
+      default_url: 'https://m.tb.cn/h.test-default',
+      package_urls: {
+        100: '',
+        300: 'https://www.goofish.com/item?id=300',
+        1000: '',
+      },
+    };
+    const disabled = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      admin.cookie,
+      { method: 'POST', body: JSON.stringify(disabledPayload) },
+    ));
+    expect(disabled.status).toBe(200);
+    expect((await jsonResponse(disabled)).unchanged).toBe(false);
+    const publicDisabled = await jsonResponse(await exports.default.fetch(new Request(
+      `${API_ORIGIN}/api/public/xianyu-purchase`,
+    )));
+    expect(publicDisabled).toEqual({
+      enabled: false,
+      links: { default: '', 100: '', 300: '', 1000: '' },
+    });
+
+    const unchanged = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/settings/xianyu',
+      admin.cookie,
+      { method: 'POST', body: JSON.stringify(disabledPayload) },
+    ));
+    expect(unchanged.status).toBe(200);
+    expect((await jsonResponse(unchanged)).unchanged).toBe(true);
+    expect(await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM site_setting_audit
+       WHERE setting_key = 'xianyu_purchase'`
+    ).first('count')).toBe(2);
+  });
+
+  it('rejects enabled empty, insecure, and non-Xianyu links without writing settings', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    for (const payload of [
+      { enabled: true, default_url: '', package_urls: {} },
+      { enabled: true, default_url: 'http://m.tb.cn/insecure', package_urls: {} },
+      { enabled: true, default_url: 'https://shop.example.com/not-xianyu', package_urls: {} },
+    ]) {
+      const response = await exports.default.fetch(authenticatedRequest(
+        '/api/admin/settings/xianyu',
+        admin.cookie,
+        { method: 'POST', body: JSON.stringify(payload) },
+      ));
+      expect(response.status).toBe(400);
+    }
+    expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM site_settings').first('count')).toBe(0);
+    expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM site_setting_audit').first('count')).toBe(0);
   });
 });
 

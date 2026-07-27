@@ -27,6 +27,12 @@ Tracked migrations applied afterward:
 | 9 | `0009_referral_reward_observation.sql` | 2026-07-24 |
 | 10 | `0010_durable_ai_provider_tasks.sql` | 2026-07-25 14:07:35 UTC |
 
+Pending local migration:
+
+| ID | Name | Status |
+|---:|---|---|
+| 11 | `0011_xianyu_purchase_settings.sql` | Local implementation; not applied to production |
+
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes
 must:
