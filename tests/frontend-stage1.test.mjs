@@ -662,6 +662,10 @@ test('credit center is visible from every localized workspace and pricing page',
     assert.ok(pricing.includes(`href="${target}"`), pricingFiles[index]);
     assert.match(pricing, /credit-shortcuts/, pricingFiles[index]);
     assert.ok(pricing.includes(`href="/redeem.html?lang=${languageParams[index]}"`), pricingFiles[index]);
+    assert.match(pricing, /\.credit-shortcuts\{[^}]*background:var\(--surface\)/, pricingFiles[index]);
+    assert.match(pricing, /\.credit-shortcuts a:focus-visible\{[^}]*var\(--accent2\)/, pricingFiles[index]);
+    assert.doesNotMatch(pricing, /\.credit-shortcuts a\{[^}]*background:#fff/, pricingFiles[index]);
+    assert.doesNotMatch(pricing, /var\(--text-2\)|var\(--blue\)/, pricingFiles[index]);
   }
 
   const center = await read('credits.html');
