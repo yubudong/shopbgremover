@@ -82,34 +82,12 @@ h1{font-size:clamp(28px,4vw,38px);font-weight:800;letter-spacing:-.03em;margin-b
 .footer-langs a{color:#6B7280;text-decoration:none;padding:4px 10px;border:1px solid rgba(255,255,255,0.08);border-radius:6px;transition:all 0.2s}
 .footer-langs a:hover{color:#fff;border-color:rgba(255,255,255,0.2)}
 .footer-langs a.active{color:#60A5FA;border-color:rgba(96,165,250,0.3)}</style>
+<link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
+<script src="/account-nav.js?v=20260727-unified-header-v1" defer></script>
 </head>
 <body>
-<nav class="navbar">
-  <a class="nav-logo" href="/de/"><img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;"></a>
-  <div class="nav-links">
-    <a href="/de/#how">So funktioniert's</a>
-    <a href="/de/pricing">Preise</a>
-    <a href="/de/shopify-background-remover">Shopify</a>
-    <a href="/de/amazon-ebay-product-images">Amazon &amp; eBay</a>
-  </div>
-  <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge"><span id="creditsText">— Credits</span></div>
-    <span class="user-name" id="userName"></span>
-    <div class="lang-switcher">
-      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Sprache ändern" aria-haspopup="true">
-        <span>🌐 DE</span><span class="lang-caret">▾</span>
-      </button>
-      <ul class="lang-menu" id="langMenu" role="menu">
-        <li role="none"><a role="menuitem" href="/contact" hreflang="en">English <span class="lang-code">EN</span></a></li>
-<li role="none"><a role="menuitem" href="/es/contact" hreflang="es">Español <span class="lang-code">ES</span></a></li>
-<li role="none"><a role="menuitem" href="/pt-br/contact" hreflang="pt-BR">Português <span class="lang-code">PT-BR</span></a></li>
-<li role="none"><a role="menuitem" href="/zh-cn/contact" hreflang="zh-CN">简体中文 <span class="lang-code">简中</span></a></li>
-<li role="none"><a role="menuitem" href="/de/contact" hreflang="de" class="active">Deutsch <span class="lang-code">DE</span></a></li>
-<li role="none"><a role="menuitem" href="/fr/contact" hreflang="fr">Français <span class="lang-code">FR</span></a></li>
-      </ul>
-    </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/de/'">Anmelden</button>
-  </div>
+<nav class="account-navbar" data-account-nav data-account-page="contact" aria-label="Seitennavigation">
+  <a class="account-nav-brand" href="/de/" aria-label="ShopBG Remover"><img src="/Logo256.png" alt=""><span class="account-nav-brand-text">ShopBG<span class="account-nav-brand-accent">Remover</span></span></a>
 </nav>
 
 <div class="container">

@@ -146,40 +146,13 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
   </style>
+<link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
+<script src="/account-nav.js?v=20260727-unified-header-v1" defer></script>
 </head>
 <body>
 
-<nav class="navbar">
-  <a class="nav-logo" href="/pt-br/">
-    <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
-  </a>
-  <div class="nav-links">
-    <a href="/pt-br/#how">Como funciona</a>
-    <a href="/pt-br/pricing">Preços</a>
-    <a href="/pt-br/shopify-background-remover">Shopify</a>
-    <a href="/pt-br/amazon-ebay-product-images">Amazon e eBay</a>
-  </div>
-  <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge">
-      <span id="creditsText">— créditos</span>
-    </div>
-    <span class="user-name" id="userName"></span>
-    <div class="lang-switcher">
-      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Mudar idioma" aria-haspopup="true">
-        <span>🌐 PT-BR</span>
-        <span class="lang-caret">▾</span>
-      </button>
-      <ul class="lang-menu" id="langMenu" role="menu">
-        <li role="none"><a role="menuitem" href="/shopify-background-remover" hreflang="en">English <span class="lang-code">EN</span></a></li>
-        <li role="none"><a role="menuitem" href="/es/shopify-background-remover" hreflang="es">Español <span class="lang-code">ES</span></a></li>
-        <li role="none"><a role="menuitem" href="/pt-br/shopify-background-remover" hreflang="pt-BR" class="active">Português <span class="lang-code">PT-BR</span></a></li>
-        <li role="none"><a role="menuitem" href="/zh-cn/shopify-background-remover" hreflang="zh-CN">简体中文 <span class="lang-code">简中</span></a></li>
-        <li role="none"><a role="menuitem" href="/de/shopify-background-remover" hreflang="de">Deutsch <span class="lang-code">DE</span></a></li>
-        <li role="none"><a role="menuitem" href="/fr/shopify-background-remover" hreflang="fr">Français <span class="lang-code">FR</span></a></li>
-      </ul>
-    </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/pt-br/'">Entrar</button>
-  </div>
+<nav class="account-navbar" data-account-nav data-account-page="shopify" aria-label="Navegação do site">
+  <a class="account-nav-brand" href="/pt-br/" aria-label="ShopBG Remover"><img src="/Logo256.png" alt=""><span class="account-nav-brand-text">ShopBG<span class="account-nav-brand-accent">Remover</span></span></a>
 </nav>
 
 <section class="hero">

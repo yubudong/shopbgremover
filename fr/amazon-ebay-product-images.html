@@ -160,40 +160,13 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
   </style>
+<link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
+<script src="/account-nav.js?v=20260727-unified-header-v1" defer></script>
 </head>
 <body>
 
-<nav class="navbar">
-  <a class="nav-logo" href="/fr/">
-    <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
-  </a>
-  <div class="nav-links">
-    <a href="/fr/#how">Comment ça marche</a>
-    <a href="/fr/pricing">Tarifs</a>
-    <a href="/fr/shopify-background-remover">Shopify</a>
-    <a href="/fr/amazon-ebay-product-images">Amazon et eBay</a>
-  </div>
-  <div class="nav-right">
-    <div class="credits-badge" id="creditsBadge">
-      <span id="creditsText">— crédits</span>
-    </div>
-    <span class="user-name" id="userName"></span>
-    <div class="lang-switcher">
-      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Changer de langue" aria-haspopup="true">
-        <span>🌐 FR</span>
-        <span class="lang-caret">▾</span>
-      </button>
-      <ul class="lang-menu" id="langMenu" role="menu">
-        <li role="none"><a role="menuitem" href="/amazon-ebay-product-images" hreflang="en">English <span class="lang-code">EN</span></a></li>
-        <li role="none"><a role="menuitem" href="/es/amazon-ebay-product-images" hreflang="es">Español <span class="lang-code">ES</span></a></li>
-        <li role="none"><a role="menuitem" href="/pt-br/amazon-ebay-product-images" hreflang="pt-BR">Português <span class="lang-code">PT-BR</span></a></li>
-        <li role="none"><a role="menuitem" href="/zh-cn/amazon-ebay-product-images" hreflang="zh-CN">简体中文 <span class="lang-code">简中</span></a></li>
-        <li role="none"><a role="menuitem" href="/de/amazon-ebay-product-images" hreflang="de">Deutsch <span class="lang-code">DE</span></a></li>
-        <li role="none"><a role="menuitem" href="/fr/amazon-ebay-product-images" hreflang="fr" class="active">Français <span class="lang-code">FR</span></a></li>
-      </ul>
-    </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="window.location.href='/fr/'">Se connecter</button>
-  </div>
+<nav class="account-navbar" data-account-nav data-account-page="marketplace" aria-label="Navigation du site">
+  <a class="account-nav-brand" href="/fr/" aria-label="ShopBG Remover"><img src="/Logo256.png" alt=""><span class="account-nav-brand-text">ShopBG<span class="account-nav-brand-accent">Remover</span></span></a>
 </nav>
 
 <section class="hero">

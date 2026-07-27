@@ -488,7 +488,8 @@ test('Simplified Chinese locale covers the public site and six-language SEO grap
 
   const chineseHome = await read('zh-cn/index.html');
   assert.match(chineseHome, /AI 去背景/);
-  assert.match(chineseHome, /href="\/credits\.html\?lang=zh-cn"/);
+  assert.match(chineseHome, /data-account-page="home"/);
+  assert.match(chineseHome, /account-nav\.js\?v=20260727-unified-header-v1/);
   assert.match(chineseHome, /Shopify 2048、Amazon 1600、eBay 1600/);
   assert.doesNotMatch(chineseHome, /Amazon 1000|eBay 500/);
 
@@ -654,11 +655,13 @@ test('administrator-managed Xianyu purchase links are Chinese-only and fail clos
 
 test('credit center is visible from every localized workspace and pricing page', async () => {
   const languageParams = ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn'];
+  const navScript = await read('account-nav.js');
   for (let index = 0; index < indexFiles.length; index += 1) {
     const home = await read(indexFiles[index]);
     const pricing = await read(pricingFiles[index]);
     const target = `/credits.html?lang=${languageParams[index]}`;
-    assert.ok(home.includes(`href="${target}"`), indexFiles[index]);
+    assert.match(home, /data-account-page="home"/, indexFiles[index]);
+    assert.match(home, /account-nav\.js\?v=20260727-unified-header-v1/, indexFiles[index]);
     assert.ok(pricing.includes(`href="${target}"`), pricingFiles[index]);
     assert.match(pricing, /credit-shortcuts/, pricingFiles[index]);
     assert.ok(pricing.includes(`href="/redeem.html?lang=${languageParams[index]}"`), pricingFiles[index]);
@@ -667,6 +670,9 @@ test('credit center is visible from every localized workspace and pricing page',
     assert.doesNotMatch(pricing, /\.credit-shortcuts a\{[^}]*background:#fff/, pricingFiles[index]);
     assert.doesNotMatch(pricing, /var\(--text-2\)|var\(--blue\)/, pricingFiles[index]);
   }
+  assert.match(navScript, /if \(page === 'credits'\) return `\/credits\.html\?lang=\$\{locale\}`/);
+  assert.match(navScript, /credits\.id = 'creditsBadge'/);
+  assert.match(navScript, /credits\.classList\.add\('show'\)/);
 
   const center = await read('credits.html');
   const script = await read('credits-center.js');
@@ -683,13 +689,8 @@ test('credit center is visible from every localized workspace and pricing page',
   assert.match(script, /replaceChildren\(\)/);
   assert.doesNotMatch(script, /\.innerHTML\s*=/);
 
-  for (const file of pricingFiles) {
-    assert.match(
-      await read(file),
-      /id="authBtn" onclick="window\.location\.href='https:\/\/api\.shopbgremover\.com\/auth\/login'"/,
-      file,
-    );
-  }
+  assert.match(navScript, /auth\.id = 'authBtn'/);
+  assert.match(navScript, /`\$\{API\}\/auth\/login`/);
 });
 
 test('administrator overview links all billing operations without exposing balance mutation', async () => {
@@ -770,9 +771,34 @@ test('localized referral centers fully translate static and dynamic states', asy
   }
 });
 
-test('account pages share one authenticated header and preserve all six locales', async () => {
+test('public and account pages share one responsive authenticated header in all six locales', async () => {
   const navScript = await read('account-nav.js');
   const navStyles = await read('account-nav.css');
+  const expectedPublicPage = new Map([
+    ['index.html', 'home'],
+    ['pricing.html', 'pricing'],
+    ['shopify-background-remover.html', 'shopify'],
+    ['amazon-ebay-product-images.html', 'marketplace'],
+    ['contact.html', 'contact'],
+    ['privacy.html', 'privacy'],
+    ['terms.html', 'terms'],
+  ]);
+  for (const file of publicSeoFiles) {
+    const html = await read(file);
+    const filename = file.split('/').at(-1);
+    assert.match(html, /href="\/account-nav\.css\?v=20260727-unified-header-v1"/, file);
+    assert.match(html, /src="\/account-nav\.js\?v=20260727-unified-header-v1"/, file);
+    assert.match(
+      html,
+      new RegExp(`class="account-navbar" data-account-nav data-account-page="${expectedPublicPage.get(filename)}"`),
+      file,
+    );
+    assert.equal((html.match(/data-account-nav(?:\s|=)/g) || []).length, 1, file);
+    assert.match(html, /account-nav-brand"[^>]*aria-label="ShopBG Remover"[^>]*><img src="\/Logo256\.png" alt="">/, file);
+    assert.match(html, /account-nav-brand-text">ShopBG<span class="account-nav-brand-accent">Remover/, file);
+    assert.doesNotMatch(html, /<nav class="navbar">/, file);
+  }
+
   const accountPages = [
     'credits.html',
     'redeem.html',
@@ -781,8 +807,8 @@ test('account pages share one authenticated header and preserve all six locales'
   ];
   for (const file of accountPages) {
     const html = await read(file);
-    assert.match(html, /href="\/account-nav\.css\?v=20260727-account-nav-v1"/, file);
-    assert.match(html, /src="\/account-nav\.js\?v=20260727-account-nav-v1"/, file);
+    assert.match(html, /href="\/account-nav\.css\?v=20260727-unified-header-v1"/, file);
+    assert.match(html, /src="\/account-nav\.js\?v=20260727-unified-header-v1"/, file);
     assert.match(html, /class="account-navbar" data-account-nav data-account-page="(?:credits|redeem|referrals)"/, file);
   }
 
@@ -793,12 +819,34 @@ test('account pages share one authenticated header and preserve all six locales'
   assert.match(navScript, /page === 'credits'/);
   assert.match(navScript, /page === 'redeem'/);
   assert.match(navScript, /page === 'referrals'/);
+  assert.match(navScript, /account-nav-platform/);
+  assert.match(navScript, /Shopify/);
+  assert.match(navScript, /Amazon & eBay/);
+  assert.match(navScript, /account-nav-mobile-toggle/);
+  assert.match(navScript, /account-nav-account/);
+  assert.match(navScript, /location\.hash === '#how'/);
+  assert.match(navScript, /aria-current/);
+  assert.match(navScript, /event\.key !== 'Escape'/);
+  assert.match(navScript, /function closeMobilePrimary\(\)/);
+  assert.match(navScript, /closeDropdown\(languageButton, languageMenu\)/);
+  assert.doesNotMatch(navScript, /\.innerHTML\s*=/);
+  assert.doesNotMatch(navStyles, /font:[^;]*inherit/);
+  assert.match(navStyles, /grid-template-columns:minmax\(176px,1fr\) auto minmax\(300px,1fr\)/);
+  assert.match(navStyles, /\.account-nav-link\.active,.account-nav-menu-button\.active/);
+  assert.match(navStyles, /@media\(max-width:980px\)/);
   assert.match(navStyles, /@media\(max-width:680px\)/);
-  assert.match(navStyles, /\.account-nav-links\{display:none\}/);
-  assert.match(navStyles, /\.account-nav-user\{display:none\}/);
+  assert.match(navStyles, /\.account-nav-primary\.open\{display:flex\}/);
+  assert.match(navStyles, /\.account-nav-brand-text\{display:none\}/);
   assert.match(navStyles, /\.account-nav-credits-add\{display:none\}/);
   for (const locale of ['en', 'de', 'es', 'fr', 'pt-br', 'zh-cn']) {
     assert.ok(navScript.includes(`${locale}: {`) || navScript.includes(`'${locale}': {`), locale);
+  }
+  for (const file of indexFiles) {
+    assert.match(
+      await read(file),
+      /if \(!btn\.closest\('\[data-account-nav\]'\)\) \{/,
+      `${file} must not let the legacy homepage session script override the shared header`,
+    );
   }
 
   const redeemScript = await read('redeem-localized.js');

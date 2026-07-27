@@ -813,6 +813,8 @@
 <link rel="stylesheet" href="/local-cleaner.css?v=20260725-credit-center-v4">
 <link rel="stylesheet" href="/ai-workflow.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/workspace-ui.css?v=20260727-image-delete-v1">
+<link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
+<script src="/account-nav.js?v=20260727-unified-header-v1" defer></script>
 </head>
 <body>
 
@@ -823,42 +825,8 @@
 </div>
 
 <!-- Navbar -->
-<nav class="navbar">
-  <a class="nav-logo" href="/es/">
-
-    <img src="/Logo256.png" alt="ShopBG Remover" style="height:32px;width:auto;display:block;">
-    <span class="nav-logo-text">ShopBG<span>Remover</span></span>
-  </a>
-
-  <div class="nav-links">
-    <a href="#how">Cómo funciona</a>
-    <a href="/es/pricing">Precios</a>
-    <a href="/es/shopify-background-remover">Shopify</a>
-    <a href="/es/amazon-ebay-product-images">Amazon e eBay</a>
-  </div>
-
-  <div class="nav-right">
-    <a class="credits-badge" id="creditsBadge" href="/credits.html?lang=es" aria-label="Abrir centro de créditos">
-      <span id="creditsText">— créditos</span>
-      <span class="credits-add">＋ Recargar</span>
-    </a>
-    <span class="user-name" id="userName"></span>
-    <div class="lang-switcher">
-      <button class="lang-btn" onclick="toggleLangMenu(event)" aria-label="Cambiar idioma" aria-haspopup="true">
-        <span>🌐 ES</span>
-        <span class="lang-caret">▾</span>
-      </button>
-      <ul class="lang-menu" id="langMenu" role="menu">
-        <li role="none"><a role="menuitem" href="/" hreflang="en">English <span class="lang-code">EN</span></a></li>
-        <li role="none"><a role="menuitem" href="/es/" hreflang="es" class="active">Español <span class="lang-code">ES</span></a></li>
-        <li role="none"><a role="menuitem" href="/pt-br/" hreflang="pt-BR">Português <span class="lang-code">PT-BR</span></a></li>
-        <li role="none"><a role="menuitem" href="/zh-cn/" hreflang="zh-CN">简体中文 <span class="lang-code">简中</span></a></li>
-        <li role="none"><a role="menuitem" href="/de/" hreflang="de">Deutsch <span class="lang-code">DE</span></a></li>
-        <li role="none"><a role="menuitem" href="/fr/" hreflang="fr">Français <span class="lang-code">FR</span></a></li>
-      </ul>
-    </div>
-    <button class="btn-nav btn-nav-login" id="authBtn" onclick="openLoginModal()">Iniciar sesión</button>
-  </div>
+<nav class="account-navbar" data-account-nav data-account-page="home" aria-label="Navegación del sitio">
+  <a class="account-nav-brand" href="/es/" aria-label="ShopBG Remover"><img src="/Logo256.png" alt=""><span class="account-nav-brand-text">ShopBG<span class="account-nav-brand-accent">Remover</span></span></a>
 </nav>
 
 <!-- Tool Section -->
@@ -1794,9 +1762,11 @@ let selectedFiles   = [];
       if (currentUser) {
         document.getElementById('userName').textContent = currentUser.name;
         const btn = document.getElementById('authBtn');
-        btn.textContent = 'Cerrar sesión';
-        btn.onclick = doLogout;
-        btn.className = 'btn-nav btn-nav-out';
+        if (!btn.closest('[data-account-nav]')) {
+          btn.textContent = 'Cerrar sesión';
+          btn.onclick = doLogout;
+          btn.className = 'btn-nav btn-nav-out';
+        }
 
         if (data.credits != null) {
           const c = data.credits.credits;
