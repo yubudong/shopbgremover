@@ -2,6 +2,10 @@
   'use strict';
 
   const language = document.documentElement.lang || 'en';
+  const normalizedLanguage = {
+    'pt-br': 'pt-BR',
+    'zh-cn': 'zh-CN',
+  }[language.toLowerCase()] || language.toLowerCase();
   const copy = {
     en: {
       edit: 'Clean locally', edited: 'Cleaned', title: 'Local photo cleanup',
@@ -20,7 +24,12 @@
       navigation: 'Scroll to move · Ctrl/⌘ + wheel to zoom',
       shortcutEmpty: 'Upload an image to start',
       shortcutReady: 'Open local cleanup',
-      shortcutBatch: 'Open first image · edit each separately',
+      shortcutBatch: 'Open cleanup · batch position available',
+      batchApply: 'Apply same marks to all {count} images',
+      batchNote: 'Uses the same relative position on every image in this batch. Best when image sizes and watermark placement match.',
+      batchProcessing: 'Cleaning image {current} of {count} locally…',
+      batchApplied: 'Cleanup applied to all {count} images.',
+      batchPartial: 'Cleaned {success} of {count} images. Try the remaining images separately.',
     },
     de: {
       edit: 'Lokal bereinigen', edited: 'Bereinigt', title: 'Lokale Fotobereinigung',
@@ -39,7 +48,12 @@
       navigation: 'Scrollen zum Bewegen · Strg/⌘ + Mausrad zum Zoomen',
       shortcutEmpty: 'Bild hochladen, um zu starten',
       shortcutReady: 'Lokale Bereinigung öffnen',
-      shortcutBatch: 'Erstes Bild öffnen · einzeln bearbeiten',
+      shortcutBatch: 'Bereinigung öffnen · Stapelposition verfügbar',
+      batchApply: 'Gleiche Markierungen auf alle {count} Bilder anwenden',
+      batchNote: 'Verwendet dieselbe relative Position für alle Bilder dieses Stapels. Ideal bei gleicher Bildgröße und Wasserzeichenposition.',
+      batchProcessing: 'Bild {current} von {count} wird lokal bereinigt…',
+      batchApplied: 'Bereinigung auf alle {count} Bilder angewendet.',
+      batchPartial: '{success} von {count} Bildern bereinigt. Bearbeite die übrigen Bilder einzeln.',
     },
     es: {
       edit: 'Limpiar localmente', edited: 'Limpia', title: 'Limpieza local de fotos',
@@ -58,7 +72,12 @@
       navigation: 'Desplaza para mover · Ctrl/⌘ + rueda para ampliar',
       shortcutEmpty: 'Sube una imagen para empezar',
       shortcutReady: 'Abrir limpieza local',
-      shortcutBatch: 'Abrir primera imagen · editar por separado',
+      shortcutBatch: 'Abrir limpieza · posición por lote disponible',
+      batchApply: 'Aplicar las mismas marcas a las {count} imágenes',
+      batchNote: 'Usa la misma posición relativa en todas las imágenes del lote. Ideal si el tamaño y la posición de la marca coinciden.',
+      batchProcessing: 'Limpiando localmente la imagen {current} de {count}…',
+      batchApplied: 'Limpieza aplicada a las {count} imágenes.',
+      batchPartial: 'Se limpiaron {success} de {count} imágenes. Edita las restantes por separado.',
     },
     fr: {
       edit: 'Nettoyer localement', edited: 'Nettoyée', title: 'Nettoyage local de photo',
@@ -77,7 +96,12 @@
       navigation: 'Faites défiler pour déplacer · Ctrl/⌘ + molette pour zoomer',
       shortcutEmpty: 'Importez une image pour commencer',
       shortcutReady: 'Ouvrir le nettoyage local',
-      shortcutBatch: 'Ouvrir la première · modifier séparément',
+      shortcutBatch: 'Ouvrir le nettoyage · position groupée disponible',
+      batchApply: 'Appliquer les mêmes marques aux {count} images',
+      batchNote: 'Utilise la même position relative sur toutes les images du lot. Idéal si leurs dimensions et le placement du filigrane concordent.',
+      batchProcessing: 'Nettoyage local de l’image {current} sur {count}…',
+      batchApplied: 'Nettoyage appliqué aux {count} images.',
+      batchPartial: '{success} images nettoyées sur {count}. Modifiez les autres séparément.',
     },
     'pt-BR': {
       edit: 'Limpar localmente', edited: 'Limpa', title: 'Limpeza local de foto',
@@ -96,16 +120,45 @@
       navigation: 'Role para mover · Ctrl/⌘ + roda para ampliar',
       shortcutEmpty: 'Envie uma imagem para começar',
       shortcutReady: 'Abrir limpeza local',
-      shortcutBatch: 'Abrir primeira imagem · editar separadamente',
+      shortcutBatch: 'Abrir limpeza · posição em lote disponível',
+      batchApply: 'Aplicar as mesmas marcações às {count} imagens',
+      batchNote: 'Usa a mesma posição relativa em todas as imagens do lote. Ideal quando tamanho e posição da marca-d’água coincidem.',
+      batchProcessing: 'Limpando localmente a imagem {current} de {count}…',
+      batchApplied: 'Limpeza aplicada às {count} imagens.',
+      batchPartial: '{success} de {count} imagens foram limpas. Edite as restantes separadamente.',
     },
-  }[language] || null;
+    'zh-CN': {
+      edit: '本地清除', edited: '已清除', title: '本地图片清除',
+      subtitle: '涂抹或框选一小块区域。图片只保留在当前浏览器中。',
+      tool: '选择工具', brush: '画笔', rectangle: '矩形框', size: '画笔大小',
+      undo: '撤销', redo: '重做', clear: '清除标记', apply: '清除当前图片',
+      download: '下载已清除图片', restore: '恢复原图',
+      ready: '请标记要移除的小物体、类似水印的痕迹、灰尘或文字。',
+      noSelection: '请先标记一个区域。', processing: '正在当前浏览器中清除所选区域…',
+      applied: '已完成清除。你可以继续标记其他区域，或关闭编辑器。',
+      restored: '已恢复原始图片。', failed: '本地清除失败，请尝试缩小标记范围。',
+      help: '更适合简单背景上的小区域；复杂纹理可能需要分多次处理。',
+      rights: '请只编辑你拥有或已获授权的图片。图片不会上传，也不会消耗积分。',
+      close: '关闭本地编辑器',
+      zoom: '缩放', zoomOut: '缩小', zoomIn: '放大', fit: '适应窗口',
+      navigation: '滚动查看图片 · Ctrl/⌘ + 滚轮缩放',
+      shortcutEmpty: '上传图片后开始',
+      shortcutReady: '打开本地清除',
+      shortcutBatch: '打开本地清除 · 可批量套用位置',
+      batchApply: '将相同标记应用到本批 {count} 张图片',
+      batchNote: '会按相同相对位置处理本批全部图片。仅适合图片尺寸比例和水印位置一致的情况。',
+      batchProcessing: '正在本地清除第 {current} / {count} 张图片…',
+      batchApplied: '已完成本批 {count} 张图片的本地清除。',
+      batchPartial: '已清除 {success} / {count} 张，其余图片请单独处理。',
+    },
+  }[normalizedLanguage] || null;
   if (!copy) return;
 
   let edits = new WeakMap();
   let active = null;
   let worker = null;
   let workerSequence = 0;
-  let cardButtons = [];
+  let cardEntries = [];
   const pendingWorkerJobs = new Map();
   const previewUrls = new Set();
   const shortcutButton = document.getElementById('localCleanupShortcut');
@@ -162,6 +215,8 @@
         </div>
         <div class="local-clean-section">
           <button class="local-clean-action primary" id="localCleanApply" type="button">${copy.apply}</button>
+          <button class="local-clean-action batch" id="localCleanApplyBatch" type="button" hidden></button>
+          <p class="local-clean-batch-note" id="localCleanBatchNote" hidden>${copy.batchNote}</p>
           <button class="local-clean-action download" id="localCleanDownload" type="button">${copy.download}</button>
           <button class="local-clean-action restore" id="localCleanRestore" type="button">${copy.restore}</button>
           <div class="local-clean-status" id="localCleanStatus" aria-live="polite">${copy.ready}</div>
@@ -181,6 +236,8 @@
   const busy = document.getElementById('localCleanBusy');
   const brushInput = document.getElementById('localCleanBrush');
   const applyButton = document.getElementById('localCleanApply');
+  const batchButton = document.getElementById('localCleanApplyBatch');
+  const batchNote = document.getElementById('localCleanBatchNote');
   const undoButton = document.getElementById('localCleanUndo');
   const redoButton = document.getElementById('localCleanRedo');
   const clearButton = document.getElementById('localCleanClear');
@@ -191,12 +248,25 @@
   const zoomInButton = document.getElementById('localCleanZoomIn');
   const zoomValue = document.getElementById('localCleanZoomValue');
 
-  function syncShortcut() {
+  function formatCopy(template, values) {
+    return Object.entries(values).reduce(
+      (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+      template,
+    );
+  }
+
+  function connectedEntries() {
+    cardEntries = cardEntries.filter((entry) => entry.button.isConnected);
+    return cardEntries;
+  }
+
+  function syncShortcut(prune = false) {
     if (!shortcutButton) return;
-    shortcutButton.disabled = cardButtons.length === 0;
-    shortcutButton.textContent = cardButtons.length > 1
+    const count = (prune ? connectedEntries() : cardEntries).length;
+    shortcutButton.disabled = count === 0;
+    shortcutButton.textContent = count > 1
       ? copy.shortcutBatch
-      : cardButtons.length === 1
+      : count === 1
         ? copy.shortcutReady
         : copy.shortcutEmpty;
   }
@@ -288,7 +358,9 @@
   }
 
   function currentSource(file) {
-    return edits.get(file)?.blob || file;
+    const edit = edits.get(file);
+    if (edit instanceof Blob) return edit;
+    return edit?.blob || file;
   }
 
   function paintMark(context, mark, width, height, mode = 'overlay', crop = null) {
@@ -338,10 +410,15 @@
 
   function updateControls() {
     const markCount = active?.marks.length || 0;
+    const batchCount = connectedEntries().length;
     undoButton.disabled = markCount === 0;
     redoButton.disabled = !active || active.redo.length === 0;
     clearButton.disabled = markCount === 0;
     applyButton.disabled = markCount === 0 || Boolean(active?.processing);
+    batchButton.hidden = batchCount < 2;
+    batchNote.hidden = batchCount < 2;
+    batchButton.textContent = formatCopy(copy.batchApply, { count: batchCount });
+    batchButton.disabled = batchCount < 2 || markCount === 0 || Boolean(active?.processing);
     downloadButton.disabled = !active || !edits.has(active.file) || Boolean(active.processing);
     restoreButton.disabled = !active || !edits.has(active.file) || Boolean(active.processing);
   }
@@ -477,113 +554,179 @@
     });
   }
 
+  async function renderCleanup(bitmap, marks) {
+    const sourceWidth = bitmap.width || bitmap.naturalWidth;
+    const sourceHeight = bitmap.height || bitmap.naturalHeight;
+    const crop = markBounds(marks, sourceWidth, sourceHeight);
+    const scale = Math.min(1, 768 / Math.max(crop.width, crop.height));
+    const workWidth = Math.max(1, Math.round(crop.width * scale));
+    const workHeight = Math.max(1, Math.round(crop.height * scale));
+    const workCanvas = document.createElement('canvas');
+    workCanvas.width = workWidth;
+    workCanvas.height = workHeight;
+    const workContext = workCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
+    workContext.imageSmoothingQuality = 'high';
+    workContext.drawImage(
+      bitmap,
+      crop.x, crop.y, crop.width, crop.height,
+      0, 0, workWidth, workHeight,
+    );
+    const imageData = workContext.getImageData(0, 0, workWidth, workHeight);
+
+    const maskWork = document.createElement('canvas');
+    maskWork.width = workWidth;
+    maskWork.height = workHeight;
+    const maskWorkContext = maskWork.getContext('2d', { willReadFrequently: true });
+    maskWorkContext.fillStyle = '#000';
+    maskWorkContext.fillRect(0, 0, workWidth, workHeight);
+    for (const mark of marks) {
+      paintMark(maskWorkContext, mark, workWidth, workHeight, 'mask', {
+        x: crop.x * scale,
+        y: crop.y * scale,
+        scaleX: sourceWidth * scale,
+        scaleY: sourceHeight * scale,
+      });
+    }
+    const maskPixels = maskWorkContext.getImageData(0, 0, workWidth, workHeight).data;
+    const mask = new Uint8Array(workWidth * workHeight);
+    for (let index = 0; index < mask.length; index += 1) mask[index] = maskPixels[index * 4] > 127 ? 1 : 0;
+    const compositeMaskValues = dilateCompositeMask(mask, workWidth, workHeight, 2);
+    if (!compositeMaskValues.some(Boolean)) throw new Error(copy.noSelection);
+
+    const result = await runInpaint(imageData, mask);
+    workContext.putImageData(new ImageData(result, workWidth, workHeight), 0, 0);
+
+    const compositeMask = document.createElement('canvas');
+    compositeMask.width = workWidth;
+    compositeMask.height = workHeight;
+    const compositeMaskContext = compositeMask.getContext('2d');
+    const compositeMaskPixels = compositeMaskContext.createImageData(workWidth, workHeight);
+    for (let index = 0; index < compositeMaskValues.length; index += 1) {
+      compositeMaskPixels.data[index * 4] = 255;
+      compositeMaskPixels.data[index * 4 + 1] = 255;
+      compositeMaskPixels.data[index * 4 + 2] = 255;
+      compositeMaskPixels.data[index * 4 + 3] = compositeMaskValues[index] ? 255 : 0;
+    }
+    compositeMaskContext.putImageData(compositeMaskPixels, 0, 0);
+
+    const repairedArea = document.createElement('canvas');
+    repairedArea.width = workWidth;
+    repairedArea.height = workHeight;
+    const repairedAreaContext = repairedArea.getContext('2d', { alpha: true });
+    repairedAreaContext.drawImage(workCanvas, 0, 0);
+    repairedAreaContext.globalCompositeOperation = 'destination-in';
+    repairedAreaContext.drawImage(compositeMask, 0, 0);
+
+    const output = document.createElement('canvas');
+    output.width = sourceWidth;
+    output.height = sourceHeight;
+    const outputContext = output.getContext('2d', { alpha: true });
+    outputContext.drawImage(bitmap, 0, 0);
+    outputContext.imageSmoothingEnabled = true;
+    outputContext.imageSmoothingQuality = 'high';
+    outputContext.drawImage(repairedArea, crop.x, crop.y, crop.width, crop.height);
+    return canvasBlob(output);
+  }
+
+  function saveEdit(entry, blob) {
+    const previous = edits.get(entry.file);
+    if (previous?.previewUrl) {
+      URL.revokeObjectURL(previous.previewUrl);
+      previewUrls.delete(previous.previewUrl);
+    }
+    const previewUrl = URL.createObjectURL(blob);
+    previewUrls.add(previewUrl);
+    edits.set(entry.file, { blob, previewUrl });
+    entry.button.classList.add('edited');
+    entry.button.textContent = copy.edited;
+    entry.onApply?.({ blob, previewUrl, restored: false, index: entry.index });
+    return previewUrl;
+  }
+
+  function cloneMarks(marks) {
+    return marks.map((mark) => mark.type === 'brush'
+      ? { ...mark, points: mark.points.map((point) => ({ ...point })) }
+      : { ...mark });
+  }
+
+  async function refreshActiveBitmap() {
+    closeBitmap(active.bitmap);
+    active.bitmap = await bitmapFrom(currentSource(active.file));
+    drawActiveBitmap();
+    active.marks = [];
+    active.redo = [];
+    redrawMarks();
+  }
+
   async function applyCleanup() {
     if (!active?.marks.length || active.processing) {
       status.textContent = copy.noSelection;
       return;
     }
     active.processing = true;
+    busy.textContent = copy.processing;
     busy.classList.add('visible');
     status.textContent = copy.processing;
     updateControls();
 
     try {
-      const sourceWidth = active.bitmap.width || active.bitmap.naturalWidth;
-      const sourceHeight = active.bitmap.height || active.bitmap.naturalHeight;
-      const crop = markBounds(active.marks, sourceWidth, sourceHeight);
-      const scale = Math.min(1, 768 / Math.max(crop.width, crop.height));
-      const workWidth = Math.max(1, Math.round(crop.width * scale));
-      const workHeight = Math.max(1, Math.round(crop.height * scale));
-      const workCanvas = document.createElement('canvas');
-      workCanvas.width = workWidth;
-      workCanvas.height = workHeight;
-      const workContext = workCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
-      workContext.imageSmoothingQuality = 'high';
-      workContext.drawImage(
-        active.bitmap,
-        crop.x, crop.y, crop.width, crop.height,
-        0, 0, workWidth, workHeight,
-      );
-      const imageData = workContext.getImageData(0, 0, workWidth, workHeight);
-
-      const maskWork = document.createElement('canvas');
-      maskWork.width = workWidth;
-      maskWork.height = workHeight;
-      const maskWorkContext = maskWork.getContext('2d', { willReadFrequently: true });
-      maskWorkContext.fillStyle = '#000';
-      maskWorkContext.fillRect(0, 0, workWidth, workHeight);
-      for (const mark of active.marks) {
-        paintMark(maskWorkContext, mark, workWidth, workHeight, 'mask', {
-          x: crop.x * scale,
-          y: crop.y * scale,
-          scaleX: sourceWidth * scale,
-          scaleY: sourceHeight * scale,
-        });
-      }
-      const maskPixels = maskWorkContext.getImageData(0, 0, workWidth, workHeight).data;
-      const mask = new Uint8Array(workWidth * workHeight);
-      for (let index = 0; index < mask.length; index += 1) mask[index] = maskPixels[index * 4] > 127 ? 1 : 0;
-      const compositeMaskValues = dilateCompositeMask(mask, workWidth, workHeight, 2);
-      if (!compositeMaskValues.some(Boolean)) throw new Error(copy.noSelection);
-
-      const result = await runInpaint(imageData, mask);
-      workContext.putImageData(new ImageData(result, workWidth, workHeight), 0, 0);
-
-      const compositeMask = document.createElement('canvas');
-      compositeMask.width = workWidth;
-      compositeMask.height = workHeight;
-      const compositeMaskContext = compositeMask.getContext('2d');
-      const compositeMaskPixels = compositeMaskContext.createImageData(workWidth, workHeight);
-      for (let index = 0; index < compositeMaskValues.length; index += 1) {
-        compositeMaskPixels.data[index * 4] = 255;
-        compositeMaskPixels.data[index * 4 + 1] = 255;
-        compositeMaskPixels.data[index * 4 + 2] = 255;
-        compositeMaskPixels.data[index * 4 + 3] = compositeMaskValues[index] ? 255 : 0;
-      }
-      compositeMaskContext.putImageData(compositeMaskPixels, 0, 0);
-
-      const repairedArea = document.createElement('canvas');
-      repairedArea.width = workWidth;
-      repairedArea.height = workHeight;
-      const repairedAreaContext = repairedArea.getContext('2d', { alpha: true });
-      repairedAreaContext.drawImage(workCanvas, 0, 0);
-      repairedAreaContext.globalCompositeOperation = 'destination-in';
-      repairedAreaContext.drawImage(compositeMask, 0, 0);
-
-      const output = document.createElement('canvas');
-      output.width = sourceWidth;
-      output.height = sourceHeight;
-      const outputContext = output.getContext('2d', { alpha: true });
-      outputContext.drawImage(active.bitmap, 0, 0);
-      outputContext.imageSmoothingEnabled = true;
-      outputContext.imageSmoothingQuality = 'high';
-      outputContext.drawImage(repairedArea, crop.x, crop.y, crop.width, crop.height);
-      const blob = await canvasBlob(output);
-
-      const previous = edits.get(active.file);
-      if (previous?.previewUrl) {
-        URL.revokeObjectURL(previous.previewUrl);
-        previewUrls.delete(previous.previewUrl);
-      }
-      const previewUrl = URL.createObjectURL(blob);
-      previewUrls.add(previewUrl);
-      edits.set(active.file, { blob, previewUrl });
-      active.button.classList.add('edited');
-      active.button.textContent = copy.edited;
-      active.onApply?.({ blob, previewUrl, restored: false, index: active.index });
-
-      closeBitmap(active.bitmap);
-      active.bitmap = await bitmapFrom(blob);
-      drawActiveBitmap();
-      active.marks = [];
-      active.redo = [];
-      redrawMarks();
+      const blob = await renderCleanup(active.bitmap, cloneMarks(active.marks));
+      saveEdit(active.entry, blob);
+      await refreshActiveBitmap();
       status.textContent = copy.applied;
     } catch (error) {
       console.error('local cleanup', error);
       status.textContent = copy.failed;
     } finally {
       active.processing = false;
+      busy.classList.remove('visible');
+      updateControls();
+    }
+  }
+
+  async function applyBatchCleanup() {
+    const entries = [...connectedEntries()];
+    if (!active?.marks.length || active.processing || entries.length < 2) {
+      status.textContent = copy.noSelection;
+      return;
+    }
+    const marks = cloneMarks(active.marks);
+    active.processing = true;
+    busy.classList.add('visible');
+    updateControls();
+    let success = 0;
+
+    for (let index = 0; index < entries.length; index += 1) {
+      const progress = formatCopy(copy.batchProcessing, {
+        current: index + 1,
+        count: entries.length,
+      });
+      busy.textContent = progress;
+      status.textContent = progress;
+      let bitmap = null;
+      try {
+        bitmap = await bitmapFrom(currentSource(entries[index].file));
+        const blob = await renderCleanup(bitmap, marks);
+        saveEdit(entries[index], blob);
+        success += 1;
+      } catch (error) {
+        console.error('local batch cleanup', entries[index].file.name, error);
+      } finally {
+        closeBitmap(bitmap);
+      }
+    }
+
+    try {
+      if (success > 0) await refreshActiveBitmap();
+      status.textContent = success === entries.length
+        ? formatCopy(copy.batchApplied, { count: entries.length })
+        : formatCopy(copy.batchPartial, { success, count: entries.length });
+    } catch (error) {
+      console.error('local batch cleanup refresh', error);
+      status.textContent = copy.failed;
+    } finally {
+      active.processing = false;
+      busy.textContent = copy.processing;
       busy.classList.remove('visible');
       updateControls();
     }
@@ -601,10 +744,12 @@
     applyZoom();
   }
 
-  async function openEditor(file, index, button, onApply) {
+  async function openEditor(entry) {
     closeBitmap(active?.bitmap);
     active = {
-      file, index, button, onApply, bitmap: await bitmapFrom(currentSource(file)),
+      ...entry,
+      entry,
+      bitmap: await bitmapFrom(currentSource(entry.file)),
       marks: [], redo: [], drawing: null, pointerId: null, tool: 'brush', processing: false, zoom: 1,
     };
     document.querySelectorAll('[data-clean-tool]').forEach((element) => {
@@ -714,12 +859,12 @@
     redrawMarks();
   });
   applyButton.addEventListener('click', applyCleanup);
+  batchButton.addEventListener('click', applyBatchCleanup);
   downloadButton.addEventListener('click', downloadCleaned);
   restoreButton.addEventListener('click', restoreOriginal);
   shortcutButton?.addEventListener('click', () => {
-    cardButtons = cardButtons.filter((button) => button.isConnected);
-    syncShortcut();
-    cardButtons[0]?.click();
+    syncShortcut(true);
+    connectedEntries()[0]?.button.click();
   });
 
   window.ShopBGLocalCleaner = {
@@ -727,25 +872,28 @@
       for (const url of previewUrls) URL.revokeObjectURL(url);
       previewUrls.clear();
       edits = new WeakMap();
-      cardButtons = [];
+      cardEntries = [];
       syncShortcut();
     },
     decorateCard(card, file, index, options = {}) {
       if (options.initialSource && options.initialSource !== file) {
-        edits.set(file, options.initialSource);
+        edits.set(file, { blob: options.initialSource, previewUrl: null });
       }
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'local-clean-card-btn';
       button.textContent = edits.has(file) ? copy.edited : copy.edit;
+      if (edits.has(file)) button.classList.add('edited');
+      const entry = { file, index, button, onApply: options.onApply };
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openEditor(file, index, button, options.onApply);
+        openEditor(entry);
       });
       card.append(button);
-      cardButtons.push(button);
+      cardEntries.push(entry);
       syncShortcut();
+      queueMicrotask(() => syncShortcut(true));
       return button;
     },
     getSourceFile(file) {
@@ -755,5 +903,5 @@
       return edits.has(file);
     },
   };
-  syncShortcut();
+  syncShortcut(true);
 })();

@@ -214,10 +214,20 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
   assert.match(cleaner, /document\.body\.append\(link\)/);
   assert.match(cleaner, /link\.download = `\$\{baseName\}-cleaned\.png`/);
   assert.match(cleaner, /document\.getElementById\('localCleanupShortcut'\)/);
-  assert.match(cleaner, /cardButtons\[0\]\?\.click\(\)/);
-  assert.match(cleaner, /shortcutButton\.disabled = cardButtons\.length === 0/);
+  assert.match(cleaner, /connectedEntries\(\)\[0\]\?\.button\.click\(\)/);
+  assert.match(cleaner, /shortcutButton\.disabled = count === 0/);
   assert.match(cleaner, /options\.initialSource && options\.initialSource !== file/);
-  assert.match(cleaner, /edits\.set\(file, options\.initialSource\)/);
+  assert.match(cleaner, /edits\.set\(file, \{ blob: options\.initialSource, previewUrl: null \}\)/);
+  assert.match(cleaner, /'zh-CN': \{/);
+  assert.match(cleaner, /normalizedLanguage/);
+  assert.match(cleaner, /id="localCleanApplyBatch"/);
+  assert.match(cleaner, /async function applyBatchCleanup\(\)/);
+  assert.match(cleaner, /const entries = \[\.\.\.connectedEntries\(\)\]/);
+  assert.match(cleaner, /bitmap = await bitmapFrom\(currentSource\(entries\[index\]\.file\)\)/);
+  assert.match(cleaner, /saveEdit\(entries\[index\], blob\)/);
+  assert.match(cleaner, /batchButton\.addEventListener\('click', applyBatchCleanup\)/);
+  assert.match(cleaner, /same relative position/i);
+  assert.match(cleaner, /相同相对位置/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
   assert.match(cleaner, /event\.ctrlKey && !event\.metaKey/);
   assert.match(cleaner, /const compositeMaskValues = dilateCompositeMask\(mask, workWidth, workHeight, 2\)/);
@@ -234,8 +244,8 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260725-credit-center-v4"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260728-batch-clean-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260728-batch-clean-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);

@@ -129,6 +129,11 @@
 .local-clean-action:disabled{opacity:.45;cursor:not-allowed}
 .local-clean-action.primary{width:100%;background:#2563eb;border-color:#2563eb;color:#fff;padding:11px}
 .local-clean-action.primary:hover{background:#1d4ed8}
+.local-clean-action.batch{
+  width:100%;margin-top:8px;padding:10px;background:#f5f3ff;border-color:#8b5cf6;color:#6d28d9
+}
+.local-clean-action.batch:hover:not(:disabled){background:#ede9fe}
+.local-clean-batch-note{margin:7px 0 0;color:#6b7280;font-size:11px;line-height:1.45}
 .local-clean-action.download{width:100%;margin-top:8px;background:#ecfdf5;border-color:#6ee7b7;color:#047857}
 .local-clean-action.restore{width:100%;margin-top:8px;color:#b91c1c}
 .local-clean-help{font-size:12px;color:#6b7280;line-height:1.55;margin:8px 0 0}
