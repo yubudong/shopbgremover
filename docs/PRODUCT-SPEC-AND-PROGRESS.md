@@ -50,7 +50,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；真实 PayPal Capture 与退款未验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
-| 4 去物体/水印 | 🟡 私有容器、健康 Tunnel 与 `off` 任务链已部署，用户入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue、`0012`、Worker `off` 和无路由 Tunnel 已部署，尚无 Access、公开主机名、服务 Secrets、`admin_free` 真实图验收或新前端，生产网页仍使用浏览器旧算法 |
+| 4 去物体/水印 | 🟡 私有容器、Access/Tunnel 与 `off` 任务链已部署，用户入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue、`0012`、Worker `off`、零会话 Access 和受保护 Tunnel 路由已部署，尚无 `admin_free` 真实图验收、80% 质量门或新前端，生产网页仍使用浏览器旧算法 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
 | 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
@@ -957,7 +957,22 @@ npm run pages:deploy
 - 部署状态：Tunnel 连接层已部署但没有入口；Access、服务令牌、受保护路由和 Worker Secrets 因 Zero Trust 最终授权未完成而暂停。不能切 `admin_free`，更不能标记功能已上线。
 - 踩坑与调整：Cloudflare 页面内复制按钮使用浏览器隔离剪贴板，macOS 系统剪贴板为空；改用浏览器内只读校验后，将令牌写入一次性 0600 临时文件并直接喂给服务器安装命令，随即删除且复核不存在。第一次尝试从旧式 Service Tokens URL 进入时返回找不到页面，按当前导航改走 `Access controls → Service credentials` 后触发 Zero Trust 首次开通流程。
 - 当前状态：私有 LaMa、无路由 Tunnel、R2/Queue/D1 和 Worker `off` 已就绪；Access 与模型调用链仍完全断开。
-- 下一步：用户在当前 Cloudflare `Activate Zero Trust Free` 页面自行阅读并勾选两项条款后点击 `Activate`。完成后创建仅 ShopBG Worker 使用的 Access Service Token 和 Service Auth 策略，先验证无凭据访问被拒绝，再发布 `inpaint-origin.shopbgremover.com` 路由；随后把 Access ID/Secret、服务 URL 和现有独立 HMAC 写入 Worker Secrets，保持 `off` 部署并复验零写入，之后才进入 `admin_free`。
+- 下一步：用户在当前 Cloudflare `Activate Zero Trust Free` 页面自行阅读并勾选两项条款后点击 `Activate`。该阻塞已由用户解除，后续 Access/Tunnel/Secrets 完成情况见 8.30。
+
+### 8.30 2026-07-29：LaMa 阶段 4B——Zero Trust、Access 与 Worker Secrets（已完成，仍为 `off`）
+
+- 任务：在用户本人完成 Zero Trust 最终财务授权后，建立只允许 ShopBG Worker 调用的 Access Service Auth、受保护 Tunnel 路由和 Worker Secrets；保持用户任务入口 `off`，不得用真实图片制造验收任务。
+- 成果：用户确认激活 `Zero Trust Free`，页面显示 `$0/month`、最多 50 个用户；创建一年有效、到期日 2027-07-29 的专用服务令牌 `shopbgremover-worker-lama`，以及 `ShopBG LaMa Origin` Access 应用和 `ShopBG Worker only` Service Auth 策略。应用只保护 `inpaint-origin.shopbgremover.com`，策略只包含该专用令牌；会话时长设为 `No duration, expires immediately`，Worker 每次请求都必须重新发送 Access ID/Secret。Tunnel 将该受保护主机名映射到服务器回环 `http://127.0.0.1:18080`，没有增加 Caddy 路由或公网入站端口。
+- Worker Secrets：通过一次 `secret bulk` 写入 `INPAINT_ACCESS_CLIENT_ID`、`INPAINT_ACCESS_CLIENT_SECRET`、`INPAINT_HMAC_SECRET` 和 `INPAINT_SERVICE_URL`，只读列表只返回四个名称和 `secret_text` 类型。Secrets 变更后的生产 Worker 版本为 `42f6d456-9572-401b-941f-bc28f5bf15cc`，此前可回滚的完整 `off` 版本为 `964d1fe1-b165-453c-a9d9-526bfe51fb64`；`INPAINT_MODE=off` 未改变。
+- 凭据处置：首次生成的 Access Client Secret 被 Cloudflare 当前页面作为按钮可访问名称返回到自动化输出，不再满足“只进入 Secret”的标准，因此没有使用，立即删除整个首次令牌并确认列表中消失；随后重新生成替代令牌，ID/Secret 只经 0600 临时文件进入 Worker。服务器 HMAC 只从既有 0600 `.env` 临时复制并校验；一次性 bulk 文件、Access ID/Secret 和 HMAC 临时副本在上传成功后全部删除并复核不存在。
+- 会话修正：第一次带凭据健康检查返回 200 时，Cloudflare 响应头包含一个 24 小时 `CF_Authorization` 临时会话 Cookie，并被命令输出记录。该 Cookie 不包含 Client Secret，但仍属于临时访问凭证；因此先删除 Tunnel 路由，再删除对应 Access 应用以使旧 Audience 失效，随后以同一专用服务令牌重建新应用，将会话时长改为立即过期，最后才恢复路由。新应用有新的 Audience，旧 Cookie 不适用于新应用；后续验收不再输出响应头。
+- 测试：Access 应用生效后，无凭据 `GET https://inpaint-origin.shopbgremover.com/healthz` 返回 403；专用令牌返回 200、`{"status":"ok","engine":"lama"}`。重建为零会话应用后再次验证仍为无凭据 403、专用令牌 200。生产能力接口继续返回 `mode=off`、`enabled=false`；空批次创建继续返回 503。只读 D1 为 `inpaint_batches=0`、`inpaint_tasks=0`、`changes=0`、`rows_written=0`；LaMa 容器为 `healthy`、重启 0 次。所有验证只调用 `/healthz`，没有调用 `/v1/inpaint` 或运行模型推理。
+- 修改文件：本阶段只更新本文档；没有修改产品代码、Pages、`wrangler.toml` 或未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。生产外部配置新增 Zero Trust Free 订阅、一个服务令牌、一条 Service Auth 策略、一个 Access 应用、一条受保护 Tunnel 路由和四个 Worker Secrets。
+- 生产写入/AI/资金影响：真实激活 Zero Trust Free，并由用户授权超出免费额度后从已绑定付款方式扣费；当前套餐显示 `$0/month` 且本项目只有机器令牌，不创建用户席位。真实发生 Access/Tunnel 配置和一次 Worker Secret 版本变更；没有部署 Pages、上传图片、写入 D1/R2/Queue 任务、调用 LaMa 推理或 fal.ai、扣积分、修改订单或产生按张 AI 费用。`cloudflared` 仅产生少量服务器心跳资源，R2 与 Zero Trust 超过免费额度仍可能产生月度账单。
+- 部署状态：私有 LaMa、Tunnel、零会话 Access、R2、Queue、D1、Worker Secrets 和 Worker `off` 安全链路均已完成生产部署；用户和管理员仍不能创建新任务，生产网页继续使用旧浏览器算法。`admin_free`、真实授权图质量门、50 图真实恢复/清理验收、六语种临时上传披露、新前端和 `public_free` 均未完成，不能把精细去水印标记为上线。
+- 踩坑与调整：Cloudflare 当前自托管应用创建入口默认带 `destination=private-ip`，即使表单后来填写公共主机名，仍会因 `use_clientless_isolation_app_launcher_url` 字段冲突而拒绝保存；改用明确的 `destination=public-hostname` 创建模式后成功。选择域名会自动重写应用名称输入，必须在域名选定后重新填写名称。任何鉴权验收都只输出状态码和响应体，不再打印包含 Access Cookie 的响应头。
+- 当前状态：阶段 4 的服务到 Worker 私有调用链已经完整接通并保持 `off`，没有用户数据或任务进入链路。
+- 下一步：进入 `admin_free` 前先准备有修改授权的真实样图和盲评记录表，并明确只允许管理员账号；切换后用少量真实图验证原图/蒙版临时上传、Access/HMAC、逐张 Queue、R2 即时与 24 小时兜底清理、刷新恢复和零积分，再逐步验证 50 图边界。真实样例至少 80% 明显优于旧算法、无严重越界且资源稳定前，不修改 Pages、不删除生产旧入口、不切 `public_free`。
 
 ---
 
