@@ -912,11 +912,12 @@ npm run pages:deploy
 - 数据库：新增加法迁移 `0012_lama_inpaint_tasks.sql` 和等价 schema 基线，包含 `inpaint_batches` / `inpaint_tasks`、活动批次唯一索引、游客日期/突发查询索引、队列租约与结果过期索引；不改变现有 `ai_tasks` 或 fal.ai 去背景计费语义。迁移尚未应用生产，迁移清单明确标为 Pending。
 - 修改文件：新增 `worker/inpaint.js`、`worker/migrations/0012_lama_inpaint_tasks.sql`、`tests/worker.inpaint.test.js`；修改 `worker/index.js`、`worker/schema.sql`、`worker/migrations/README.md`、`wrangler.toml`、`vitest.config.mjs`、Worker/schema/备份测试和本文档。未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
 - 测试：新增 5 项 Worker 任务链集成测试，覆盖 `off` 零写入、`admin_free` 权限、50/51、一个活动批次、幂等复用、60/10 分钟、游客每日 50、跨身份 404、私有 R2 上传、Access/HMAC 请求、Queue 成功/重试/终态清理、结果读取/确认删除和积分余额不变。完整回归通过：备份保护 3 项、前端 72 项、Worker 55 项，共 130 项；Next.js 生产构建通过，Wrangler 4.114.0 `deploy --dry-run` 打包通过，Worker gzip 约 31.6 KiB，`git diff --check` 通过。首次完整回归只因新增两张表使备份元数据预期从 27 变为 29 而失败，更新真实结构断言后全绿。
+- Git/CI：提交 `fea377d` 已推送 `origin/main`；GitHub Actions `30403957554` 完成并通过。
 - 生产写入/AI/资金影响：无。没有创建 R2/Queue/Tunnel/Access/Secrets，没有迁移或写入生产 D1，没有部署 Worker/Pages/服务器，没有上传图片、调用线上 LaMa 或 fal.ai，没有扣积分或产生付款。现有 Hetzner 私有 LaMa 容器继续健康但仍无公网入口，生产网页仍使用旧浏览器算法。
-- 部署状态：未部署。`wrangler.toml` 仅新增显式 `INPAINT_MODE = "off"`，尚未加入不存在的生产 R2/Queue 绑定；生产 Worker、Pages、D1 和用户行为保持不变。
+- 部署状态：未部署。`wrangler.toml` 仅新增显式 `INPAINT_MODE = "off"`，尚未加入不存在的生产 R2/Queue 绑定；生产 Worker、Pages、D1 和用户行为保持不变。阶段 3B 只读预检确认当前 Cloudflare 登录账号为 `yubudong2023@gmail.com` 对应账户，Queue 列表为空；R2 API 返回 `10042`，明确要求先在 Dashboard 完成 R2 subscription checkout。官方说明 R2 虽有 Standard 每月 10 GB-month、100 万次 Class A、1000 万次 Class B 免费用量，但仍是按月计费订阅并可能要求付款方式，因此未擅自开通，也没有先创建孤立 Queue 或迁移 D1。
 - 踩坑与调整：Cloudflare Vitest 在受限环境需要临时回环监听权限，获准后运行；Worker 导出绑定调用会固定使用测试 `env`，任务链灰度测试改为直接调用模块导出的 Worker 并注入隔离假 R2/Queue。二进制结果响应补齐现有 CORS 头，避免未来 `www` 页面跨域下载被浏览器拦截。现有产品规则早期的“10 分钟 25 个任务”已在 8.22 最终调整为 60 个，以容纳合法 50 图批次和 10 次重试，本实现使用最终值 60。
 - 当前状态：阶段 3A 本地任务链和安全门完成；`0012`、R2、Queue、Tunnel/Access、Secrets 与 Worker `off` 生产部署仍未完成，不能标记为已上线。
-- 下一步：先创建私有 R2、主 Queue 和死信 Queue并配置单消息、全局消费者并发 2；随后执行受保护 D1 备份与 `0012` 迁移，给 Worker 加绑定但保持 `off` 部署并验证能力接口零写入。完成后再建立独立 Tunnel/Access 与 Secrets，切 `admin_free` 做真实授权图片质量、50 图、恢复和零积分验收；真实样图 80% 门未通过前不切 `public_free`，游客批量 AI 去背景继续不在本阶段。
+- 下一步：用户先在 Cloudflare Dashboard 的 `Storage & databases → R2 → Overview` 完成 R2 subscription checkout；这是当前唯一外部阻塞项。开通后先复核账户与空桶，再创建私有 R2、主 Queue 和死信 Queue并配置单消息、全局消费者并发 2；随后执行受保护 D1 备份与 `0012` 迁移，给 Worker 加绑定但保持 `off` 部署并验证能力接口零写入。完成后再建立独立 Tunnel/Access 与 Secrets，切 `admin_free` 做真实授权图片质量、50 图、恢复和零积分验收；真实样图 80% 门未通过前不切 `public_free`，游客批量 AI 去背景继续不在本阶段。
 
 ---
 
