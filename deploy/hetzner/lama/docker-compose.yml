@@ -1,0 +1,49 @@
+name: shopbg-lama
+
+services:
+  cleaner:
+    image: ${SHOPBG_LAMA_IMAGE:-shopbg-lama-cleaner:local}
+    build:
+      context: ../../../services/lama-cleaner
+    restart: unless-stopped
+    env_file:
+      - path: ${SHOPBG_LAMA_ENV_FILE:-/root/shopbgremover/shared/lama/.env}
+        required: true
+    environment:
+      INPAINT_ENGINE: lama
+      LAMA_DEVICE: cpu
+      TORCH_HOME: /models
+      TORCH_NUM_THREADS: "2"
+      MAX_FILE_MB: "10"
+      MAX_SIDE: "2048"
+      MAX_DECODED_PIXELS: "4194304"
+      MAX_CONCURRENCY: "2"
+      CROP_MAX: "512"
+      MASK_DILATION: "3"
+      MASK_FEATHER: "3"
+      MAX_MASK_RATIO: "0.85"
+    ports:
+      - "127.0.0.1:18080:8000"
+    volumes:
+      - lama_models:/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    cpus: 4.0
+    mem_limit: 6g
+    mem_reservation: 4g
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  lama_models:
+    name: shopbg_lama_models
