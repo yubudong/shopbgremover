@@ -9,6 +9,8 @@
     "d1:migrate:remote": "bash scripts/migrate_d1_remote.sh",
     "benchmark:local-inpaint": "node scripts/benchmark_local_inpaint.mjs",
     "benchmark:local-inpaint:candidates": "node scripts/compare_local_inpaint_candidates.mjs",
+    "benchmark:lama-ab": "python3 services/lama-cleaner/benchmark_ab.py --json",
+    "test:lama-service": "python3 -m pytest services/lama-cleaner/tests",
     "validation:local-inpaint": "python3 -m http.server 4173 --bind 127.0.0.1",
     "pages:build": "node scripts/build_static_pages.mjs",
     "pages:deploy": "npm run pages:build && wrangler pages deploy .pages-dist --project-name shopbgremover --branch main",
