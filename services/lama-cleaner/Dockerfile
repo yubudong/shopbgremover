@@ -10,10 +10,11 @@ RUN pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir --force-reinstall --no-deps \
-        torch==2.4.1 torchvision==0.19.1 \
-        --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY app.py inpaint.py processing.py ./
 

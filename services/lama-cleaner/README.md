@@ -29,3 +29,7 @@ shopbg-inpaint-v1
 The Docker image expects the LaMa checkpoint under `TORCH_HOME=/models`.
 Phase 2 will define the private model volume, Tunnel, Access, capacity test,
 and deployment procedure before any server is changed.
+
+`capacity_probe.py` sends signed 2048 px test images to a loopback-bound
+container with at most two concurrent requests. It is a local/administrator
+diagnostic only and must never be published as a browser tool.
