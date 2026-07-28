@@ -50,7 +50,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；真实 PayPal Capture 与退款未验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
-| 4 去物体/水印 | 🟡 私有容器、R2、Queue 和 D1 空任务表已就绪，入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue 和 `0012` 已就绪，尚无 Tunnel/Access、Worker `off` 生产部署或新前端，生产网页仍使用浏览器旧算法 |
+| 4 去物体/水印 | 🟡 私有容器与 `off` 任务链已部署，用户入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue、`0012` 和 Worker `off` 已部署，尚无 Tunnel/Access、服务 Secrets、`admin_free` 真实图验收或新前端，生产网页仍使用浏览器旧算法 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
 | 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
@@ -930,8 +930,20 @@ npm run pages:deploy
 - 生产写入/AI/资金影响：生产新增一个空私有 Standard R2 bucket、两个空 Cloudflare Queue，并给 D1 新增两张空表和索引；生成一份权限 0600 的验证备份。R2 订阅基础费用为 `$0`，但超额用量会按月从用户付款方式扣费；当前没有 R2 对象、Queue 消息、图片上传、LaMa/fal.ai 请求、积分变化或订单变化，没有按张 AI 成本。
 - 部署状态：R2、Queue 与 D1 已完成；Worker 尚未用新 R2/Queue 配置部署，Tunnel/Access、Secrets、Pages 和用户入口均未完成。生产页面和现有 Worker 行为保持不变。
 - 踩坑与调整：第一次从 R2 计划页进入最终付款页后，CLI 仍返回 `10042`；最终付款页还需要用户本人处理页面错误、勾选条款和超额扣费授权并点击 `Activate R2`。本次始终以 CLI 成功列桶作为激活完成证据，没有代替用户提交财务授权。生命周期删除可能在到期后约 24 小时内异步完成，因此应用层仍须成功/终态时即时删输入蒙版、客户端确认时即时删结果，生命周期只作兜底。
-- 当前状态：单身份并发 1、Queue 全站并发 2、私有 R2 24 小时兜底和生产 D1 任务结构均就绪且为空；Worker 完整绑定已通过本地打包验证但尚未部署。
-- 下一步：提交并推送精确绑定配置，CI 通过后部署 Worker `off`；线上验证能力接口只读、任务创建 503、R2/Queue/D1 仍为空且现有登录/积分接口正常。随后配置 Tunnel/Access/Secrets，进入 `admin_free` 真实图片和零积分验收。
+- 当前状态：单身份并发 1、Queue 全站并发 2、私有 R2 24 小时兜底和生产 D1 任务结构均就绪且为空；精确绑定配置已由提交 `0f63aae` 推送，CI `30405615056` 通过，后续 `off` 部署和线上验收见 8.28。
+- 下一步：按 8.28 配置 Tunnel/Access/Secrets，进入 `admin_free` 真实图片和零积分验收。
+
+### 8.28 2026-07-29：LaMa 阶段 3C——Worker `off` 生产部署（已完成，用户入口未开放）
+
+- 任务：在 R2、Queue 和 D1 安全底座完成后，将完整任务链绑定部署到生产 Worker，但保持 `INPAINT_MODE=off`，确认任何图片、任务、积分和模型调用发生前即拒绝请求。
+- 成果：生产 Worker 版本 `964d1fe1-b165-453c-a9d9-526bfe51fb64` 已绑定私有 `INPAINT_OBJECTS`、主队列 `INPAINT_QUEUE` 和现有 D1；主队列显示 1 个生产者、1 个消费者，消费者仍是单消息批次、全站最大并发 2，D1 条件认领继续保证每个登录用户或游客批次并发 1。部署前回滚基线为 `0afdb02d-02d5-413e-a0ff-a00749b7ef45`。
+- 修改文件：本阶段部署前的绑定代码和配置由提交 `0f63aae` 完成；本次只更新本文档记录真实部署结果。未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
+- 测试：提交 `0f63aae` 的 GitHub Actions `30405615056` 在 1 分 5 秒内通过；部署前完整回归为备份保护 3 项、前端 72 项、Worker 55 项，共 130 项，Wrangler dry-run 通过。生产 `GET /api/inpaint/capabilities` 返回 200、`mode=off`、`enabled=false`；空的 `POST /api/inpaint/batches` 返回 503 与 `code=inpaint_off`；无登录 `GET /api/me` 仍返回 200 和 `user=null`。部署后只读 D1 查询为 `inpaint_batches=0`、`inpaint_tasks=0`、`changes=0`、`rows_written=0`。
+- 生产写入/AI/资金影响：真实发生一次 Worker 生产部署，并建立 Worker 对私有 R2、Queue 和 D1 的运行时绑定；没有部署 Pages、修改积分或订单、上传图片、创建批次、发送 Queue 消息、调用 LaMa/fal.ai、扣积分或产生按张 AI 费用。R2 仍存在超出免费额度后的月度账单风险，但 `off` 状态下产品请求不能写入 R2；现有 Hetzner 私有容器也没有收到本次生产图片请求。
+- 部署状态：Worker `off` 已完成生产部署和只读验收，用户仍看不到或不能调用新 LaMa 功能，生产网页继续使用旧浏览器算法。Tunnel/Access、服务 Secrets、`admin_free`、真实授权样图 80% 质量门、六语种临时上传披露、新前端和 `public_free` 均未完成，不能把精细去水印标记为上线。
+- 踩坑与调整：受限本地环境第一次运行 Wrangler 时因不能写默认日志目录且无法解析 Cloudflare API 域名而在上传前失败；改为将日志写入 `/private/tmp` 并使用获准的生产网络通道后部署成功。验收请求只发送空 JSON，并依靠 `off` 在解析业务数据和所有 D1/R2/Queue 写入前返回，未用真实图片制造测试任务。
+- 当前状态：阶段 3 的 R2、Queue、D1 和 Worker `off` 安全底座已完整部署，单身份并发 1、全站并发 2 的配置已经进入生产，但开关关闭且数据为零。
+- 下一步：先为现有私有 LaMa 容器配置独立 Cloudflare Tunnel、Access Service Token 和 Worker Secrets，仅做健康与拒绝直连检查；随后切 `admin_free`，只允许管理员用有授权样图验证真实上传、相同归一化蒙版、50 图逐张处理、刷新恢复、R2 即时/24 小时清理、零积分和至少 80% 质量门。全部通过并上线六语种临时上传披露前，不切 `public_free`；游客批量 AI 去背景继续保持独立未开放。
 
 ---
 
