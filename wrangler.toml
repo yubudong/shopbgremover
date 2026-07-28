@@ -24,6 +24,7 @@ migrations_dir = "worker/migrations"
 FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
 ADMIN_EMAILS = "yubudong2023@gmail.com"
+INPAINT_MODE = "off"
 
 [triggers]
 crons = ["17 * * * *"]

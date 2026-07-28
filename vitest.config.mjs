@@ -33,7 +33,10 @@ export default defineConfig({
     })),
   ],
   test: {
-    include: ['tests/worker.integration.test.js'],
+    include: [
+      'tests/worker.integration.test.js',
+      'tests/worker.inpaint.test.js',
+    ],
     testTimeout: 10_000,
   },
 });

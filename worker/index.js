@@ -1,3 +1,9 @@
+import {
+  cleanupExpiredInpaint,
+  maybeHandleInpaintRequest,
+  processInpaintQueue,
+} from './inpaint.js';
+
 // Cloudflare Worker - shopbgremover API backend
 // Handles: Google OAuth, session, credits, history
 
@@ -45,7 +51,7 @@ function cors(origin) {
   
   return {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Device-ID',
     'Access-Control-Expose-Headers': 'X-Task-ID, X-AI-Reused',
     'Access-Control-Allow-Credentials': 'true',
@@ -130,6 +136,22 @@ async function getAdmin(request, env) {
   const user = await getUser(request, env);
   if (!user?.email) return null;
   return getAdminEmails(env).has(user.email.toLowerCase()) ? user : null;
+}
+
+async function resolveInpaintIdentity(request, env) {
+  const [user, guest] = await Promise.all([
+    getUser(request, env),
+    getGuestIdentity(request),
+  ]);
+  return {
+    ownerKey: user?.sub ? `user:${user.sub}` : guest.ownerKey,
+    userId: user?.sub || null,
+    guestDeviceHash: user?.sub ? null : guest.deviceHash,
+    guestIpHash: user?.sub ? null : guest.ipHash,
+    isAdmin: Boolean(
+      user?.email && getAdminEmails(env).has(user.email.toLowerCase()),
+    ),
+  };
 }
 
 function maskEmail(email) {
@@ -1406,6 +1428,14 @@ export default {
         }
       });
     }
+
+    const inpaintResponse = await maybeHandleInpaintRequest(request, env, {
+      resolveIdentity: resolveInpaintIdentity,
+      respond: privateJson,
+      origin,
+      responseHeaders: cors(origin),
+    });
+    if (inpaintResponse) return inpaintResponse;
 
     // GET /auth/login → redirect to Google
     if (url.pathname === '/auth/login') {
@@ -3496,9 +3526,17 @@ export default {
 
   async scheduled(_controller, env) {
     const released = await releaseDueRewardHolds(env);
+    const expiredInpaintResults = env.INPAINT_OBJECTS
+      ? await cleanupExpiredInpaint(env)
+      : 0;
     console.log(JSON.stringify({
       message: 'Referral reward observation release completed',
       released,
+      expiredInpaintResults,
     }));
+  },
+
+  async queue(batch, env) {
+    await processInpaintQueue(batch, env);
   },
 };

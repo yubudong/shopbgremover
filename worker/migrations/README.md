@@ -27,6 +27,7 @@ Tracked migrations applied afterward:
 | 9 | `0009_referral_reward_observation.sql` | 2026-07-24 |
 | 10 | `0010_durable_ai_provider_tasks.sql` | 2026-07-25 14:07:35 UTC |
 | 11 | `0011_xianyu_purchase_settings.sql` | 2026-07-27 02:15:47 UTC |
+| 12 | `0012_lama_inpaint_tasks.sql` | Pending protected production apply |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes

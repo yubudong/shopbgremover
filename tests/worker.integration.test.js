@@ -16,6 +16,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM inpaint_tasks;
+    DELETE FROM inpaint_batches;
     DELETE FROM site_setting_audit;
     DELETE FROM site_settings;
     DELETE FROM guest_ai_charges;
@@ -286,6 +288,8 @@ describe('production schema baseline', () => {
       'guest_ai_charges',
       'guest_ip_usage',
       'guest_usage',
+      'inpaint_batches',
+      'inpaint_tasks',
       'orders',
       'processing_history',
       'referral_codes',

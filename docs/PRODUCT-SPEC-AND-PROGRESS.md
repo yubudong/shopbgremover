@@ -904,6 +904,20 @@ npm run pages:deploy
 - 当前状态：同机低流量私有试运行的目标 x86 构建、独立模型、健康检查、单图、8 图和完整 50 图并发 2 验证均已完成。实测表现支持继续开发，但保守共机容量警告、真实授权样图 80% 质量门和异常时优先降低 Ecom 并发的回退策略继续保留。
 - 下一步：按 Cloudflare 当前文档实现独立 Tunnel/Access、私有 R2、单图 Queue、`0012` 加法迁移和 Worker `off` 开关；必须先本地覆盖 50/51 边界、身份隔离、零积分、重试和清理，再做受保护 D1 迁移。完成 `off` 部署后才进入 `admin_free`，真实授权样图质量门通过前不切 `public_free`。
 
+### 8.26 2026-07-29：LaMa 阶段 3A——`off` 任务链代码与本地安全门（已完成，未部署）
+
+- 任务：在不创建 Cloudflare 资源、不迁移生产 D1、不开放页面入口的前提下，实现私有 LaMa 的 Worker/R2/Queue/D1 任务链代码，并让生产默认开关保持 `off`。
+- 成果：新增独立 `worker/inpaint.js`。Worker 现在具有能力查询、批次创建/查询/取消、逐图私有上传、单图 Queue 消费、同身份串行认领、Access Service Token 与 HMAC 双重服务鉴权、私有结果读取/确认删除、失败重试和 24 小时结果清理逻辑。`off` 在解析请求体、身份查询和任何 D1/R2/Queue 操作之前返回 503；能力接口只返回开关和固定限制。去水印任务只写独立表，不读取或修改积分表。
+- 安全边界：前后端目标批次上限仍为 50；服务端拒绝第 51 张，游客按北京时间每日 50，登录用户无每日累计；每个身份仅一个活动批次，10 分钟最多新建 60 个任务；单个派生图片和蒙版各 10 MB。Queue 代码按单消息处理，D1 条件认领保证同身份一次只有一张处于处理状态；成功后立即删除输入与蒙版，结果仅私有恢复并在客户端确认或最长 24 小时后删除。批次蒙版保存规范化描述和哈希，后续六语种前端必须由第一张图的同一规范化描述为每张不同尺寸图片生成对应 PNG 蒙版。
+- 数据库：新增加法迁移 `0012_lama_inpaint_tasks.sql` 和等价 schema 基线，包含 `inpaint_batches` / `inpaint_tasks`、活动批次唯一索引、游客日期/突发查询索引、队列租约与结果过期索引；不改变现有 `ai_tasks` 或 fal.ai 去背景计费语义。迁移尚未应用生产，迁移清单明确标为 Pending。
+- 修改文件：新增 `worker/inpaint.js`、`worker/migrations/0012_lama_inpaint_tasks.sql`、`tests/worker.inpaint.test.js`；修改 `worker/index.js`、`worker/schema.sql`、`worker/migrations/README.md`、`wrangler.toml`、`vitest.config.mjs`、Worker/schema/备份测试和本文档。未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
+- 测试：新增 5 项 Worker 任务链集成测试，覆盖 `off` 零写入、`admin_free` 权限、50/51、一个活动批次、幂等复用、60/10 分钟、游客每日 50、跨身份 404、私有 R2 上传、Access/HMAC 请求、Queue 成功/重试/终态清理、结果读取/确认删除和积分余额不变。完整回归通过：备份保护 3 项、前端 72 项、Worker 55 项，共 130 项；Next.js 生产构建通过，Wrangler 4.114.0 `deploy --dry-run` 打包通过，Worker gzip 约 31.6 KiB，`git diff --check` 通过。首次完整回归只因新增两张表使备份元数据预期从 27 变为 29 而失败，更新真实结构断言后全绿。
+- 生产写入/AI/资金影响：无。没有创建 R2/Queue/Tunnel/Access/Secrets，没有迁移或写入生产 D1，没有部署 Worker/Pages/服务器，没有上传图片、调用线上 LaMa 或 fal.ai，没有扣积分或产生付款。现有 Hetzner 私有 LaMa 容器继续健康但仍无公网入口，生产网页仍使用旧浏览器算法。
+- 部署状态：未部署。`wrangler.toml` 仅新增显式 `INPAINT_MODE = "off"`，尚未加入不存在的生产 R2/Queue 绑定；生产 Worker、Pages、D1 和用户行为保持不变。
+- 踩坑与调整：Cloudflare Vitest 在受限环境需要临时回环监听权限，获准后运行；Worker 导出绑定调用会固定使用测试 `env`，任务链灰度测试改为直接调用模块导出的 Worker 并注入隔离假 R2/Queue。二进制结果响应补齐现有 CORS 头，避免未来 `www` 页面跨域下载被浏览器拦截。现有产品规则早期的“10 分钟 25 个任务”已在 8.22 最终调整为 60 个，以容纳合法 50 图批次和 10 次重试，本实现使用最终值 60。
+- 当前状态：阶段 3A 本地任务链和安全门完成；`0012`、R2、Queue、Tunnel/Access、Secrets 与 Worker `off` 生产部署仍未完成，不能标记为已上线。
+- 下一步：先创建私有 R2、主 Queue 和死信 Queue并配置单消息、全局消费者并发 2；随后执行受保护 D1 备份与 `0012` 迁移，给 Worker 加绑定但保持 `off` 部署并验证能力接口零写入。完成后再建立独立 Tunnel/Access 与 Secrets，切 `admin_free` 做真实授权图片质量、50 图、恢复和零积分验收；真实样图 80% 门未通过前不切 `public_free`，游客批量 AI 去背景继续不在本阶段。
+
 ---
 
 ## 9. 文档维护规则
