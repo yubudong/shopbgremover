@@ -50,7 +50,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；真实 PayPal Capture 与退款未验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
-| 4 去物体/水印 | 🟡 LaMa 阶段 2 完成，同机私有试运行准备中 | 独立服务、本地真实模型/A/B、容器和容量测试已完成；用户接受低流量下在现有 Hetzner 做受限私有试运行，生产网页仍使用浏览器旧算法 |
+| 4 去物体/水印 | 🟡 LaMa 私有容器已部署，任务链路未接入 | 现有 Hetzner 的独立回环容器已通过 x86 单图、8 图和完整 50 图并发 2 压测；尚无 Tunnel/Access、R2/Queue/D1/Worker 或新前端，生产网页仍使用浏览器旧算法 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
 | 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
@@ -63,7 +63,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | P0 | 真实 PayPal 捕获与退款 | 页面、订单 Worker、Webhook 和冲正自动化已上线；没有带 Capture ID 的可退款生产订单 | 使用可验证的境外买家账号完成 USD 3.49 付款、100 积分到账、全额退款、Webhook 冲正和最终余额恢复 |
 | P1（外部阻塞） | Temu 官方预设 | 公开资料不足，不能用第三方参数硬编码；SKU 分组替代能力已上线 | 获得目标站点官方卖家后台的尺寸、格式、文件上限和规则证据后实施 |
 | P2（补验） | 管理员审计表单正常入口 | 表单已上线；生产没有待审核推荐或可争议卡密，操作按钮为 0 | 自然符合条件的记录出现后，完成“打开→字符校验→勾选→取消”，不得产生审核或争议写入 |
-| P1 | LaMa 精细清除上线 | 阶段 2 已完成；8 GB 共机保守容量门未通过，但用户基于两个站真实流量都很低，接受现有 Hetzner 受限试运行；生产旧算法未变 | 完成目标 x86 主机私有容器实测、真实授权样图质量门、Tunnel/Access、R2/Queue/D1/Worker `off → admin_free`、六语种临时上传披露和 `public_free` 生产验收 |
+| P1 | LaMa 精细清除上线 | 目标 x86 主机私有容器已部署并通过 50 图并发 2 压测；8 GB 共机保守门仍未通过，但低流量试运行实测可用；生产旧算法未变 | 完成真实授权样图质量门、Tunnel/Access、R2/Queue/D1/Worker `off → admin_free`、六语种临时上传披露和 `public_free` 生产验收 |
 
 补充边界：
 
@@ -883,19 +883,25 @@ npm run pages:deploy
 - 当前状态：容器可运行性和保守共机容量门已完成；按该门槛现有 Hetzner 不通过。2026-07-29 用户基于 EcomSellerKit 实际处理速度和两个站点当前真实用户都很少，明确接受在现有服务器进行受限同机试运行：ShopBG 保持全局并发 2，若后续出现资源问题，优先把 EcomSellerKit 并发降为 1。此决定是商业风险取舍，不把原容量测试改写为“通过”。
 - 下一步：先把 ShopBG 容器以独立目录、密钥、只读模型卷、6 GiB 上限和仅本机端口部署到现有 x86 主机，复跑并发 2 的 8 图压力测试并确认 Ecom 服务持续健康；未通过则停止。通过后才配置 Tunnel/Access 和 `off` 状态的 R2/Queue/D1/Worker 链路。真实授权样图 80% 质量门仍需在 `admin_free` 或公开前完成。
 
-### 8.25 2026-07-29：现有 Hetzner 低流量私有试运行决策与部署基线（准备完成，尚未部署）
+### 8.25 2026-07-29：现有 Hetzner 低流量私有 LaMa 容器（已部署，未接用户入口）
 
 - 任务：在用户确认两个网站真实用户都很少、接受共机资源风险后，把原“现有主机拒绝部署”调整为可回滚的受限私有试运行；ShopBG 全局并发保持 2，若后续出现问题再优先把 EcomSellerKit 并发降为 1。
 - 决策边界：8.24 的 2/3/4 GiB OOM 和 8 GB 共机保守容量门不通过仍是有效技术事实；本次只改变是否接受低流量试运行的产品决策，不把容量结论改写为通过。试运行必须先保持浏览器入口、Tunnel、Worker 和 Queue 全部关闭，只有目标 x86 主机实测通过后才进入后续基础设施阶段。
-- 本地成果：新增 `deploy/hetzner/lama/docker-compose.yml` 和部署说明。ShopBG 使用固定 compose 项目、独立镜像/容器、独立 HMAC Secret、独立模型卷和 `127.0.0.1:18080`；容器为只读根文件系统、非 root、删除全部 Linux capabilities、禁止提权，限制 4 CPU、6 GiB、256 进程、全局并发 2，并限制本地 Docker 日志大小。明确禁止为该阶段修改 EcomSellerKit 或增加 Caddy 公网路由。
+- 本地成果：新增 `deploy/hetzner/lama/docker-compose.yml` 和部署说明。ShopBG 使用固定 compose 项目、独立镜像/容器、独立 HMAC Secret、外部预创建的独立模型卷和 `127.0.0.1:18080`；容器为只读根文件系统、非 root、删除全部 Linux capabilities、禁止提权，限制 4 CPU、6 GiB、256 进程、全局并发 2，并限制本地 Docker 日志大小。明确禁止为该阶段修改 EcomSellerKit 或增加 Caddy 公网路由。
 - 数据库复核：`worker/schema.sql` 已实际包含 `0011_xianyu_purchase_settings.sql` 的两张表，但顶部注释仍写“through 0010”；本次只修正注释，不修改任何表、迁移或生产 D1。
-- 测试：本机 `docker compose config` 成功展开配置，确认端口只绑定回环地址、模型卷只读、资源/权限/日志限制生效；备份保护 3 项、前端 72 项和 Worker 50 项全部通过，共 125 项；LaMa 服务与本机真实 checkpoint 11 项通过；Pages 白名单构建仍为 95 个文件，`git diff --check` 通过。Worker 首次在受限环境因不能写 Wrangler 日志和监听回环端口失败，在允许的本机测试环境按原命令重跑后 50 项通过；系统默认 Python 3.14 没有 pytest，改用既有隔离 Python 3.11 环境并显式启用真实模型集成测试后 11 项通过。尚未在目标服务器构建、启动或压测，因此不能标记服务器试运行为完成。
+- 测试：准备提交 `74ba4e4` 的 CI `30380743564` 通过；本机 `docker compose config` 成功展开配置，确认端口只绑定回环地址、模型卷只读、资源/权限/日志限制生效；备份保护 3 项、前端 72 项和 Worker 50 项全部通过，共 125 项；LaMa 服务与本机真实 checkpoint 11 项通过；Pages 白名单构建仍为 95 个文件，`git diff --check` 通过。Worker 首次在受限环境因不能写 Wrangler 日志和监听回环端口失败，在允许的本机测试环境按原命令重跑后 50 项通过；系统默认 Python 3.14 没有 pytest，改用既有隔离 Python 3.11 环境并显式启用真实模型集成测试后 11 项通过。
+- 目标服务器部署与验证：
+  - 服务器从 GitHub 只读检出精确提交 `74ba4e4`，独立 HMAC Secret 文件权限为 `0600`；从现有 Ecom 模型卷一次性复制 `big-lama.pt` 到 `shopbg_lama_models`，SHA-256 一致，运行时只读挂载且不共享可写卷。
+  - 为降低两个模型偶发同时峰值时的整机 OOM 风险，新增 `/swapfile-shopbg` 4 GiB 交换文件并写入 `/etc/fstab`；压测后仅使用 512 KiB。没有更改 Ecom 容器、镜像、环境变量、并发或 Caddy。
+  - x86_64 镜像 `shopbg-lama-cleaner:74ba4e4` 构建成功，约 491 MB，运行用户 `shopbg`。容器健康、0 次重启、只读根文件系统、6 GiB 内存上限和 4 CPU 上限生效；唯一监听为 `127.0.0.1:18080`，没有公网监听或路由。
+  - 单张 2048 px 真实签名请求 1/1 成功，端到端约 3.54 秒、模型约 3.07 秒。8 张并发 2 为 8/8 成功，约 13.75 秒、34.91 张/分钟；完整 50 张并发 2 为 50/50 成功，约 79.50 秒、37.74 张/分钟，中位 3.06 秒、P95 3.55 秒、最慢 3.82 秒。
+  - 完整压测后 ShopBG cgroup 峰值约 1.37 GB，`memory.events` 的 `oom=0`、`oom_kill=0`；ShopBG 与 Ecom 均保持 `healthy`、重启 0 次，服务器约 4.7 GiB 可用内存，ShopBG 日志没有 error/exception/traceback/OOM。
 - 修改文件：新增 `deploy/hetzner/lama/docker-compose.yml`、`deploy/hetzner/lama/README.md`，修正 `worker/schema.sql` 注释并更新本文档；未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
-- 生产写入/AI/资金影响：当前只完成本地配置和服务器只读复核；没有启动 ShopBG 服务器容器、修改 EcomSellerKit/Caddy、配置 Tunnel/Access、写 D1/R2/Queue、部署 Worker/Pages、调用 fal.ai、扣积分或产生付款。后续私有容器阶段会占用服务器 CPU、内存、磁盘和少量电力，但 LaMa 无按张 API 费。
-- 部署状态：尚未部署。生产 Pages、Worker、D1 和现有 Hetzner 服务保持不变。
-- 踩坑与调整：容量测试回答的是“两个服务同时达到峰值是否仍安全”，而用户当前试用体验回答的是“低流量时是否够快”；两者不矛盾。必须用受限试运行和可立即关闭入口来承接这一风险，不能删除容量警告或让模型端口直接公网开放。
-- 当前状态：同机试运行已获用户确认，部署基线已在本地完成；目标服务器 x86 构建、独立模型复制、健康检查、单请求和并发 2 压测尚未执行。
-- 下一步：提交并推送本阶段配置，等待 CI 通过；随后在目标服务器创建独立 release/secret/model volume，加入有限交换空间安全缓冲，启动仅回环容器并执行 8 图并发 2 压测。只有成功且 EcomSellerKit 全程健康，才继续 Tunnel/Access 和 `off` Worker 链路。
+- 生产写入/AI/资金影响：服务器新增约 491 MB ShopBG 镜像、独立发布目录、约 196 MB 模型副本、0600 Secret、4 GiB 交换文件、独立 Docker 网络和一个常驻私有容器；完整压测执行 59 次本机 LaMa 推理（1+8+50），短时使用服务器 CPU/内存/少量电力。没有上传用户图片、调用 fal.ai 或任何付费 AI API、扣积分、写 D1/R2/Queue、部署 Worker/Pages、生成订单、点击付款或修改 Ecom/Caddy，因此没有按张 AI 费或资金交易。
+- 部署状态：私有 LaMa 容器已部署并保持健康，但没有 Tunnel/Access、公网域名、R2/Queue/D1/Worker 接入或页面入口，任何用户目前都不能调用它。生产 Pages、Worker 和 D1 版本保持不变。
+- 踩坑与调整：首次服务器准备误用了不正确的完整提交哈希，Git 在 checkout 前安全拒绝；改为用本地 `git rev-parse` 返回的真实哈希并重新校验后继续，未产生半部署。第一次探针因生产镜像刻意不带测试依赖 `httpx` 而在导入阶段退出，未调用模型；后续只在一次性探针容器临时安装该依赖，生产镜像保持最小化。预创建模型卷最初被 Compose 提示“非本项目创建”，已将仓库声明改为明确 `external: true`，不影响当前运行。
+- 当前状态：同机低流量私有试运行的目标 x86 构建、独立模型、健康检查、单图、8 图和完整 50 图并发 2 验证均已完成。实测表现支持继续开发，但保守共机容量警告、真实授权样图 80% 质量门和异常时优先降低 Ecom 并发的回退策略继续保留。
+- 下一步：按 Cloudflare 当前文档实现独立 Tunnel/Access、私有 R2、单图 Queue、`0012` 加法迁移和 Worker `off` 开关；必须先本地覆盖 50/51 边界、身份隔离、零积分、重试和清理，再做受保护 D1 迁移。完成 `off` 部署后才进入 `admin_free`，真实授权样图质量门通过前不切 `public_free`。
 
 ---
 

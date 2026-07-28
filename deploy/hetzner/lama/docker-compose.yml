@@ -47,3 +47,4 @@ services:
 volumes:
   lama_models:
     name: shopbg_lama_models
+    external: true
