@@ -897,6 +897,7 @@ npm run pages:deploy
   - 单张 2048 px 真实签名请求 1/1 成功，端到端约 3.54 秒、模型约 3.07 秒。8 张并发 2 为 8/8 成功，约 13.75 秒、34.91 张/分钟；完整 50 张并发 2 为 50/50 成功，约 79.50 秒、37.74 张/分钟，中位 3.06 秒、P95 3.55 秒、最慢 3.82 秒。
   - 完整压测后 ShopBG cgroup 峰值约 1.37 GB，`memory.events` 的 `oom=0`、`oom_kill=0`；ShopBG 与 Ecom 均保持 `healthy`、重启 0 次，服务器约 4.7 GiB 可用内存，ShopBG 日志没有 error/exception/traceback/OOM。
 - 修改文件：新增 `deploy/hetzner/lama/docker-compose.yml`、`deploy/hetzner/lama/README.md`，修正 `worker/schema.sql` 注释并更新本文档；未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
+- Git/CI：部署准备提交 `74ba4e4` 的 CI `30380743564` 通过；私有容器实测和外部模型卷修正提交 `02fc35e` 的 CI `30381511581` 通过。服务器 `current` 已指向 `02fc35e`，运行镜像仍为经过完整压测且代码相同的 `shopbg-lama-cleaner:74ba4e4`。
 - 生产写入/AI/资金影响：服务器新增约 491 MB ShopBG 镜像、独立发布目录、约 196 MB 模型副本、0600 Secret、4 GiB 交换文件、独立 Docker 网络和一个常驻私有容器；完整压测执行 59 次本机 LaMa 推理（1+8+50），短时使用服务器 CPU/内存/少量电力。没有上传用户图片、调用 fal.ai 或任何付费 AI API、扣积分、写 D1/R2/Queue、部署 Worker/Pages、生成订单、点击付款或修改 Ecom/Caddy，因此没有按张 AI 费或资金交易。
 - 部署状态：私有 LaMa 容器已部署并保持健康，但没有 Tunnel/Access、公网域名、R2/Queue/D1/Worker 接入或页面入口，任何用户目前都不能调用它。生产 Pages、Worker 和 D1 版本保持不变。
 - 踩坑与调整：首次服务器准备误用了不正确的完整提交哈希，Git 在 checkout 前安全拒绝；改为用本地 `git rev-parse` 返回的真实哈希并重新校验后继续，未产生半部署。第一次探针因生产镜像刻意不带测试依赖 `httpx` 而在导入阶段退出，未调用模型；后续只在一次性探针容器临时安装该依赖，生产镜像保持最小化。预创建模型卷最初被 Compose 提示“非本项目创建”，已将仓库声明改为明确 `external: true`，不影响当前运行。
