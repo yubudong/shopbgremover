@@ -50,7 +50,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；真实 PayPal Capture 与退款未验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
-| 4 去物体/水印 | 🟡 私有容器与 `off` 任务链已部署，用户入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue、`0012` 和 Worker `off` 已部署，尚无 Tunnel/Access、服务 Secrets、`admin_free` 真实图验收或新前端，生产网页仍使用浏览器旧算法 |
+| 4 去物体/水印 | 🟡 私有容器、健康 Tunnel 与 `off` 任务链已部署，用户入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；私有 R2、主/死信 Queue、`0012`、Worker `off` 和无路由 Tunnel 已部署，尚无 Access、公开主机名、服务 Secrets、`admin_free` 真实图验收或新前端，生产网页仍使用浏览器旧算法 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
 | 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
@@ -944,6 +944,20 @@ npm run pages:deploy
 - 踩坑与调整：受限本地环境第一次运行 Wrangler 时因不能写默认日志目录且无法解析 Cloudflare API 域名而在上传前失败；改为将日志写入 `/private/tmp` 并使用获准的生产网络通道后部署成功。验收请求只发送空 JSON，并依靠 `off` 在解析业务数据和所有 D1/R2/Queue 写入前返回，未用真实图片制造测试任务。
 - 当前状态：阶段 3 的 R2、Queue、D1 和 Worker `off` 安全底座已完整部署，单身份并发 1、全站并发 2 的配置已经进入生产，但开关关闭且数据为零。
 - 下一步：先为现有私有 LaMa 容器配置独立 Cloudflare Tunnel、Access Service Token 和 Worker Secrets，仅做健康与拒绝直连检查；随后切 `admin_free`，只允许管理员用有授权样图验证真实上传、相同归一化蒙版、50 图逐张处理、刷新恢复、R2 即时/24 小时清理、零积分和至少 80% 质量门。全部通过并上线六语种临时上传披露前，不切 `public_free`；游客批量 AI 去背景继续保持独立未开放。
+
+### 8.29 2026-07-29：LaMa 阶段 4A——Tunnel 连接与 Zero Trust 财务授权阻塞（部分完成，无路由）
+
+- 任务：为现有 Hetzner 私有 LaMa 容器建立独立 Cloudflare Tunnel，再创建 Access 服务令牌、受保护主机名和 Worker Secrets；在 Access 策略生效前不得发布公网路由。
+- 成果：Cloudflare 新增专用远程管理 Tunnel `shopbgremover-lama`；Hetzner 从 Cloudflare 官方 Debian 仓库安装 `cloudflared 2026.7.3`，systemd 服务为 `active/running`、重启 0 次，并通过 QUIC 建立 4 条 Cloudflare 边缘连接。LaMa 容器继续健康且只监听 `127.0.0.1:18080`。Tunnel 令牌只从已登录 Cloudflare 页面经一次性 0600 临时文件传给服务器，服务安装成功后临时副本已删除，令牌没有写入仓库、本文档或命令输出。
+- 安全顺序：已在 Cloudflare 填写但没有保存 `inpaint-origin.shopbgremover.com → http://127.0.0.1:18080`，因为 Access 尚未建立。Tunnel 当前显示 1 个健康连接器、0 条路由；没有公共主机名、DNS 路由、Access 应用、服务令牌或 Worker 模型服务 Secrets，外部请求仍不能到达 LaMa。
+- 外部阻塞：该账户此前未开通 Zero Trust。选择 `Zero Trust Free` 后最终页面明确显示 `$0/month`、保护最多 50 个用户，但仍要求账户持有人勾选条款，并授权 Cloudflare 在超过免费额度时从已绑定付款方式扣费。由于这是新的财务授权，本次没有代替用户勾选或点击 `Activate`，浏览器保留在最终激活页等待用户本人确认。
+- 修改文件：本阶段只更新本文档；没有修改产品代码、Pages、Worker 配置或未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。服务器新增 Cloudflare 官方软件源、约 39.3 MB 的 `cloudflared` 安装和一个 systemd 服务。
+- 测试：远程只读验证 LaMa 容器为 `healthy`、回环端口仍为 `127.0.0.1:18080`；`cloudflared` 为 `active/running`、`NRestarts=0`，环境预检 DNS、UDP/QUIC、TCP/HTTP2 和 Cloudflare API 均通过，4 条边缘连接成功注册。没有运行模型请求，因为 Tunnel 尚无路由。
+- 生产写入/AI/资金影响：真实创建一个无路由 Tunnel，并在服务器安装和启动常驻 `cloudflared`，会产生极少量服务器 CPU、内存和网络心跳；没有激活 Zero Trust 计费授权、发布域名、上传图片、写 D1/R2/Queue、调用 LaMa/fal.ai、扣积分或修改订单。Worker 继续是 `off`，R2 仍为零产品流量。
+- 部署状态：Tunnel 连接层已部署但没有入口；Access、服务令牌、受保护路由和 Worker Secrets 因 Zero Trust 最终授权未完成而暂停。不能切 `admin_free`，更不能标记功能已上线。
+- 踩坑与调整：Cloudflare 页面内复制按钮使用浏览器隔离剪贴板，macOS 系统剪贴板为空；改用浏览器内只读校验后，将令牌写入一次性 0600 临时文件并直接喂给服务器安装命令，随即删除且复核不存在。第一次尝试从旧式 Service Tokens URL 进入时返回找不到页面，按当前导航改走 `Access controls → Service credentials` 后触发 Zero Trust 首次开通流程。
+- 当前状态：私有 LaMa、无路由 Tunnel、R2/Queue/D1 和 Worker `off` 已就绪；Access 与模型调用链仍完全断开。
+- 下一步：用户在当前 Cloudflare `Activate Zero Trust Free` 页面自行阅读并勾选两项条款后点击 `Activate`。完成后创建仅 ShopBG Worker 使用的 Access Service Token 和 Service Auth 策略，先验证无凭据访问被拒绝，再发布 `inpaint-origin.shopbgremover.com` 路由；随后把 Access ID/Secret、服务 URL 和现有独立 HMAC 写入 Worker Secrets，保持 `off` 部署并复验零写入，之后才进入 `admin_free`。
 
 ---
 
