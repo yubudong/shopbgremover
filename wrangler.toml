@@ -20,6 +20,10 @@ database_name = "shopbgremover-db"
 database_id = "f9c622b0-9360-48c1-a2a6-36e51b93d3de"
 migrations_dir = "worker/migrations"
 
+[[r2_buckets]]
+binding = "INPAINT_OBJECTS"
+bucket_name = "shopbgremover-inpaint-private"
+
 [vars]
 FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
