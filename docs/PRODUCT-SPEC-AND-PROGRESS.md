@@ -50,7 +50,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；真实 PayPal Capture 与退款未验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
-| 4 去物体/水印 | 🟡 LaMa 私有容器已部署，任务链路未接入 | 现有 Hetzner 的独立回环容器已通过 x86 单图、8 图和完整 50 图并发 2 压测；尚无 Tunnel/Access、R2/Queue/D1/Worker 或新前端，生产网页仍使用浏览器旧算法 |
+| 4 去物体/水印 | 🟡 私有容器、Queue 和 D1 空任务表已就绪，入口仍关闭 | 现有 Hetzner 独立回环容器已通过 50 图并发 2 压测；主/死信 Queue 已创建、`0012` 已受保护迁移，尚无可用 R2、Tunnel/Access、Worker 完整绑定或新前端，生产网页仍使用浏览器旧算法 |
 | 5 AI 去背景 | ✅ 完成 | 开关、逐图控制、计费、幂等、透明跳过、部分失败、刷新恢复和新任务重处理均已验收 |
 | 6 背景与本地合成 | ✅ 完成 | 上传背景、适配、背景与商品变换、背景模糊、阴影、单张覆盖、三格式导出、恢复和生产零 AI 下载均已验收 |
 | 7 平台支持 | 🟡 进行中 | Shopify、Amazon、eBay、TikTok Shop、Shopee 和 SKU 分组完成；Temu 等待官方规则证据 |
@@ -918,6 +918,20 @@ npm run pages:deploy
 - 踩坑与调整：Cloudflare Vitest 在受限环境需要临时回环监听权限，获准后运行；Worker 导出绑定调用会固定使用测试 `env`，任务链灰度测试改为直接调用模块导出的 Worker 并注入隔离假 R2/Queue。二进制结果响应补齐现有 CORS 头，避免未来 `www` 页面跨域下载被浏览器拦截。现有产品规则早期的“10 分钟 25 个任务”已在 8.22 最终调整为 60 个，以容纳合法 50 图批次和 10 次重试，本实现使用最终值 60。
 - 当前状态：阶段 3A 本地任务链和安全门完成；`0012`、R2、Queue、Tunnel/Access、Secrets 与 Worker `off` 生产部署仍未完成，不能标记为已上线。
 - 下一步：用户先在 Cloudflare Dashboard 的 `Storage & databases → R2 → Overview` 完成 R2 subscription checkout；这是当前唯一外部阻塞项。开通后先复核账户与空桶，再创建私有 R2、主 Queue 和死信 Queue并配置单消息、全局消费者并发 2；随后执行受保护 D1 备份与 `0012` 迁移，给 Worker 加绑定但保持 `off` 部署并验证能力接口零写入。完成后再建立独立 Tunnel/Access 与 Secrets，切 `admin_free` 做真实授权图片质量、50 图、恢复和零积分验收；真实样图 80% 门未通过前不切 `public_free`，游客批量 AI 去背景继续不在本阶段。
+
+### 8.27 2026-07-29：LaMa 阶段 3B——Queue 与受保护 D1 迁移（已完成，R2/Worker 完整部署仍阻塞）
+
+- 任务：在用户要求继续推进、R2 最终 checkout 尚未成功的情况下，先完成不依赖 R2 的专用 Queue、生产 D1 加法迁移和 Worker 绑定配置；用户入口继续保持 `off`。
+- Queue：Cloudflare 账户新增 `shopbgremover-inpaint` 主队列与 `shopbgremover-inpaint-dlq` 死信队列。`wrangler.toml` 将 `INPAINT_QUEUE` 绑定到主队列，消费者固定 `max_batch_size = 1`、`max_batch_timeout = 1`、`max_concurrency = 2`、`max_retries = 3`、`retry_delay = 2`，超过平台重试次数进入专用死信队列。D1 条件认领继续强制每个登录用户或游客身份同时仅一张 `processing`；因此最终语义为单身份并发 1、全站并发 2。
+- D1：远程检查确认只有 `0012_lama_inpaint_tasks.sql` 待应用。保护脚本先完成生产导出、本机恢复和 `PRAGMA integrity_check=ok`，备份 SHA-256 为 `a2c77315ec613789c2bbac004360c46bc22eddfebc0cfb0e2985258c85b359b7`，Time Travel 书签为 `00000338-00000000-000050b6-f8697782e9a6f7d816ba1e12790d9098`；随后在 2026-07-28 22:37:59 UTC 成功执行 10 条加法命令。迁移后 `inpaint_batches=0`、`inpaint_tasks=0`，用户 6、订单 50 与备份一致；验证查询 `changes=0`，没有写积分、订单或任务数据。
+- R2 阻塞：用户在上一轮确认准备开通后，实际 Dashboard 仍停在 `Activate R2` 最终付款页，两个条款/超额用量扣费授权框未勾选，并显示“处理过程中发生了错误”；CLI 因此继续返回 `10042`。页面显示今日与基础月费均为 `$0`，但超额用量会从现有付款方式按月扣费。未代替用户勾选或提交财务授权，未创建 R2 bucket。
+- 修改文件：修改 `wrangler.toml`、迁移清单和本文档；未修改或纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
+- 测试：完整回归继续通过，备份保护 3 项、前端 72 项、Worker 55 项，共 130 项；Wrangler 4.114.0 `deploy --dry-run` 成功识别 `INPAINT_QUEUE`、D1 与 `INPAINT_MODE=off`，Worker gzip 约 31.6 KiB。主/死信 Queue 只读复核均存在且生产者、消费者仍为 0，因为 Worker 尚未部署绑定。
+- 生产写入/AI/资金影响：生产新增两个空 Cloudflare Queue，并给 D1 新增两张空表和索引；生成一份权限 0600 的验证备份。没有 R2 对象、Queue 消息、图片上传、LaMa/fal.ai 请求、积分变化、订单变化或付款；没有按张 AI 成本。Queue/R2 未来超出 Cloudflare 免费额度时可能产生平台费用。
+- 部署状态：Queue 与 D1 已完成；Worker 尚未用新 Queue 配置部署，R2、Tunnel/Access、Secrets、Pages 和用户入口均未完成。生产页面和现有 Worker 行为保持不变。
+- 踩坑与调整：用户所说“已经确认开通 R2”对应从计划页进入了最终付款页，并不等于订阅已经激活；必须以 `wrangler r2 bucket list` 成功为准。为避免阻塞全部进度，本阶段只创建空 Queue 和执行可回滚的加法 D1 迁移，不伪造 R2 已完成状态。
+- 当前状态：单身份并发 1、Queue 目标全站并发 2 已写入配置并通过打包验证；生产 D1 任务结构就绪且为空。R2 仍是 Worker 完整 `off` 部署的唯一阻塞项。
+- 下一步：用户在保留的 Cloudflare `Activate R2` 页面手动处理错误、勾选两项授权并提交；CLI 确认 R2 生效后创建私有 Standard bucket 与 24 小时故障兜底生命周期，再加入 R2 绑定并部署 Worker `off`。随后配置 Tunnel/Access/Secrets，进入 `admin_free` 真实图片和零积分验收。
 
 ---
 

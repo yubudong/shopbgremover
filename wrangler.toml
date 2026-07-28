@@ -29,6 +29,19 @@ INPAINT_MODE = "off"
 [triggers]
 crons = ["17 * * * *"]
 
+[[queues.producers]]
+binding = "INPAINT_QUEUE"
+queue = "shopbgremover-inpaint"
+
+[[queues.consumers]]
+queue = "shopbgremover-inpaint"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
+dead_letter_queue = "shopbgremover-inpaint-dlq"
+max_concurrency = 2
+retry_delay = 2
+
 [[routes]]
 pattern = "api.shopbgremover.com/*"
 zone_name = "shopbgremover.com"
