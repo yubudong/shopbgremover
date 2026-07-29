@@ -16,6 +16,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM analytics_events;
+    DELETE FROM analytics_rate_limits;
     DELETE FROM inpaint_tasks;
     DELETE FROM inpaint_batches;
     DELETE FROM site_setting_audit;
@@ -281,6 +283,8 @@ describe('production schema baseline', () => {
 
     expect(result.results.map((row) => row.name)).toEqual([
       'ai_tasks',
+      'analytics_events',
+      'analytics_rate_limits',
       'credit_grants',
       'credit_ledger',
       'email_otps',
@@ -1082,6 +1086,251 @@ describe('credit center and administrator overview', () => {
     }));
     expect(body.recent_ledger).toHaveLength(2);
     expect(body.recent_orders).toEqual([]);
+  });
+
+  it('collects only allowlisted, hashed first-party events and exposes aggregated admin data', async () => {
+    const regular = await createAuthenticatedUser({
+      email: 'analytics-regular@example.com',
+      credits: 0,
+    });
+    const regularResponse = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      regular.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.70',
+        },
+        body: JSON.stringify({
+          visitor_id: 'regular-visitor',
+          session_id: 'regular-session',
+          events: [{
+            event_id: 'regular-event',
+            event_name: 'page_view',
+            page_group: 'home',
+          }],
+        }),
+      },
+    ));
+    expect(regularResponse.status).toBe(202);
+    expect(await jsonResponse(regularResponse)).toEqual({
+      accepted: 0,
+      mode: 'admin_only',
+    });
+
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+      deviceId: 'analytics-admin-device',
+    });
+    const payload = {
+      visitor_id: 'raw-browser-visitor',
+      session_id: 'raw-browser-session',
+      events: [{
+        event_id: 'analytics-event-1',
+        event_name: 'page_view',
+        page_group: 'zh-cn/home',
+        tool_id: '',
+        device_type: 'desktop',
+        language: 'zh-CN',
+        source: 'google.com',
+        campaign: 'launch-2026',
+      }, {
+        event_id: 'analytics-event-2',
+        event_name: 'file_selected',
+        page_group: 'home',
+        tool_id: 'workspace',
+        file_count: 3,
+        size_bucket: '2-5MB',
+      }, {
+        event_id: 'analytics-event-3',
+        event_name: 'tool_started',
+        page_group: 'home',
+        tool_id: 'remove_bg',
+        file_count: 3,
+      }, {
+        event_id: 'analytics-event-4',
+        event_name: 'result_ready',
+        page_group: 'home',
+        tool_id: 'remove_bg',
+        file_count: 3,
+        duration_ms: 950,
+      }, {
+        event_id: 'analytics-event-5',
+        event_name: 'result_downloaded',
+        page_group: 'home',
+        tool_id: 'remove_bg',
+        file_count: 3,
+      }],
+    };
+    const collected = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      admin.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.71',
+          'CF-IPCountry': 'CN',
+        },
+        body: JSON.stringify(payload),
+      },
+    ));
+    expect(collected.status).toBe(202);
+    expect(await jsonResponse(collected)).toEqual({
+      accepted: 5,
+      mode: 'admin_only',
+    });
+
+    const stored = await env.DB.prepare(
+      `SELECT id, visitor_hash, session_hash, actor_type, country, source,
+              file_count, size_bucket
+       FROM analytics_events ORDER BY created_at, event_name`
+    ).all();
+    expect(stored.results).toHaveLength(5);
+    expect(stored.results[0].id).toMatch(/^[a-f0-9]{64}$/);
+    expect(stored.results[0].visitor_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(stored.results[0].visitor_hash).not.toBe('raw-browser-visitor');
+    expect(stored.results[0].session_hash).not.toBe('raw-browser-session');
+    expect(stored.results.every((row) => row.actor_type === 'admin')).toBe(true);
+    expect(stored.results.some((row) => row.country === 'CN')).toBe(true);
+    expect(stored.results.some((row) => row.source === 'google.com')).toBe(true);
+    expect(stored.results.some((row) => row.file_count === 3 && row.size_bucket === '2-5MB')).toBe(true);
+
+    const duplicate = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      admin.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.71',
+        },
+        body: JSON.stringify({
+          visitor_id: payload.visitor_id,
+          session_id: payload.session_id,
+          events: [payload.events[0]],
+        }),
+      },
+    ));
+    expect((await jsonResponse(duplicate)).accepted).toBe(0);
+
+    await env.DB.prepare(
+      `INSERT INTO ai_tasks
+       (task_id, owner_key, input_hash, status, created_at, updated_at, completed_at)
+       VALUES ('analytics-ai-task', 'test-owner', 'input-hash', 'succeeded',
+               unixepoch() - 2, unixepoch(), unixepoch())`
+    ).run();
+
+    const forbidden = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/analytics?days=30',
+      regular.cookie,
+    ));
+    expect(forbidden.status).toBe(403);
+
+    const overview = await exports.default.fetch(authenticatedRequest(
+      '/api/admin/analytics?days=30',
+      admin.cookie,
+    ));
+    expect(overview.status).toBe(200);
+    expect(overview.headers.get('Cache-Control')).toBe('no-store');
+    const body = await jsonResponse(overview);
+    expect(body.mode).toBe('admin_only');
+    expect(body.retention_days).toBe(180);
+    expect(body.summary).toEqual(expect.objectContaining({
+      visitors: 1,
+      sessions: 1,
+      selected: 1,
+      starts: 1,
+      completed: 1,
+      downloads: 1,
+      download_rate: 100,
+    }));
+    expect(body.service.remove_bg).toEqual(expect.objectContaining({
+      started: 1,
+      succeeded: 1,
+      failed: 0,
+      success_rate: 100,
+    }));
+    expect(body.tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        tool_id: 'remove_bg',
+        starts: 1,
+        completed: 1,
+        downloads: 1,
+      }),
+    ]));
+
+    const privacyOptOut = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      admin.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.71',
+          'Sec-GPC': '1',
+        },
+        body: JSON.stringify({
+          visitor_id: payload.visitor_id,
+          session_id: payload.session_id,
+          events: [{
+            event_id: 'analytics-event-opt-out',
+            event_name: 'page_view',
+          }],
+        }),
+      },
+    ));
+    expect(privacyOptOut.status).toBe(202);
+    expect(await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM analytics_events'
+    ).first('count')).toBe(5);
+  });
+
+  it('rejects cross-site and unsupported analytics payloads without recording them', async () => {
+    const admin = await createAuthenticatedUser({
+      email: 'admin@example.com',
+      credits: 0,
+    });
+    const crossSite = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      admin.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://attacker.example',
+          'Sec-Fetch-Site': 'cross-site',
+        },
+        body: JSON.stringify({
+          visitor_id: 'visitor',
+          session_id: 'session',
+          events: [{ event_id: 'event', event_name: 'page_view' }],
+        }),
+      },
+    ));
+    expect(crossSite.status).toBe(403);
+
+    const unsupported = await exports.default.fetch(authenticatedRequest(
+      '/api/analytics/events',
+      admin.cookie,
+      {
+        method: 'POST',
+        headers: {
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.73',
+        },
+        body: JSON.stringify({
+          visitor_id: 'visitor',
+          session_id: 'session',
+          events: [{ event_id: 'event', event_name: 'mouse_moved' }],
+        }),
+      },
+    ));
+    expect(unsupported.status).toBe(400);
+    expect(await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM analytics_events'
+    ).first('count')).toBe(0);
   });
 });
 

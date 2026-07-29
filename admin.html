@@ -3,328 +3,225 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex,nofollow">
+  <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Cache-Control" content="no-store">
-  <title>管理后台 · ShopBG Remover</title>
+  <title>运营后台 · ShopBG Remover</title>
   <link rel="icon" href="/favicon.svg">
-  <style>
-    *{box-sizing:border-box}body{margin:0;background:#f4f6fa;color:#172033;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    header{height:64px;padding:0 max(20px,calc((100vw - 1180px)/2));display:flex;align-items:center;justify-content:space-between;background:#111c2f;color:#fff}
-    header a{color:#afbdd1;text-decoration:none;font-size:13px}.brand{font-size:18px;font-weight:850}
-    main{width:min(1180px,calc(100% - 32px));margin:32px auto 72px}h1{margin:0 0 8px;font-size:32px}.sub{margin:0 0 24px;color:#64748b}
-    .notice{padding:15px;border-radius:10px;background:#fff;border:1px solid #dfe5ee;color:#526078}.notice.error{background:#fff1f2;border-color:#fecdd3;color:#9f1239}
-    .app{display:none}.app.visible{display:block}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-    .stat,.panel,.portal{background:#fff;border:1px solid #dfe5ee;border-radius:14px;box-shadow:0 8px 26px rgba(24,39,75,.05)}
-    .stat{padding:17px}.stat span{display:block;color:#64748b;font-size:11px;font-weight:750}.stat strong{display:block;margin-top:6px;font-size:27px}
-    .portals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.portal{padding:18px;text-decoration:none}.portal:hover{border-color:#93c5fd}.portal b{display:block;margin:8px 0 5px}.portal small{color:#64748b;line-height:1.5}
-    .panel{padding:19px;margin-top:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}.panel h2{margin:0;font-size:18px}.panel-head span{color:#64748b;font-size:12px}
-    .table-wrap{overflow:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:12px}th,td{padding:10px 8px;border-bottom:1px solid #edf1f6;text-align:left;vertical-align:top}th{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.05em}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#64748b}.positive{color:#047857;font-weight:800}.negative{color:#b91c1c;font-weight:800}
-    .validation-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.validation-file{display:grid;gap:7px;padding:14px;border:1px solid #dfe5ee;border-radius:10px;background:#f8fafc}.validation-file span{font-size:12px;font-weight:800}.validation-file small{color:#64748b}.validation-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.validation-actions button,.validation-actions a{min-height:40px;padding:0 15px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#172033;font:inherit;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.validation-actions .primary{background:#2563eb;border-color:#2563eb;color:#fff}.validation-actions button:disabled{opacity:.45;cursor:not-allowed}.validation-status{margin:14px 0 0;padding:12px;border-radius:9px;background:#eff6ff;color:#1e40af;white-space:pre-wrap}.validation-status.error{background:#fff1f2;color:#9f1239}.validation-result{display:none;margin-top:14px;grid-template-columns:minmax(0,320px) 1fr;gap:14px;align-items:start}.validation-result.visible{display:grid}.validation-result img{width:100%;max-height:320px;object-fit:contain;border:1px solid #dfe5ee;border-radius:10px;background:#eef2f7}
-    @media(max-width:850px){.stats{grid-template-columns:1fr 1fr}.portals{grid-template-columns:1fr}}@media(max-width:480px){main{width:calc(100% - 20px)}.stat strong{font-size:23px}}
-    @media(max-width:650px){.validation-grid,.validation-result{grid-template-columns:1fr}}
-  </style>
+  <link rel="stylesheet" href="/admin.css?v=20260729-operations-v1">
 </head>
 <body>
-  <header><span class="brand">ShopBG Remover · 管理后台</span><a href="/">返回网站</a></header>
-  <main>
-    <h1>积分与订单总览</h1>
-    <p class="sub" id="authStatus">正在验证管理员身份并加载数据…</p>
+  <aside class="sidebar">
+    <a class="admin-brand" href="/">
+      <img src="/Logo256.png" alt="">
+      <span>ShopBG Remover<small>运营后台</small></span>
+    </a>
+    <nav class="side-nav" aria-label="后台导航">
+      <a href="#operations" data-admin-view="operations"><span>⌂</span>网站运营</a>
+      <a href="#tools" data-admin-view="operations"><span>▦</span>工具分析</a>
+      <a href="#service" data-admin-view="operations"><span>◉</span>服务质量</a>
+      <a href="#acquisition" data-admin-view="operations"><span>↗</span>来源与设备</a>
+      <a href="#billing" data-admin-view="billing"><span>▤</span>积分与订单</a>
+      <a href="/admin-vouchers"><span>🎟</span>闲鱼卡密</a>
+      <a href="/admin-referrals"><span>🛡</span>推荐奖励</a>
+      <a href="#validation" data-admin-view="validation"><span>✦</span>LaMa 验收</a>
+    </nav>
+    <div class="privacy-note">
+      <strong>隐私优先</strong>
+      <span>不保存图片、文件名、完整 IP、邮箱或完整来源网址</span>
+    </div>
+  </aside>
+
+  <main class="dashboard">
+    <header class="dashboard-head">
+      <div>
+        <p class="eyebrow" id="pageEyebrow">SHOPBGREMOVER ANALYTICS</p>
+        <h1 id="pageTitle">网站运营概览</h1>
+        <p id="authStatus" class="muted">正在验证管理员身份并加载数据…</p>
+      </div>
+      <div class="head-actions" id="analyticsActions">
+        <label class="range-select">
+          <span>统计范围</span>
+          <select id="analyticsRange">
+            <option value="1">最近 24 小时</option>
+            <option value="7">最近 7 天</option>
+            <option value="30" selected>最近 30 天</option>
+            <option value="90">最近 90 天</option>
+          </select>
+        </label>
+        <button id="refreshAnalytics" class="primary-button" type="button">刷新</button>
+      </div>
+    </header>
+
     <div class="notice" id="notice">请稍候。</div>
-    <div class="app" id="adminApp">
-      <section class="stats">
-        <div class="stat"><span>用户数</span><strong id="users">—</strong></div>
-        <div class="stat"><span>当前可用积分</span><strong id="activeCredits">—</strong></div>
-        <div class="stat"><span>累计消耗积分</span><strong id="totalUsed">—</strong></div>
-        <div class="stat"><span>已完成充值订单</span><strong id="completedOrders">—</strong></div>
-        <div class="stat"><span>待支付订单</span><strong id="pendingOrders">—</strong></div>
-        <div class="stat"><span>已兑换卡密</span><strong id="redeemedVouchers">—</strong></div>
-        <div class="stat"><span>待审核推荐</span><strong id="pendingReviews">—</strong></div>
-        <div class="stat"><span>观察期待发奖励</span><strong id="pendingHolds">—</strong></div>
+
+    <div class="admin-app" id="adminApp">
+      <section class="admin-view" id="operationsView" data-view="operations">
+        <section class="metric-grid">
+          <article class="metric-card accent-blue">
+            <span>匿名访客</span>
+            <strong id="metricVisitors">—</strong>
+            <small id="metricSessions">— 次访问会话</small>
+          </article>
+          <article class="metric-card accent-violet">
+            <span>上传图片</span>
+            <strong id="metricSelected">—</strong>
+            <small>至少选择过产品图的会话</small>
+          </article>
+          <article class="metric-card accent-cyan">
+            <span>开始处理</span>
+            <strong id="metricStarts">—</strong>
+            <small>通过确认并真正开始的会话</small>
+          </article>
+          <article class="metric-card accent-green">
+            <span>成功下载</span>
+            <strong id="metricDownloads">—</strong>
+            <small id="metricDownloadRate">— 下载转化率</small>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <article class="panel trend-panel">
+            <div class="panel-title">
+              <div><p class="eyebrow">趋势</p><h2>访问与使用变化</h2></div>
+              <div class="legend">
+                <span><i class="dot visitors"></i>访客</span>
+                <span><i class="dot selected"></i>上传</span>
+                <span><i class="dot starts"></i>开始</span>
+                <span><i class="dot downloads"></i>下载</span>
+              </div>
+            </div>
+            <div id="trendChart" class="chart" aria-label="访问与使用趋势图"></div>
+          </article>
+          <article class="panel funnel-panel">
+            <div class="panel-title">
+              <div><p class="eyebrow">漏斗</p><h2>用户完成路径</h2></div>
+            </div>
+            <div id="funnelChart" class="funnel"></div>
+          </article>
+        </section>
+
+        <section id="tools" class="panel table-panel">
+          <div class="panel-title">
+            <div><p class="eyebrow">工具分析</p><h2>哪些功能真正产生结果</h2></div>
+            <p class="muted">下载率 = 成功下载会话 ÷ 开始处理会话</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>工具</th><th>打开</th><th>开始</th><th>得到结果</th><th>下载</th><th>下载率</th><th>服务器失败</th><th>平均耗时</th></tr></thead>
+              <tbody id="toolsTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="service" class="panel">
+          <div class="panel-title">
+            <div><p class="eyebrow">服务质量</p><h2>AI 处理链路</h2></div>
+            <span class="status-pill" id="analyticsMode">读取中</span>
+          </div>
+          <div class="service-grid">
+            <article class="service-card">
+              <div class="service-head"><span class="service-icon inpaint">✦</span><div><h3>AI 去物体 / 水印</h3><p>自托管 LaMa · 免费</p></div></div>
+              <div class="service-stats">
+                <div><span>任务</span><strong id="inpaintStarted">—</strong></div>
+                <div><span>成功率</span><strong id="inpaintSuccess">—</strong></div>
+                <div><span>平均耗时</span><strong id="inpaintAverage">—</strong></div>
+                <div><span>P95 耗时</span><strong id="inpaintP95">—</strong></div>
+                <div><span>排队 / 处理中</span><strong id="inpaintActive">—</strong></div>
+                <div><span>失败</span><strong id="inpaintFailed">—</strong></div>
+              </div>
+            </article>
+            <article class="service-card">
+              <div class="service-head"><span class="service-icon remove-bg">◌</span><div><h3>AI 去背景</h3><p>fal.ai · 成功后扣积分</p></div></div>
+              <div class="service-stats">
+                <div><span>任务</span><strong id="removeBgStarted">—</strong></div>
+                <div><span>成功率</span><strong id="removeBgSuccess">—</strong></div>
+                <div><span>平均耗时</span><strong id="removeBgAverage">—</strong></div>
+                <div><span>P95 耗时</span><strong id="removeBgP95">—</strong></div>
+                <div><span>处理中</span><strong id="removeBgActive">—</strong></div>
+                <div><span>失败</span><strong id="removeBgFailed">—</strong></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="acquisition" class="rank-grid">
+          <article class="panel compact-panel"><div class="panel-title"><h2>访问来源</h2></div><div id="sourcesList" class="rank-list"></div></article>
+          <article class="panel compact-panel"><div class="panel-title"><h2>设备类型</h2></div><div id="devicesList" class="rank-list"></div></article>
+          <article class="panel compact-panel"><div class="panel-title"><h2>国家/地区</h2></div><div id="countriesList" class="rank-list"></div></article>
+          <article class="panel compact-panel"><div class="panel-title"><h2>语言版本</h2></div><div id="languagesList" class="rank-list"></div></article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title"><div><p class="eyebrow">购买转化</p><h2>价格页、PayPal 与闲鱼</h2></div></div>
+          <div class="commerce-grid">
+            <div><span>价格页访问</span><strong id="commercePricing">—</strong></div>
+            <div><span>PayPal 订单创建</span><strong id="commercePaypalOrders">—</strong></div>
+            <div><span>PayPal 完成</span><strong id="commercePaypalCompleted">—</strong></div>
+            <div><span>点击闲鱼购买</span><strong id="commerceXianyuClicks">—</strong></div>
+            <div><span>卡密兑换完成</span><strong id="commerceVouchers">—</strong></div>
+          </div>
+          <p class="panel-note">闲鱼点击与卡密兑换为总体趋势，不代表同一用户的一一归因。</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title"><div><p class="eyebrow">问题定位</p><h2>最近常见处理错误</h2></div></div>
+          <div id="errorsList" class="error-list"></div>
+        </section>
       </section>
-      <section class="portals">
-        <a class="portal" href="/admin-vouchers"><span>🎟️</span><b>闲鱼卡密管理</b><small>生成、发货、作废、查询和争议冲正</small></a>
-        <a class="portal" href="/admin-referrals"><span>🛡️</span><b>推荐奖励审核</b><small>处理卡密邀请风险与人工审核队列</small></a>
-        <a class="portal" href="#inpaintValidation"><span>🧽</span><b>AI 精细去水印验收</b><small>仅管理员使用真实图片验证私有 LaMa 链路</small></a>
-        <a class="portal" href="/credits.html?lang=en"><span>👤</span><b>用户积分中心预览</b><small>查看用户实际看到的余额、订单和流水界面</small></a>
+
+      <section class="admin-view" id="billingView" data-view="billing" hidden>
+        <section class="billing-stats">
+          <article><span>用户数</span><strong id="users">—</strong></article>
+          <article><span>当前可用积分</span><strong id="activeCredits">—</strong></article>
+          <article><span>累计消耗积分</span><strong id="totalUsed">—</strong></article>
+          <article><span>已完成充值订单</span><strong id="completedOrders">—</strong></article>
+          <article><span>待支付订单</span><strong id="pendingOrders">—</strong></article>
+          <article><span>已兑换卡密</span><strong id="redeemedVouchers">—</strong></article>
+          <article><span>待审核推荐</span><strong id="pendingReviews">—</strong></article>
+          <article><span>观察期待发奖励</span><strong id="pendingHolds">—</strong></article>
+        </section>
+        <section class="portal-grid">
+          <a href="/admin-vouchers"><span>🎟️</span><b>闲鱼卡密管理</b><small>生成、发货、作废、查询和争议冲正</small></a>
+          <a href="/admin-referrals"><span>🛡️</span><b>推荐奖励审核</b><small>处理卡密邀请风险与人工审核队列</small></a>
+          <a href="/credits.html?lang=zh-cn"><span>👤</span><b>用户积分中心预览</b><small>查看用户实际看到的余额、订单和流水</small></a>
+        </section>
+        <section class="panel">
+          <div class="panel-title"><h2>最近充值订单</h2><span class="muted">最多 30 条 · 只读</span></div>
+          <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>方式</th><th>金额</th><th>积分</th><th>状态</th><th>订单</th></tr></thead><tbody id="orderRows"></tbody></table></div>
+        </section>
+        <section class="panel">
+          <div class="panel-title"><h2>最近积分流水</h2><span class="muted">最多 30 条 · 只读</span></div>
+          <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>变化</th><th>类型</th><th>原因</th><th>订单</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+        </section>
       </section>
-      <section class="panel" id="inpaintValidation">
-        <div class="panel-head"><h2>AI 精细去水印 · 单图验收</h2><span>管理员专用 · 免费且不扣积分</span></div>
-        <p class="sub">原图和 PNG 蒙版会临时上传到私有 R2，经受保护的 LaMa 服务处理。输入与蒙版成功后立即删除；结果在确认后删除，最长保留 24 小时。</p>
-        <div class="validation-grid">
-          <label class="validation-file">
-            <span>测试原图</span>
-            <input id="inpaintImage" type="file" accept="image/png,image/jpeg,image/webp">
-            <small>PNG、JPG 或 WebP，最大 10 MB，长边不超过 2048 px。</small>
-          </label>
-          <label class="validation-file">
-            <span>黑白蒙版</span>
-            <input id="inpaintMask" type="file" accept="image/png">
-            <small>与原图尺寸一致的 PNG；白色区域表示需要清除。</small>
-          </label>
-        </div>
-        <div class="validation-actions">
-          <button class="primary" id="inpaintStart" type="button" disabled>开始真实链路验收</button>
-          <button id="inpaintCancel" type="button" disabled>取消活动批次</button>
-        </div>
-        <p class="validation-status" id="inpaintStatus" aria-live="polite">请选择原图和蒙版。页面刷新后可继续查询已经创建的验收任务。</p>
-        <div class="validation-result" id="inpaintResult">
-          <img id="inpaintPreview" alt="LaMa 验收结果预览">
-          <div>
-            <p>结果已从私有 R2 读取。先下载并检查图片，再确认删除服务器结果。</p>
-            <div class="validation-actions">
-              <a class="primary" id="inpaintDownload" download="shopbg-lama-validation.png">下载结果 PNG</a>
-              <button id="inpaintAcknowledge" type="button">确认已下载并清理服务器结果</button>
+
+      <section class="admin-view" id="validationView" data-view="validation" hidden>
+        <section class="panel" id="inpaintValidation">
+          <div class="panel-title"><div><p class="eyebrow">管理员验收</p><h2>AI 精细去水印 · 单图真实链路</h2></div><span class="status-pill">免费且不扣积分</span></div>
+          <p class="muted validation-intro">原图和 PNG 蒙版会临时上传到私有 R2，经受保护的 LaMa 服务处理。输入与蒙版成功后立即删除；结果确认后删除，最长保留 24 小时。</p>
+          <div class="validation-grid">
+            <label class="validation-file"><span>测试原图</span><input id="inpaintImage" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG、JPG 或 WebP，最大 10 MB，长边不超过 2048 px。</small></label>
+            <label class="validation-file"><span>黑白蒙版</span><input id="inpaintMask" type="file" accept="image/png"><small>与原图尺寸一致；白色区域表示需要清除。</small></label>
+          </div>
+          <div class="validation-actions">
+            <button class="primary-button" id="inpaintStart" type="button" disabled>开始真实链路验收</button>
+            <button id="inpaintCancel" type="button" disabled>取消活动批次</button>
+          </div>
+          <p class="validation-status" id="inpaintStatus" aria-live="polite">请选择原图和蒙版。页面刷新后可继续查询已经创建的验收任务。</p>
+          <div class="validation-result" id="inpaintResult">
+            <img id="inpaintPreview" alt="LaMa 验收结果预览">
+            <div>
+              <p>结果已从私有 R2 读取。先下载并检查图片，再确认删除服务器结果。</p>
+              <div class="validation-actions">
+                <a class="primary-button" id="inpaintDownload" download="shopbg-lama-validation.png">下载结果 PNG</a>
+                <button id="inpaintAcknowledge" type="button">确认已下载并清理服务器结果</button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h2>最近充值订单</h2><span>最多 30 条 · 只读</span></div>
-        <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>方式</th><th>金额</th><th>积分</th><th>状态</th><th>订单</th></tr></thead><tbody id="orderRows"></tbody></table></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h2>最近积分流水</h2><span>最多 30 条 · 只读</span></div>
-        <div class="table-wrap"><table><thead><tr><th>时间</th><th>账号</th><th>变化</th><th>类型</th><th>原因</th><th>订单</th></tr></thead><tbody id="ledgerRows"></tbody></table></div>
+        </section>
       </section>
     </div>
   </main>
-  <script>
-    const API = 'https://api.shopbgremover.com';
-    const notice = document.getElementById('notice');
-    const INPAINT_STATE_KEY = 'shopbg-admin-inpaint-validation-v1';
-    const inpaintImage = document.getElementById('inpaintImage');
-    const inpaintMask = document.getElementById('inpaintMask');
-    const inpaintStart = document.getElementById('inpaintStart');
-    const inpaintCancel = document.getElementById('inpaintCancel');
-    const inpaintStatus = document.getElementById('inpaintStatus');
-    const inpaintResult = document.getElementById('inpaintResult');
-    const inpaintPreview = document.getElementById('inpaintPreview');
-    const inpaintDownload = document.getElementById('inpaintDownload');
-    const inpaintAcknowledge = document.getElementById('inpaintAcknowledge');
-    let activeInpaint = null;
-    let resultObjectUrl = null;
-    const cell = (row, value, className = '') => {
-      const td = document.createElement('td');
-      td.textContent = value;
-      if (className) td.className = className;
-      row.append(td);
-    };
-    const formatTime = value => value ? new Date(Number(value) * 1000).toLocaleString('zh-CN') : '—';
-    const shortId = value => {
-      const text = String(value || '');
-      return text.length > 22 ? `${text.slice(0, 11)}…${text.slice(-7)}` : text || '—';
-    };
-    function renderOrders(orders) {
-      const body = document.getElementById('orderRows');
-      body.replaceChildren();
-      orders.forEach(order => {
-        const row = document.createElement('tr');
-        cell(row, formatTime(order.completed_at || order.created_at));
-        cell(row, order.email);
-        cell(row, order.payment_method);
-        cell(row, `${order.currency} ${Number(order.amount || 0).toFixed(2)}`);
-        cell(row, String(Number(order.base_credits || 0) + Number(order.bonus_credits || 0)));
-        cell(row, order.refunded_at ? 'refunded' : order.status);
-        cell(row, shortId(order.id), 'mono');
-        body.append(row);
-      });
-    }
-    function renderLedger(entries) {
-      const body = document.getElementById('ledgerRows');
-      body.replaceChildren();
-      entries.forEach(entry => {
-        const row = document.createElement('tr');
-        cell(row, formatTime(entry.created_at));
-        cell(row, entry.email);
-        cell(row, `${Number(entry.delta) > 0 ? '+' : ''}${entry.delta}`, Number(entry.delta) > 0 ? 'positive' : 'negative');
-        cell(row, entry.balance_type);
-        cell(row, entry.reason);
-        cell(row, shortId(entry.order_id), 'mono');
-        body.append(row);
-      });
-    }
-    const inpaintMessage = (message, error = false) => {
-      inpaintStatus.textContent = message;
-      inpaintStatus.classList.toggle('error', error);
-    };
-    const inpaintJson = async (path, init = {}) => {
-      const response = await fetch(`${API}${path}`, {
-        credentials: 'include',
-        ...init,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-      return data;
-    };
-    const updateInpaintStart = () => {
-      inpaintStart.disabled = !(inpaintImage.files[0] && inpaintMask.files[0]) || Boolean(activeInpaint);
-    };
-    const storeInpaintState = state => {
-      activeInpaint = state;
-      if (state) localStorage.setItem(INPAINT_STATE_KEY, JSON.stringify(state));
-      else localStorage.removeItem(INPAINT_STATE_KEY);
-      inpaintCancel.disabled = !state;
-      updateInpaintStart();
-    };
-    const clearInpaintResult = () => {
-      if (resultObjectUrl) URL.revokeObjectURL(resultObjectUrl);
-      resultObjectUrl = null;
-      inpaintPreview.removeAttribute('src');
-      inpaintDownload.removeAttribute('href');
-      inpaintResult.classList.remove('visible');
-    };
-    const showInpaintResult = async taskId => {
-      const response = await fetch(`${API}/api/inpaint/tasks/${encodeURIComponent(taskId)}/result`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${response.status}`);
-      }
-      clearInpaintResult();
-      resultObjectUrl = URL.createObjectURL(await response.blob());
-      inpaintPreview.src = resultObjectUrl;
-      inpaintDownload.href = resultObjectUrl;
-      inpaintResult.classList.add('visible');
-      inpaintCancel.disabled = true;
-      inpaintMessage('处理成功。结果已读取，请下载并检查；确认后再清理服务器结果。');
-    };
-    const pollInpaint = async state => {
-      for (let attempt = 0; attempt < 180; attempt += 1) {
-        const data = await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(state.batchId)}`);
-        const task = data.batch.tasks.find(item => item.id === state.taskId);
-        if (!task) throw new Error('任务状态不存在。');
-        inpaintMessage(`批次：${data.batch.status}\n任务：${task.status}\n第 ${attempt + 1} 次状态检查`);
-        if (task.status === 'succeeded') {
-          await showInpaintResult(state.taskId);
-          return;
-        }
-        if (['failed', 'cancelled'].includes(task.status)) {
-          throw new Error(`任务${task.status === 'failed' ? '失败' : '已取消'}：${task.error_code || '无详细原因'}`);
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      throw new Error('处理超时；任务仍保存在服务器，可刷新页面继续查询。');
-    };
-    const resumeInpaint = async () => {
-      const saved = localStorage.getItem(INPAINT_STATE_KEY);
-      if (!saved) return;
-      try {
-        const state = JSON.parse(saved);
-        if (!state?.batchId || !state?.taskId) throw new Error('invalid state');
-        storeInpaintState(state);
-        inpaintMessage('正在恢复上一次管理员验收任务…');
-        await pollInpaint(state);
-      } catch (error) {
-        if (error.message === 'invalid state' || /Batch not found|Task not found/.test(error.message)) {
-          storeInpaintState(null);
-        }
-        inpaintMessage(`恢复失败：${error.message}`, true);
-      }
-    };
-    inpaintImage.addEventListener('change', updateInpaintStart);
-    inpaintMask.addEventListener('change', updateInpaintStart);
-    inpaintStart.addEventListener('click', async () => {
-      const image = inpaintImage.files[0];
-      const mask = inpaintMask.files[0];
-      if (!image || !mask) return;
-      if (image.size > 10 * 1024 * 1024 || mask.size > 10 * 1024 * 1024) {
-        inpaintMessage('原图或蒙版超过 10 MB。', true);
-        return;
-      }
-      clearInpaintResult();
-      inpaintStart.disabled = true;
-      try {
-        inpaintMessage('正在创建管理员验收批次…');
-        const created = await inpaintJson('/api/inpaint/batches', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            task_count: 1,
-            client_batch_id: `admin_validation_${Date.now().toString(36)}`,
-            mask_spec: {
-              version: 1,
-              source: 'admin_validation',
-              normalized: false,
-            },
-          }),
-        });
-        const task = created.batch.tasks[0];
-        const state = { batchId: created.batch.id, taskId: task.id };
-        storeInpaintState(state);
-        inpaintMessage('正在把原图和蒙版上传到私有临时存储…');
-        const form = new FormData();
-        form.set('image', image, image.name);
-        form.set('mask', mask, mask.name);
-        form.set('mask_spec_hash', created.batch.mask_spec_hash);
-        await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(state.batchId)}/tasks/0`, {
-          method: 'POST',
-          body: form,
-        });
-        inpaintMessage('已进入单图队列，正在等待 LaMa 处理…');
-        await pollInpaint(state);
-      } catch (error) {
-        inpaintMessage(`验收失败：${error.message}`, true);
-      } finally {
-        updateInpaintStart();
-      }
-    });
-    inpaintCancel.addEventListener('click', async () => {
-      if (!activeInpaint) return;
-      try {
-        const data = await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(activeInpaint.batchId)}`, {
-          method: 'DELETE',
-        });
-        clearInpaintResult();
-        storeInpaintState(null);
-        inpaintMessage(`批次已${data.status === 'cancelled' ? '取消' : '结束'}。`);
-      } catch (error) {
-        inpaintMessage(`取消失败：${error.message}`, true);
-      }
-    });
-    inpaintAcknowledge.addEventListener('click', async () => {
-      if (!activeInpaint) return;
-      try {
-        await inpaintJson(`/api/inpaint/tasks/${encodeURIComponent(activeInpaint.taskId)}/result`, {
-          method: 'DELETE',
-        });
-        clearInpaintResult();
-        storeInpaintState(null);
-        inpaintMessage('服务器结果已确认删除，本次验收记录仍保留在 D1 审计表。');
-      } catch (error) {
-        inpaintMessage(`清理失败：${error.message}`, true);
-      }
-    });
-    fetch(`${API}/api/admin/overview`, { credentials: 'include' })
-      .then(async response => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(response.status === 403 ? '当前账号没有管理员权限。' : (data.error || `HTTP ${response.status}`));
-        return data;
-      })
-      .then(data => {
-        document.getElementById('authStatus').textContent = `管理员：${data.admin.email}`;
-        const fields = {
-          users: data.totals.users,
-          activeCredits: data.totals.active_credits,
-          totalUsed: data.totals.total_used,
-          completedOrders: data.totals.completed_orders,
-          pendingOrders: data.totals.pending_orders,
-          redeemedVouchers: data.totals.redeemed_vouchers,
-          pendingReviews: data.totals.pending_referral_reviews,
-          pendingHolds: data.totals.pending_reward_holds,
-        };
-        Object.entries(fields).forEach(([id, value]) => { document.getElementById(id).textContent = value; });
-        renderOrders(data.recent_orders || []);
-        renderLedger(data.recent_ledger || []);
-        notice.style.display = 'none';
-        document.getElementById('adminApp').classList.add('visible');
-        resumeInpaint();
-      })
-      .catch(error => {
-        document.getElementById('authStatus').textContent = '无法打开管理后台';
-        notice.textContent = `${error.message} 请先使用管理员账号登录网站。`;
-        notice.classList.add('error');
-      });
-  </script>
+  <script src="/admin.js?v=20260729-operations-v1"></script>
 </body>
 </html>

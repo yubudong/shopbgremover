@@ -39,6 +39,30 @@ const REFERRAL_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 const REFERRAL_REWARD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const REFERRAL_OBSERVATION_SECONDS = 7 * 24 * 60 * 60;
 const FAL_QUEUE_ENDPOINT = 'https://queue.fal.run/fal-ai/birefnet';
+const ANALYTICS_RETENTION_DAYS = 180;
+const ANALYTICS_BATCH_LIMIT = 20;
+const ANALYTICS_RATE_WINDOW_SECONDS = 10 * 60;
+const ANALYTICS_RATE_EVENT_LIMIT = 250;
+const ANALYTICS_EVENTS = new Set([
+  'page_view',
+  'workspace_view',
+  'file_selected',
+  'tool_open',
+  'tool_started',
+  'result_ready',
+  'result_downloaded',
+  'pricing_view',
+  'xianyu_clicked',
+]);
+const ANALYTICS_TOOLS = new Set([
+  '',
+  'workspace',
+  'inpaint',
+  'remove_bg',
+  'compose',
+  'zip',
+  'pricing',
+]);
 
 // ── CORS headers ──────────────────────────────────────────────
 function cors(origin) {
@@ -1413,6 +1437,468 @@ async function releaseDueRewardHolds(env, limit = 50) {
   return released;
 }
 
+function analyticsMode(env) {
+  const mode = String(env.ANALYTICS_MODE || 'off').toLowerCase();
+  return ['off', 'admin_only', 'public'].includes(mode) ? mode : 'off';
+}
+
+function analyticsOriginAllowed(request) {
+  if (request.headers.get('Sec-Fetch-Site') === 'cross-site') return false;
+  const origin = request.headers.get('Origin');
+  return origin === 'https://www.shopbgremover.com'
+    || origin === 'https://shopbgremover.com'
+    || origin === 'http://localhost'
+    || /^http:\/\/localhost:\d+$/.test(origin || '')
+    || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin || '');
+}
+
+function analyticsToken(value, maxLength, pattern = /[^a-zA-Z0-9._:/-]/g) {
+  return String(value || '').trim().replace(pattern, '').slice(0, maxLength);
+}
+
+function analyticsOptionalInteger(value, minimum, maximum) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < minimum || number > maximum) return null;
+  return number;
+}
+
+async function analyticsHash(env, kind, value) {
+  return sha256Hex(`${env.JWT_SECRET}:analytics:${kind}:${value}`);
+}
+
+async function acceptAnalyticsRate(env, request, eventCount, now) {
+  const rawIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ipHash = await analyticsHash(env, 'rate', rawIp);
+  const windowStart = Math.floor(now / ANALYTICS_RATE_WINDOW_SECONDS)
+    * ANALYTICS_RATE_WINDOW_SECONDS;
+  await env.DB.prepare(
+    `INSERT INTO analytics_rate_limits
+     (ip_hash, window_start, event_count, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(ip_hash, window_start) DO UPDATE SET
+       event_count = analytics_rate_limits.event_count + excluded.event_count,
+       updated_at = excluded.updated_at`
+  ).bind(ipHash, windowStart, eventCount, now).run();
+  const count = await env.DB.prepare(
+    `SELECT event_count FROM analytics_rate_limits
+     WHERE ip_hash = ? AND window_start = ?`
+  ).bind(ipHash, windowStart).first('event_count');
+  return Number(count || 0) <= ANALYTICS_RATE_EVENT_LIMIT;
+}
+
+async function storeAnalyticsBatch(env, request, payload) {
+  const events = Array.isArray(payload?.events) ? payload.events : null;
+  if (
+    !events
+    || events.length < 1
+    || events.length > ANALYTICS_BATCH_LIMIT
+  ) {
+    return { error: 'Analytics batches must contain 1–20 events.', status: 400 };
+  }
+
+  const visitorId = analyticsToken(payload.visitor_id, 64);
+  const sessionId = analyticsToken(payload.session_id, 64);
+  if (!visitorId || !sessionId) {
+    return { error: 'Anonymous visitor and session identifiers are required.', status: 400 };
+  }
+  if (events.some((event) => !ANALYTICS_EVENTS.has(String(event?.event_name || '')))) {
+    return { error: 'Unsupported analytics event.', status: 400 };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!await acceptAnalyticsRate(env, request, events.length, now)) {
+    return { error: 'Analytics request was not accepted.', status: 429 };
+  }
+
+  const [visitorHash, sessionHash, user, admin] = await Promise.all([
+    analyticsHash(env, 'visitor', visitorId),
+    analyticsHash(env, 'session', sessionId),
+    getUser(request, env),
+    getAdmin(request, env),
+  ]);
+  const actorType = admin ? 'admin' : user ? 'user' : 'guest';
+  const country = analyticsToken(
+    request.headers.get('CF-IPCountry') || '',
+    2,
+    /[^a-zA-Z]/g,
+  ).toUpperCase();
+  const statements = [];
+
+  for (const event of events) {
+    const eventId = analyticsToken(event.event_id, 64);
+    const toolId = analyticsToken(event.tool_id, 24);
+    if (!eventId || !ANALYTICS_TOOLS.has(toolId)) {
+      return { error: 'Invalid analytics event identifier or tool.', status: 400 };
+    }
+    const id = await analyticsHash(env, 'event', eventId);
+    const deviceType = ['desktop', 'tablet', 'mobile'].includes(event.device_type)
+      ? event.device_type
+      : '';
+    const sizeBucket = ['<500KB', '500KB-2MB', '2-5MB', '5-10MB', '10MB+']
+      .includes(event.size_bucket)
+      ? event.size_bucket
+      : '';
+    statements.push(
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO analytics_events
+         (id, visitor_hash, session_hash, event_name, tool_id, page_group,
+          actor_type, device_type, language, country, source, campaign,
+          file_count, size_bucket, duration_ms, status_code, error_code,
+          created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        visitorHash,
+        sessionHash,
+        event.event_name,
+        toolId,
+        analyticsToken(event.page_group, 80),
+        actorType,
+        deviceType,
+        analyticsToken(event.language, 16, /[^a-zA-Z-]/g),
+        country,
+        analyticsToken(
+          String(event.source || '').toLowerCase(),
+          120,
+          /[^a-z0-9.-]/g,
+        ),
+        analyticsToken(
+          String(event.campaign || '').toLowerCase(),
+          80,
+          /[^a-z0-9._-]/g,
+        ),
+        analyticsOptionalInteger(event.file_count, 0, 50),
+        sizeBucket,
+        analyticsOptionalInteger(event.duration_ms, 0, 3600000),
+        analyticsOptionalInteger(event.status_code, 100, 599),
+        analyticsToken(
+          String(event.error_code || '').toLowerCase(),
+          80,
+          /[^a-z0-9._-]/g,
+        ),
+        now,
+      ),
+    );
+  }
+
+  const results = await env.DB.batch(statements);
+  return {
+    accepted: results.reduce(
+      (total, result) => total + Number(result.meta?.changes || 0),
+      0,
+    ),
+  };
+}
+
+function analyticsDayLabels(days) {
+  const labels = [];
+  const shanghaiNow = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const day = new Date(shanghaiNow);
+    day.setUTCDate(day.getUTCDate() - offset);
+    labels.push(day.toISOString().slice(0, 10));
+  }
+  return labels;
+}
+
+function analyticsRate(numerator, denominator) {
+  return denominator ? Math.round((numerator / denominator) * 1000) / 10 : 0;
+}
+
+function analyticsDuration(value) {
+  return Math.max(0, Math.round(Number(value || 0)));
+}
+
+async function getAnalyticsOverview(env, days) {
+  const cutoff = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
+  const [
+    summary,
+    trendRows,
+    toolRows,
+    sourceRows,
+    deviceRows,
+    countryRows,
+    languageRows,
+    inpaintService,
+    removeBgService,
+    inpaintP95,
+    removeBgP95,
+    errorRows,
+    commerce,
+    dataStartedAt,
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT
+         COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+         COUNT(DISTINCT session_hash) AS sessions,
+         COUNT(DISTINCT CASE WHEN event_name = 'file_selected' THEN session_hash END) AS selected,
+         COUNT(DISTINCT CASE WHEN event_name = 'tool_started' THEN session_hash END) AS starts,
+         COUNT(DISTINCT CASE WHEN event_name = 'result_ready' THEN session_hash END) AS completed,
+         COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads
+       FROM analytics_events
+       WHERE created_at >= ?`
+    ).bind(cutoff).first(),
+    env.DB.prepare(
+      `SELECT
+         strftime('%Y-%m-%d', created_at, 'unixepoch', '+8 hours') AS day,
+         COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+         COUNT(DISTINCT CASE WHEN event_name = 'file_selected' THEN session_hash END) AS selected,
+         COUNT(DISTINCT CASE WHEN event_name = 'tool_started' THEN session_hash END) AS starts,
+         COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads
+       FROM analytics_events
+       WHERE created_at >= ?
+       GROUP BY day
+       ORDER BY day`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT
+         tool_id,
+         COUNT(DISTINCT CASE WHEN event_name = 'tool_open' THEN session_hash END) AS opens,
+         COUNT(DISTINCT CASE WHEN event_name = 'tool_started' THEN session_hash END) AS starts,
+         COUNT(DISTINCT CASE WHEN event_name = 'result_ready' THEN session_hash END) AS completed,
+         COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads,
+         AVG(CASE WHEN event_name = 'result_ready' THEN duration_ms END) AS avg_duration_ms
+       FROM analytics_events
+       WHERE created_at >= ? AND tool_id NOT IN ('', 'workspace', 'pricing')
+       GROUP BY tool_id
+       ORDER BY starts DESC, opens DESC`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT source AS label, COUNT(DISTINCT session_hash) AS sessions
+       FROM analytics_events
+       WHERE created_at >= ? AND event_name = 'page_view' AND source != ''
+       GROUP BY source ORDER BY sessions DESC LIMIT 12`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT device_type AS label, COUNT(DISTINCT session_hash) AS sessions
+       FROM analytics_events
+       WHERE created_at >= ? AND event_name = 'page_view' AND device_type != ''
+       GROUP BY device_type ORDER BY sessions DESC`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT country AS label, COUNT(DISTINCT session_hash) AS sessions
+       FROM analytics_events
+       WHERE created_at >= ? AND event_name = 'page_view' AND country != ''
+       GROUP BY country ORDER BY sessions DESC LIMIT 12`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT language AS label, COUNT(DISTINCT session_hash) AS sessions
+       FROM analytics_events
+       WHERE created_at >= ? AND event_name = 'page_view' AND language != ''
+       GROUP BY language ORDER BY sessions DESC`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `SELECT
+         COUNT(*) AS started,
+         SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+         SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) AS queued,
+         SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing,
+         AVG(CASE
+           WHEN status = 'succeeded' AND completed_at IS NOT NULL AND started_at IS NOT NULL
+           THEN (completed_at - started_at) * 1000
+         END) AS avg_duration_ms
+       FROM inpaint_tasks
+       WHERE created_at >= ?`
+    ).bind(cutoff).first(),
+    env.DB.prepare(
+      `SELECT
+         COUNT(*) AS started,
+         SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+         SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing,
+         AVG(CASE
+           WHEN status = 'succeeded' AND completed_at IS NOT NULL
+           THEN (completed_at - created_at) * 1000
+         END) AS avg_duration_ms
+       FROM ai_tasks
+       WHERE created_at >= ?`
+    ).bind(cutoff).first(),
+    env.DB.prepare(
+      `WITH ranked AS (
+         SELECT
+           (completed_at - started_at) * 1000 AS duration_ms,
+           ROW_NUMBER() OVER (ORDER BY completed_at - started_at) AS row_number,
+           COUNT(*) OVER () AS total
+         FROM inpaint_tasks
+         WHERE created_at >= ? AND status = 'succeeded'
+           AND completed_at IS NOT NULL AND started_at IS NOT NULL
+       )
+       SELECT duration_ms
+       FROM ranked
+       WHERE row_number >= CAST((total * 95 + 99) / 100 AS INTEGER)
+       ORDER BY row_number LIMIT 1`
+    ).bind(cutoff).first('duration_ms'),
+    env.DB.prepare(
+      `WITH ranked AS (
+         SELECT
+           (completed_at - created_at) * 1000 AS duration_ms,
+           ROW_NUMBER() OVER (ORDER BY completed_at - created_at) AS row_number,
+           COUNT(*) OVER () AS total
+         FROM ai_tasks
+         WHERE created_at >= ? AND status = 'succeeded'
+           AND completed_at IS NOT NULL
+       )
+       SELECT duration_ms
+       FROM ranked
+       WHERE row_number >= CAST((total * 95 + 99) / 100 AS INTEGER)
+       ORDER BY row_number LIMIT 1`
+    ).bind(cutoff).first('duration_ms'),
+    env.DB.prepare(
+      `SELECT tool_id, error, COUNT(*) AS count
+       FROM (
+         SELECT 'inpaint' AS tool_id, COALESCE(NULLIF(error_code, ''), 'unknown') AS error
+         FROM inpaint_tasks WHERE created_at >= ? AND status = 'failed'
+         UNION ALL
+         SELECT 'remove_bg' AS tool_id, COALESCE(NULLIF(error_code, ''), 'unknown') AS error
+         FROM ai_tasks WHERE created_at >= ? AND status = 'failed'
+       )
+       GROUP BY tool_id, error
+       ORDER BY count DESC LIMIT 15`
+    ).bind(cutoff, cutoff).all(),
+    env.DB.prepare(
+      `SELECT
+         (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
+          WHERE created_at >= ? AND event_name = 'pricing_view') AS pricing_views,
+         (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
+          WHERE created_at >= ? AND event_name = 'xianyu_clicked') AS xianyu_clicks,
+         (SELECT COUNT(*) FROM orders
+          WHERE created_at >= ? AND payment_method = 'paypal') AS paypal_orders,
+         (SELECT COUNT(*) FROM orders
+          WHERE completed_at >= ? AND status = 'completed'
+            AND payment_method = 'paypal') AS paypal_completed,
+         (SELECT COUNT(*) FROM voucher_cards
+          WHERE redeemed_at >= ? AND status = 'redeemed') AS vouchers_redeemed`
+    ).bind(cutoff, cutoff, cutoff, cutoff, cutoff).first(),
+    env.DB.prepare(
+      'SELECT MIN(created_at) AS created_at FROM analytics_events'
+    ).first('created_at'),
+  ]);
+
+  const summaryValues = {
+    visitors: Number(summary?.visitors || 0),
+    sessions: Number(summary?.sessions || 0),
+    selected: Number(summary?.selected || 0),
+    starts: Number(summary?.starts || 0),
+    completed: Number(summary?.completed || 0),
+    downloads: Number(summary?.downloads || 0),
+  };
+  summaryValues.download_rate = analyticsRate(
+    summaryValues.downloads,
+    summaryValues.starts,
+  );
+
+  const byDay = new Map((trendRows.results || []).map((row) => [row.day, row]));
+  const trend = analyticsDayLabels(days).map((day) => {
+    const row = byDay.get(day) || {};
+    return {
+      day,
+      visitors: Number(row.visitors || 0),
+      selected: Number(row.selected || 0),
+      starts: Number(row.starts || 0),
+      downloads: Number(row.downloads || 0),
+    };
+  });
+
+  const inpaint = {
+    started: Number(inpaintService?.started || 0),
+    succeeded: Number(inpaintService?.succeeded || 0),
+    failed: Number(inpaintService?.failed || 0),
+    queued: Number(inpaintService?.queued || 0),
+    processing: Number(inpaintService?.processing || 0),
+    avg_duration_ms: analyticsDuration(inpaintService?.avg_duration_ms),
+    p95_duration_ms: analyticsDuration(inpaintP95),
+  };
+  inpaint.success_rate = analyticsRate(
+    inpaint.succeeded,
+    inpaint.succeeded + inpaint.failed,
+  );
+  const removeBg = {
+    started: Number(removeBgService?.started || 0),
+    succeeded: Number(removeBgService?.succeeded || 0),
+    failed: Number(removeBgService?.failed || 0),
+    processing: Number(removeBgService?.processing || 0),
+    avg_duration_ms: analyticsDuration(removeBgService?.avg_duration_ms),
+    p95_duration_ms: analyticsDuration(removeBgP95),
+  };
+  removeBg.success_rate = analyticsRate(
+    removeBg.succeeded,
+    removeBg.succeeded + removeBg.failed,
+  );
+
+  const tools = (toolRows.results || []).map((tool) => {
+    const starts = Number(tool.starts || 0);
+    const downloads = Number(tool.downloads || 0);
+    const service = tool.tool_id === 'inpaint'
+      ? inpaint
+      : tool.tool_id === 'remove_bg'
+        ? removeBg
+        : null;
+    return {
+      tool_id: tool.tool_id,
+      opens: Number(tool.opens || 0),
+      starts,
+      completed: Number(tool.completed || 0),
+      downloads,
+      download_rate: analyticsRate(downloads, starts),
+      failures: service?.failed || 0,
+      avg_duration_ms: service?.avg_duration_ms
+        || analyticsDuration(tool.avg_duration_ms),
+    };
+  });
+
+  return {
+    generated_at: Math.floor(Date.now() / 1000),
+    days,
+    mode: analyticsMode(env),
+    retention_days: ANALYTICS_RETENTION_DAYS,
+    data_started_at: Number(dataStartedAt || 0),
+    summary: summaryValues,
+    trend,
+    funnel: {
+      opened: summaryValues.sessions,
+      selected: summaryValues.selected,
+      started: summaryValues.starts,
+      completed: summaryValues.completed,
+      downloaded: summaryValues.downloads,
+    },
+    tools,
+    service: {
+      inpaint,
+      remove_bg: removeBg,
+    },
+    sources: sourceRows.results || [],
+    devices: deviceRows.results || [],
+    countries: countryRows.results || [],
+    languages: languageRows.results || [],
+    errors: errorRows.results || [],
+    commerce: {
+      pricing_views: Number(commerce?.pricing_views || 0),
+      xianyu_clicks: Number(commerce?.xianyu_clicks || 0),
+      paypal_orders: Number(commerce?.paypal_orders || 0),
+      paypal_completed: Number(commerce?.paypal_completed || 0),
+      vouchers_redeemed: Number(commerce?.vouchers_redeemed || 0),
+    },
+  };
+}
+
+async function cleanupAnalytics(env) {
+  const retentionSeconds = ANALYTICS_RETENTION_DAYS * 24 * 60 * 60;
+  const [events, limits] = await env.DB.batch([
+    env.DB.prepare(
+      'DELETE FROM analytics_events WHERE created_at < unixepoch() - ?'
+    ).bind(retentionSeconds),
+    env.DB.prepare(
+      'DELETE FROM analytics_rate_limits WHERE updated_at < unixepoch() - 3600'
+    ),
+  ]);
+  return {
+    events: Number(events.meta?.changes || 0),
+    rate_limits: Number(limits.meta?.changes || 0),
+  };
+}
+
 // ── Router ────────────────────────────────────────────────────
 export default {
   async fetch(request, env, ctx) {
@@ -1427,6 +1913,57 @@ export default {
           'Access-Control-Max-Age': '86400',
         }
       });
+    }
+
+    if (url.pathname === '/api/analytics/events' && request.method === 'POST') {
+      const mode = analyticsMode(env);
+      if (
+        mode === 'off'
+        || request.headers.get('Sec-GPC') === '1'
+        || request.headers.get('DNT') === '1'
+      ) {
+        return privateJson({ accepted: 0, mode }, 202, origin);
+      }
+      if (!analyticsOriginAllowed(request)) {
+        return privateJson({ error: 'Analytics request was not accepted.' }, 403, origin);
+      }
+      if (mode === 'admin_only' && !await getAdmin(request, env)) {
+        return privateJson({ accepted: 0, mode }, 202, origin);
+      }
+
+      const contentLength = Number(request.headers.get('Content-Length') || 0);
+      if (contentLength > 32768) {
+        return privateJson({ error: 'Analytics payload is too large.' }, 413, origin);
+      }
+      const rawBody = await request.text();
+      if (rawBody.length > 32768) {
+        return privateJson({ error: 'Analytics payload is too large.' }, 413, origin);
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return privateJson({ error: 'Invalid analytics JSON.' }, 400, origin);
+      }
+      const result = await storeAnalyticsBatch(env, request, payload);
+      if (result.error) {
+        return privateJson({ error: result.error }, result.status, origin);
+      }
+      return privateJson({ ...result, mode }, 202, origin);
+    }
+
+    if (url.pathname === '/api/admin/analytics' && request.method === 'GET') {
+      const admin = await getAdmin(request, env);
+      if (!admin) return privateJson({ error: 'Forbidden' }, 403, origin);
+      const requestedDays = Number.parseInt(url.searchParams.get('days') || '30', 10);
+      if (![1, 7, 30, 90].includes(requestedDays)) {
+        return privateJson({ error: 'Invalid analytics date range.' }, 400, origin);
+      }
+      const overview = await getAnalyticsOverview(env, requestedDays);
+      return privateJson({
+        admin: { email: admin.email },
+        ...overview,
+      }, 200, origin);
     }
 
     const inpaintResponse = await maybeHandleInpaintRequest(request, env, {
@@ -3529,10 +4066,12 @@ export default {
     const expiredInpaintResults = env.INPAINT_OBJECTS
       ? await cleanupExpiredInpaint(env)
       : 0;
+    const analyticsCleanup = await cleanupAnalytics(env);
     console.log(JSON.stringify({
       message: 'Referral reward observation release completed',
       released,
       expiredInpaintResults,
+      analyticsCleanup,
     }));
   },
 

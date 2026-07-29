@@ -1,6 +1,14 @@
 (() => {
   'use strict';
 
+  if (!window.ShopBGAnalytics && !document.querySelector('script[data-shopbg-analytics]')) {
+    const analytics = document.createElement('script');
+    analytics.src = '/analytics.js?v=20260729-admin-operations-v1';
+    analytics.async = true;
+    analytics.dataset.shopbgAnalytics = 'true';
+    document.head.append(analytics);
+  }
+
   const API = 'https://api.shopbgremover.com';
   const localeOrder = ['en', 'es', 'pt-br', 'zh-cn', 'de', 'fr'];
   const localeNames = {

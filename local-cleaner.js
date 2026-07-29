@@ -739,6 +739,7 @@
 
   async function runServerBatch(entries, marks) {
     if (batchRunning) return;
+    const analyticsStartedAt = performance.now();
     batchRunning = true;
     if (active) active.processing = true;
     busy.classList.add('visible');
@@ -746,6 +747,10 @@
     syncShortcut();
     updateControls();
     try {
+      window.ShopBGAnalytics?.track('tool_started', {
+        tool_id: 'inpaint',
+        file_count: Math.min(entries.length, 50),
+      });
       const maskSpec = compactMaskSpec(marks);
       const clientBatchId = `browser_${crypto.randomUUID()}`;
       const created = await apiJson('/api/inpaint/batches', {
@@ -769,6 +774,13 @@
       };
       writeActiveBatch(record);
       const result = await finishBatch(record, entries);
+      if (result.success > 0) {
+        window.ShopBGAnalytics?.track('result_ready', {
+          tool_id: 'inpaint',
+          file_count: Math.min(result.success, 50),
+          duration_ms: Math.round(performance.now() - analyticsStartedAt),
+        });
+      }
       if (active && result.success > 0) await refreshActiveBitmap();
       status.textContent = result.cleanupPending
         ? copy.cleanupPending
@@ -926,6 +938,7 @@
   }
 
   async function openEditor(entry) {
+    window.ShopBGAnalytics?.track('tool_open', { tool_id: 'inpaint' });
     overlay.classList.add('visible');
     document.body.style.overflow = 'hidden';
     await loadEditorEntry(entry);
@@ -966,6 +979,11 @@
   function downloadCleaned() {
     const edit = active && edits.get(active.file);
     if (!edit) return;
+    window.ShopBGAnalytics?.track('result_downloaded', {
+      tool_id: 'inpaint',
+      file_count: 1,
+    });
+    window.ShopBGAnalytics?.flush();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(edit.blob);
     link.download = `${active.file.name.replace(/\.[^.]+$/, '') || 'product'}-cleaned.png`;
@@ -984,6 +1002,11 @@
       zip.file(name, edits.get(entry.file).blob);
     });
     const blob = await zip.generateAsync({ type: 'blob' });
+    window.ShopBGAnalytics?.track('result_downloaded', {
+      tool_id: 'inpaint',
+      file_count: Math.min(completed.length, 50),
+    });
+    window.ShopBGAnalytics?.flush();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'shopbg-ai-cleaned.zip';

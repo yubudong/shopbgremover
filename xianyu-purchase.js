@@ -33,6 +33,12 @@
         entry.target = '_blank';
         entry.rel = 'noopener noreferrer';
         entry.hidden = false;
+        entry.addEventListener('click', () => {
+          window.ShopBGAnalytics?.track('xianyu_clicked', {
+            tool_id: 'pricing',
+          });
+          window.ShopBGAnalytics?.flush();
+        });
         visibleCount += 1;
       }
       if (visibleCount) document.body.classList.add('xianyu-purchase-visible');

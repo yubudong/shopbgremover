@@ -17,6 +17,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await env.DB.exec(`
+    DELETE FROM analytics_events;
+    DELETE FROM analytics_rate_limits;
     DELETE FROM inpaint_tasks;
     DELETE FROM inpaint_batches;
     DELETE FROM credit_ledger;

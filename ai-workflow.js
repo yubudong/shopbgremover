@@ -715,11 +715,17 @@
         await waitForDetection();
         const plan = sync();
         if (!await preflight(plan)) return { started: false };
+        const analyticsTool = plan.aiCount > 0 ? 'remove_bg' : 'compose';
+        const analyticsStartedAt = performance.now();
 
         starting = false;
         processing = true;
         sync();
         options.onStart?.(plan);
+        window.ShopBGAnalytics?.track('tool_started', {
+          tool_id: analyticsTool,
+          file_count: Math.min(files.length, 50),
+        });
         let errors = 0;
         let stoppedForCredits = false;
         let actualAiCalls = 0;
@@ -786,6 +792,13 @@
         options.onOutputsChanged?.(outputs);
         sync();
         await persistSession();
+        if (outputs.length > 0) {
+          window.ShopBGAnalytics?.track('result_ready', {
+            tool_id: analyticsTool,
+            file_count: Math.min(outputs.length, 50),
+            duration_ms: Math.round(performance.now() - analyticsStartedAt),
+          });
+        }
         options.onComplete?.({
           outputs,
           errors,

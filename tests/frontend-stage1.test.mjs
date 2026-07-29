@@ -88,7 +88,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /src="\/ai-workflow\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /src="\/ai-workflow\.js\?v=20260729-admin-operations-v1"/, file);
     assert.match(html, /src="\/background-composer\.js\?v=20260727-image-delete-v1"/, file);
     assert.match(html, /src="\/product-organizer\.js\?v=20260727-image-delete-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260727-image-delete-v1"/, file);
@@ -258,7 +258,7 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
   for (const file of indexFiles) {
     const html = await read(file);
     assert.match(html, /href="\/local-cleaner\.css\?v=20260729-editor-navigation-v1"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-rectangle-wheel-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-admin-operations-v1"/, file);
     assert.match(html, /href="\/workspace-ui\.css\?v=20260729-gallery-readable-v1"/, file);
     assert.match(html, /src="\/workspace-ui\.js\?v=20260729-gallery-readable-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
@@ -532,7 +532,7 @@ test('Simplified Chinese locale covers the public site and six-language SEO grap
   const chineseHome = await read('zh-cn/index.html');
   assert.match(chineseHome, /AI 去背景/);
   assert.match(chineseHome, /data-account-page="home"/);
-  assert.match(chineseHome, /account-nav\.js\?v=20260727-unified-header-v1/);
+  assert.match(chineseHome, /account-nav\.js\?v=20260729-admin-operations-v1/);
   assert.match(chineseHome, /Shopify 2048、Amazon 1600、eBay 1600/);
   assert.doesNotMatch(chineseHome, /Amazon 1000|eBay 500/);
 
@@ -671,7 +671,7 @@ test('administrator-managed Xianyu purchase links are Chinese-only and fail clos
   assert.doesNotMatch(purchaseScript, /credentials: 'include'/);
 
   assert.match(credits, /data-xianyu-purchase data-xianyu-credits="default" hidden/);
-  assert.match(credits, /src="\/xianyu-purchase\.js\?v=20260727-xianyu-link-v1"/);
+  assert.match(credits, /src="\/xianyu-purchase\.js\?v=20260729-admin-operations-v1"/);
   assert.equal((chinesePricing.match(/data-xianyu-purchase(?:\s|=)/g) || []).length, 4);
   for (const [creditsValue, price] of [['100', '22'], ['300', '60'], ['1000', '160']]) {
     assert.match(
@@ -679,7 +679,7 @@ test('administrator-managed Xianyu purchase links are Chinese-only and fail clos
       new RegExp(`data-xianyu-credits="${creditsValue}" hidden>¥${price} · 去闲鱼购买`),
     );
   }
-  assert.match(chinesePricing, /src="\/xianyu-purchase\.js\?v=20260727-xianyu-link-v1"/);
+  assert.match(chinesePricing, /src="\/xianyu-purchase\.js\?v=20260729-admin-operations-v1"/);
 
   for (const file of pricingFiles.slice(0, -1)) {
     assert.doesNotMatch(await read(file), /data-xianyu-purchase|xianyu-purchase\.js/, file);
@@ -702,7 +702,7 @@ test('credit center is visible from every localized workspace and pricing page',
     const pricing = await read(pricingFiles[index]);
     const target = `/credits.html?lang=${languageParams[index]}`;
     assert.match(home, /data-account-page="home"/, indexFiles[index]);
-    assert.match(home, /account-nav\.js\?v=20260727-unified-header-v1/, indexFiles[index]);
+    assert.match(home, /account-nav\.js\?v=20260729-admin-operations-v1/, indexFiles[index]);
     assert.ok(pricing.includes(`href="${target}"`), pricingFiles[index]);
     assert.match(pricing, /credit-shortcuts/, pricingFiles[index]);
     assert.ok(pricing.includes(`href="/redeem.html?lang=${languageParams[index]}"`), pricingFiles[index]);
@@ -736,20 +736,62 @@ test('credit center is visible from every localized workspace and pricing page',
 
 test('administrator overview links all billing operations without exposing balance mutation', async () => {
   const admin = await read('admin.html');
-  assert.match(admin, /\/api\/admin\/overview/);
+  const script = await read('admin.js');
+  assert.match(admin, /网站运营/);
+  assert.match(admin, /积分与订单/);
+  assert.match(admin, /id="operationsView"/);
+  assert.match(admin, /id="billingView"/);
+  assert.doesNotMatch(admin, /admin-analytics/);
+  assert.match(script, /\/api\/admin\/overview/);
+  assert.match(script, /\/api\/admin\/analytics\?days=/);
   assert.match(admin, /id="inpaintValidation"/);
-  assert.match(admin, /\/api\/inpaint\/batches/);
-  assert.match(admin, /\/api\/inpaint\/tasks\/\$\{encodeURIComponent\(activeInpaint\.taskId\)\}\/result/);
-  assert.match(admin, /mask_spec_hash/);
-  assert.match(admin, /shopbg-admin-inpaint-validation-v1/);
-  assert.match(admin, /credentials:\s*'include'/);
-  assert.match(admin, /10 \* 1024 \* 1024/);
+  assert.match(script, /\/api\/inpaint\/batches/);
+  assert.match(script, /\/api\/inpaint\/tasks\/\$\{encodeURIComponent\(activeInpaint\.taskId\)\}\/result/);
+  assert.match(script, /mask_spec_hash/);
+  assert.match(script, /shopbg-admin-inpaint-validation-v1/);
+  assert.match(script, /credentials:\s*'include'/);
+  assert.match(script, /10 \* 1024 \* 1024/);
   assert.match(admin, /确认已下载并清理服务器结果/);
   assert.match(admin, /href="\/admin-vouchers"/);
   assert.match(admin, /href="\/admin-referrals"/);
-  assert.doesNotMatch(admin, /UPDATE user_credits|manual-credit|adjust-balance/i);
+  assert.doesNotMatch(`${admin}\n${script}`, /UPDATE user_credits|manual-credit|adjust-balance/i);
   assert.match(await read('admin-vouchers.html'), /href="\/admin"/);
   assert.match(await read('admin-referrals.html'), /href="\/admin"/);
+});
+
+test('first-party analytics is privacy-minimal and wired to explicit product milestones', async () => {
+  const analytics = await read('analytics.js');
+  const nav = await read('account-nav.js');
+  const cleaner = await read('local-cleaner.js');
+  const workflow = await read('ai-workflow.js');
+  const xianyu = await read('xianyu-purchase.js');
+  assert.match(nav, /analytics\.js\?v=20260729-admin-operations-v1/);
+  assert.match(analytics, /navigator\.globalPrivacyControl/);
+  assert.match(analytics, /navigator\.doNotTrack/);
+  assert.match(analytics, /\/api\/analytics\/events/);
+  assert.match(analytics, /events = queue\.splice\(0, 20\)/);
+  assert.match(analytics, /input\?\.id !== 'fileInput'/);
+  assert.match(analytics, /file_count/);
+  assert.match(analytics, /size_bucket/);
+  assert.doesNotMatch(analytics, /file\.name/);
+  assert.doesNotMatch(analytics, /CF-Connecting-IP|email|mask_key|result_key/);
+  assert.match(cleaner, /tool_id: 'inpaint'/);
+  assert.match(cleaner, /ShopBGAnalytics\?\.track\('result_ready'/);
+  assert.match(workflow, /plan\.aiCount > 0 \? 'remove_bg' : 'compose'/);
+  assert.match(workflow, /ShopBGAnalytics\?\.track\('tool_started'/);
+  assert.match(xianyu, /ShopBGAnalytics\?\.track\('xianyu_clicked'/);
+  for (const file of [
+    'privacy.html',
+    'de/privacy.html',
+    'es/privacy.html',
+    'fr/privacy.html',
+    'pt-br/privacy.html',
+    'zh-cn/privacy.html',
+  ]) {
+    const privacy = await read(file);
+    assert.match(privacy, /180/);
+    assert.match(privacy, /Global Privacy Control/);
+  }
 });
 
 test('localized low-credit prompts no longer advertise subscriptions or fake discounts', async () => {
@@ -835,7 +877,7 @@ test('public and account pages share one responsive authenticated header in all 
     const html = await read(file);
     const filename = file.split('/').at(-1);
     assert.match(html, /href="\/account-nav\.css\?v=20260727-unified-header-v1"/, file);
-    assert.match(html, /src="\/account-nav\.js\?v=20260727-unified-header-v1"/, file);
+    assert.match(html, /src="\/account-nav\.js\?v=20260729-admin-operations-v1"/, file);
     assert.match(
       html,
       new RegExp(`class="account-navbar" data-account-nav data-account-page="${expectedPublicPage.get(filename)}"`),
@@ -856,7 +898,7 @@ test('public and account pages share one responsive authenticated header in all 
   for (const file of accountPages) {
     const html = await read(file);
     assert.match(html, /href="\/account-nav\.css\?v=20260727-unified-header-v1"/, file);
-    assert.match(html, /src="\/account-nav\.js\?v=20260727-unified-header-v1"/, file);
+    assert.match(html, /src="\/account-nav\.js\?v=20260729-admin-operations-v1"/, file);
     assert.match(html, /class="account-navbar" data-account-nav data-account-page="(?:credits|redeem|referrals)"/, file);
   }
 

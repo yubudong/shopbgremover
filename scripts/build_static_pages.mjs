@@ -8,10 +8,13 @@ const output = path.join(root, '.pages-dist');
 const rootFiles = [
   '404.html',
   'admin.html',
+  'admin.css',
+  'admin.js',
   'admin-vouchers.html',
   'admin-referrals.html',
   'account-nav.css',
   'account-nav.js',
+  'analytics.js',
   'ai-workflow.css',
   'ai-workflow.js',
   'background-composer.js',

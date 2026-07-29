@@ -29,6 +29,7 @@ FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
 ADMIN_EMAILS = "yubudong2023@gmail.com"
 INPAINT_MODE = "public_free"
+ANALYTICS_MODE = "admin_only"
 
 [triggers]
 crons = ["17 * * * *"]
