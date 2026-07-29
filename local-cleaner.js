@@ -270,8 +270,14 @@
   const zoomFitButton = document.getElementById('localCleanZoomFit');
   const zoomInButton = document.getElementById('localCleanZoomIn');
   const zoomValue = document.getElementById('localCleanZoomValue');
+  const inpaintApiBase = typeof API === 'string'
+    ? API.replace(/\/+$/, '')
+    : (location.hostname === 'www.shopbgremover.com'
+      ? 'https://api.shopbgremover.com'
+      : '');
 
   const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+  const apiUrl = (path) => `${inpaintApiBase}${path}`;
   const formatCopy = (template, values) => Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
     template,
@@ -298,7 +304,7 @@
   async function apiJson(path, init = {}) {
     const headers = new Headers(init.headers);
     headers.set('X-Device-ID', deviceId());
-    const response = await fetch(path, {
+    const response = await fetch(apiUrl(path), {
       ...init,
       headers,
       credentials: 'include',
@@ -634,7 +640,7 @@
     const pendingAcknowledgements = new Map(record.pendingAcknowledgements || []);
     for (const task of batch.tasks) {
       if (task.status !== 'succeeded' || recovered.has(task.position)) continue;
-      const response = await fetch(`/api/inpaint/tasks/${encodeURIComponent(task.id)}/result`, {
+      const response = await fetch(apiUrl(`/api/inpaint/tasks/${encodeURIComponent(task.id)}/result`), {
         credentials: 'include',
         headers: { 'X-Device-ID': deviceId() },
       });

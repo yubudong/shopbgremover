@@ -237,13 +237,16 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
   assert.match(cleaner, /相同相对位置/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
   assert.match(cleaner, /!event\.ctrlKey && !event\.metaKey/);
-  assert.match(cleaner, /fetch\(path/);
+  assert.match(cleaner, /typeof API === 'string'/);
+  assert.match(cleaner, /'https:\/\/api\.shopbgremover\.com'/);
+  assert.match(cleaner, /fetch\(apiUrl\(path\)/);
+  assert.match(cleaner, /fetch\(apiUrl\(`\/api\/inpaint\/tasks/);
   assert.doesNotMatch(cleaner, /new Worker\(|inpaintRgba|dilateMask|sampleRadius|smoothingPasses/);
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260729-lama-public-v1"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-lama-public-v1"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260729-lama-public-v2"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-lama-public-v2"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
