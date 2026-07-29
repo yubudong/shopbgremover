@@ -29,7 +29,7 @@ Tracked migrations applied afterward:
 | 11 | `0011_xianyu_purchase_settings.sql` | 2026-07-27 02:15:47 UTC |
 | 12 | `0012_lama_inpaint_tasks.sql` | 2026-07-28 22:37:59 UTC |
 | 13 | `0013_first_party_product_analytics.sql` | 2026-07-29 08:28:06 UTC |
-| 14 | `0014_analytics_customer_segments.sql` | Pending |
+| 14 | `0014_analytics_customer_segments.sql` | 2026-07-29 10:46:46 UTC |
 
 The resulting production structure is maintained in `../schema.sql`. For a
 fresh database, initialize from that schema baseline. Future production changes

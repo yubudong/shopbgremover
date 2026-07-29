@@ -1689,7 +1689,8 @@ async function getAnalyticsOverview(env, days) {
          COUNT(DISTINCT CASE WHEN event_name = 'result_ready' THEN session_hash END) AS completed,
          COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads
        FROM analytics_events
-       WHERE created_at >= ? AND audience_type != 'internal'`
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')`
     ).bind(cutoff).first(),
     env.DB.prepare(
       `SELECT
@@ -1706,6 +1707,7 @@ async function getAnalyticsOverview(env, days) {
          COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
        GROUP BY day
        ORDER BY day`
     ).bind(cutoff).all(),
@@ -1719,6 +1721,7 @@ async function getAnalyticsOverview(env, days) {
          AVG(CASE WHEN event_name = 'result_ready' THEN duration_ms END) AS avg_duration_ms
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
          AND tool_id NOT IN ('', 'workspace', 'pricing')
        GROUP BY tool_id
        ORDER BY starts DESC, opens DESC`
@@ -1727,6 +1730,7 @@ async function getAnalyticsOverview(env, days) {
       `SELECT source AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
          AND event_name = 'page_view' AND source != ''
        GROUP BY source ORDER BY sessions DESC LIMIT 12`
     ).bind(cutoff).all(),
@@ -1734,6 +1738,7 @@ async function getAnalyticsOverview(env, days) {
       `SELECT device_type AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
          AND event_name = 'page_view' AND device_type != ''
        GROUP BY device_type ORDER BY sessions DESC`
     ).bind(cutoff).all(),
@@ -1741,6 +1746,7 @@ async function getAnalyticsOverview(env, days) {
       `SELECT country AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
          AND event_name = 'page_view' AND country != ''
        GROUP BY country ORDER BY sessions DESC LIMIT 12`
     ).bind(cutoff).all(),
@@ -1748,6 +1754,7 @@ async function getAnalyticsOverview(env, days) {
       `SELECT language AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
        WHERE created_at >= ? AND audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')
          AND event_name = 'page_view' AND language != ''
        GROUP BY language ORDER BY sessions DESC`
     ).bind(cutoff).all(),
@@ -1876,9 +1883,11 @@ async function getAnalyticsOverview(env, days) {
       `SELECT
          (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
           WHERE created_at >= ? AND audience_type != 'internal'
+            AND (audience_type = 'anonymous' OR account_hash != '')
             AND event_name = 'pricing_view') AS pricing_views,
          (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
           WHERE created_at >= ? AND audience_type != 'internal'
+            AND (audience_type = 'anonymous' OR account_hash != '')
             AND event_name = 'xianyu_clicked') AS xianyu_clicks,
          (SELECT COUNT(*) FROM orders
           WHERE created_at >= ? AND payment_method = 'paypal') AS paypal_orders,
@@ -1891,7 +1900,8 @@ async function getAnalyticsOverview(env, days) {
     env.DB.prepare(
       `SELECT MIN(created_at) AS created_at
        FROM analytics_events
-       WHERE audience_type != 'internal'`
+       WHERE audience_type != 'internal'
+         AND (audience_type = 'anonymous' OR account_hash != '')`
     ).first('created_at'),
   ]);
 

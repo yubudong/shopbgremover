@@ -1343,6 +1343,12 @@ describe('credit center and administrator overview', () => {
       && row.actor_type === 'user'
       && /^[a-f0-9]{64}$/.test(row.account_hash)
     ))).toBe(true);
+    await env.DB.prepare(
+      `INSERT INTO analytics_events
+       (id, visitor_hash, session_hash, event_name, actor_type, audience_type)
+       VALUES ('legacy-signed-event', 'legacy-visitor', 'legacy-session',
+               'page_view', 'user', 'registered')`
+    ).run();
 
     await env.DB.prepare(
       `INSERT INTO ai_tasks
@@ -1432,7 +1438,7 @@ describe('credit center and administrator overview', () => {
     expect(privacyOptOut.status).toBe(202);
     expect(await env.DB.prepare(
       'SELECT COUNT(*) AS count FROM analytics_events'
-    ).first('count')).toBe(12);
+    ).first('count')).toBe(13);
   });
 
   it('rejects cross-site and unsupported analytics payloads without recording them', async () => {
