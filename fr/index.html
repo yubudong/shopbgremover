@@ -277,7 +277,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260728-batch-clean-v1">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260729-lama-public-v1">
 <link rel="stylesheet" href="/ai-workflow.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/workspace-ui.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
@@ -297,7 +297,7 @@
 <section class="tool-section" id="tool">
   <div class="tool-head">
     <h1>Supprimez l'arrière-plan de vos produits pour <em>Shopify, Amazon et eBay</em></h1>
-    <p>Supprimez gratuitement et localement de petits objets ou des marques ressemblant à un filigrane, puis retirez le fond avec l’IA. Connectez-vous pour traiter jusqu’à 50 images par lot.</p>
+    <p>Supprimez gratuitement objets et traces de filigrane avec l’IA LaMa, puis retirez le fond si nécessaire. Visiteurs et utilisateurs peuvent nettoyer jusqu’à 50 images par lot.</p>
   </div>
 
   <div class="workspace">
@@ -331,8 +331,8 @@
         <div class="tool-feat">
           <span class="tool-feat-icon">🧽</span>
           <div>
-            <div class="tool-feat-title">Nettoyage local d’objets</div>
-            <div class="tool-feat-desc">Marquez gratuitement les petits objets et traces de type filigrane</div>
+            <div class="tool-feat-title">Nettoyage précis d’objets par IA</div>
+            <div class="tool-feat-desc">Nettoyage LaMa gratuit des objets et traces de filigrane</div>
           </div>
         </div>
         <div class="tool-feat">
@@ -368,10 +368,10 @@
           <span class="local-clean-entry-icon">🧽</span>
           <div class="local-clean-entry-copy">
             <strong class="local-clean-entry-title">Supprimer objets / filigranes</strong>
-            <span class="local-clean-entry-pill">Local · Gratuit</span>
+            <span class="local-clean-entry-pill">IA · Gratuit · Sans crédit</span>
           </div>
         </div>
-        <p>Peignez ou encadrez une petite zone. L’image reste dans ce navigateur et aucun crédit n’est utilisé.</p>
+        <p>Une image dérivée et le masque sont téléversés temporairement dans un stockage privé, supprimés après récupération dans le navigateur et conservés au maximum 24 heures.</p>
         <button class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled>Importez une image pour commencer</button>
       </div>
 
@@ -401,7 +401,7 @@
         <div class="ai-workflow-head">
           <div class="ai-workflow-copy">
             <strong>Supprimer le fond avec l’IA</strong>
-            <span>Un traitement IA réussi coûte 1 crédit par image. Le nettoyage local, les réglages du fond et l’export restent gratuits.</span>
+            <span>La suppression de fond coûte 1 crédit seulement après réussite. Le nettoyage d’objets par IA, les réglages du fond et l’export restent gratuits.</span>
           </div>
           <label class="ai-master-toggle" title="Activer l’IA pour toutes les images non transparentes">
             <input id="aiRemoveToggle" type="checkbox" checked aria-label="Activer l’IA pour toutes les images non transparentes">
@@ -754,7 +754,7 @@
     <div class="trust-card">
       <span class="trust-icon">🔒</span>
       <h3>Récupération uniquement dans le navigateur</h3>
-      <p>Votre espace de travail est enregistré localement dans ce navigateur pendant 24 heures maximum. Les images ne quittent le navigateur que si vous activez la suppression d’arrière-plan par IA.</p>
+      <p>Votre espace reste dans ce navigateur jusqu’à 24 heures. Le nettoyage IA téléverse temporairement une image dérivée et le masque dans un stockage privé ; la suppression de fond envoie l’image requise à son API.</p>
     </div>
     <div class="trust-card">
       <span class="trust-icon">💰</span>
@@ -1330,7 +1330,7 @@ let selectedFiles   = [];
 
   function handleFiles(files, { restoredItems = [] } = {}) {
     const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
-    const limit = currentUser ? 50 : 1;
+    const limit = 50;
     const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
     const additions = files
       .filter(file => file.type.startsWith('image/'))
@@ -1342,9 +1342,7 @@ let selectedFiles   = [];
       })
       .slice(0, Math.max(0, limit - selectedFiles.length));
     if (!additions.length) {
-      if (selectedFiles.length >= limit) setStatus(currentUser
-        ? 'La limite de 50 images par lot est atteinte.'
-        : 'Connectez-vous pour ajouter plus d’une image.');
+      if (selectedFiles.length >= limit) setStatus('La limite de 50 images par lot est atteinte.');
       return;
     }
     const startIndex = selectedFiles.length;
@@ -1388,7 +1386,7 @@ let selectedFiles   = [];
       card.appendChild(removeButton);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
         initialSource: restoredItem?.sourceBlob || null,
-        onApply: ({ previewUrl, restored }) => {
+        onApply: async ({ previewUrl, restored }) => {
           if (img.dataset.aiResultUrl) {
             URL.revokeObjectURL(img.dataset.aiResultUrl);
             delete img.dataset.aiResultUrl;
@@ -1398,6 +1396,7 @@ let selectedFiles   = [];
           badge.textContent = restored ? '⏳' : '✏️';
           aiWorkflow?.markSourceChanged(i);
           resetProcessActionAfterLocalEdit(i, restored);
+          await aiWorkflow?.persistSession();
         },
       });
       backgroundComposer?.decorateCard(card, i, file.name);
@@ -1444,7 +1443,7 @@ let selectedFiles   = [];
     setProcessButtonReady();
     setStatus(restored
       ? "Original restauré. Seule cette image doit être préparée à nouveau."
-      : "Nettoyage local enregistré. Seule cette image doit être préparée à nouveau.");
+      : "Nettoyage IA enregistré. Seule cette image doit être préparée à nouveau.");
   }
 
   async function compressToDataUrl(file) {
@@ -1717,7 +1716,7 @@ let selectedFiles   = [];
     userReady.finally(() => aiWorkflow.restoreSession());
   }, { once: true });
 </script>
-<script src="/local-cleaner.js?v=20260728-batch-clean-v1"></script>
+<script src="/local-cleaner.js?v=20260729-lama-public-v1"></script>
 <script src="/workspace-ui.js?v=20260727-image-delete-v1"></script>
 </body>
 </html>

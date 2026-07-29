@@ -28,7 +28,7 @@ bucket_name = "shopbgremover-inpaint-private"
 FRONTEND_URL = "https://www.shopbgremover.com"
 NEXTAUTH_URL = "https://www.shopbgremover.com"
 ADMIN_EMAILS = "yubudong2023@gmail.com"
-INPAINT_MODE = "admin_free"
+INPAINT_MODE = "public_free"
 
 [triggers]
 crons = ["17 * * * *"]

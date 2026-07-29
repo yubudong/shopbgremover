@@ -24,8 +24,6 @@ const rootFiles = [
   'index.html',
   'local-cleaner.css',
   'local-cleaner.js',
-  'local-cleaner-worker.js',
-  'local-inpaint-core.mjs',
   'pricing.html',
   'privacy.html',
   'product-organizer.js',

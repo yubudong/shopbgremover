@@ -810,7 +810,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260728-batch-clean-v1">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260729-lama-public-v1">
 <link rel="stylesheet" href="/ai-workflow.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/workspace-ui.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
@@ -833,7 +833,7 @@
 <section class="tool-section" id="tool">
   <div class="tool-head">
     <h1>Quita el fondo de tus productos para <em>Shopify, Amazon e eBay</em></h1>
-    <p>Elimina localmente objetos pequeños o marcas similares a una marca de agua gratis y después quita el fondo con IA. Inicia sesión para procesar hasta 50 imágenes por lote.</p>
+    <p>Elimina gratis objetos o marcas de agua con IA LaMa y después quita el fondo si lo necesitas. Invitados y usuarios pueden limpiar hasta 50 imágenes por lote.</p>
   </div>
 
   <div class="workspace">
@@ -870,8 +870,8 @@
         <div class="tool-feat">
           <span class="tool-feat-icon">🧽</span>
           <div>
-            <div class="tool-feat-title">Limpieza local de objetos</div>
-            <div class="tool-feat-desc">Marca objetos pequeños y señales tipo marca de agua gratis</div>
+            <div class="tool-feat-title">Limpieza precisa de objetos con IA</div>
+            <div class="tool-feat-desc">Limpieza LaMa gratis para objetos y marcas de agua</div>
           </div>
         </div>
         <div class="tool-feat">
@@ -907,10 +907,10 @@
           <span class="local-clean-entry-icon">🧽</span>
           <div class="local-clean-entry-copy">
             <strong class="local-clean-entry-title">Quitar objetos / marcas de agua</strong>
-            <span class="local-clean-entry-pill">Local · Gratis</span>
+            <span class="local-clean-entry-pill">IA · Gratis · Sin créditos</span>
           </div>
         </div>
-        <p>Pinta o encuadra un área pequeña. La imagen permanece en este navegador y no consume créditos.</p>
+        <p>Una imagen derivada y la máscara se suben temporalmente a almacenamiento privado, se borran tras recuperarlas en el navegador y se conservan como máximo 24 horas.</p>
         <button class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled>Sube una imagen para empezar</button>
       </div>
 
@@ -940,7 +940,7 @@
         <div class="ai-workflow-head">
           <div class="ai-workflow-copy">
             <strong>Eliminar fondo con IA</strong>
-            <span>El procesamiento correcto con IA cuesta 1 crédito por imagen. La limpieza local, los ajustes de fondo y la exportación siguen siendo gratis.</span>
+            <span>La eliminación de fondo cuesta 1 crédito solo tras completarse. La limpieza de objetos con IA, los ajustes de fondo y la exportación son gratis.</span>
           </div>
           <label class="ai-master-toggle" title="Activar IA para todas las imágenes no transparentes">
             <input id="aiRemoveToggle" type="checkbox" checked aria-label="Activar IA para todas las imágenes no transparentes">
@@ -1306,7 +1306,7 @@
     <div class="trust-card">
       <span class="trust-icon">🔒</span>
       <h3>Recuperación solo en el navegador</h3>
-      <p>Tu espacio de trabajo se guarda localmente en este navegador durante un máximo de 24 horas. Las imágenes solo salen del navegador si habilitas la eliminación de fondo con IA.</p>
+      <p>Tu espacio se guarda en este navegador hasta 24 horas. La limpieza IA sube temporalmente una imagen derivada y la máscara a almacenamiento privado; la eliminación de fondo sube la imagen necesaria a su API.</p>
     </div>
     <div class="trust-card">
       <span class="trust-icon">💰</span>
@@ -1910,7 +1910,7 @@ let selectedFiles   = [];
 
   function handleFiles(files, { restoredItems = [] } = {}) {
     const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
-    const limit = currentUser ? 50 : 1;
+    const limit = 50;
     const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
     const additions = files
       .filter(file => file.type.startsWith('image/'))
@@ -1922,9 +1922,7 @@ let selectedFiles   = [];
       })
       .slice(0, Math.max(0, limit - selectedFiles.length));
     if (!additions.length) {
-      if (selectedFiles.length >= limit) setStatus(currentUser
-        ? 'Se alcanzó el límite de 50 imágenes por lote.'
-        : 'Inicia sesión para añadir más de una imagen.');
+      if (selectedFiles.length >= limit) setStatus('Se alcanzó el límite de 50 imágenes por lote.');
       return;
     }
     const startIndex = selectedFiles.length;
@@ -1968,7 +1966,7 @@ let selectedFiles   = [];
       card.appendChild(removeButton);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
         initialSource: restoredItem?.sourceBlob || null,
-        onApply: ({ previewUrl, restored }) => {
+        onApply: async ({ previewUrl, restored }) => {
           if (img.dataset.aiResultUrl) {
             URL.revokeObjectURL(img.dataset.aiResultUrl);
             delete img.dataset.aiResultUrl;
@@ -1978,6 +1976,7 @@ let selectedFiles   = [];
           badge.textContent = restored ? '⏳' : '✏️';
           aiWorkflow?.markSourceChanged(i);
           resetProcessActionAfterLocalEdit(i, restored);
+          await aiWorkflow?.persistSession();
         },
       });
       backgroundComposer?.decorateCard(card, i, file.name);
@@ -2024,7 +2023,7 @@ let selectedFiles   = [];
     setProcessButtonReady();
     setStatus(restored
       ? "Original restaurado. Solo esta imagen debe prepararse de nuevo."
-      : "Limpieza local guardada. Solo esta imagen debe prepararse de nuevo.");
+      : "Limpieza con IA guardada. Solo esta imagen debe prepararse de nuevo.");
   }
 
   // ── Free-use gate (anonymous) ─────────────────────────────
@@ -2314,7 +2313,7 @@ let selectedFiles   = [];
     userReady.finally(() => aiWorkflow.restoreSession());
   }, { once: true });
 </script>
-<script src="/local-cleaner.js?v=20260728-batch-clean-v1"></script>
+<script src="/local-cleaner.js?v=20260729-lama-public-v1"></script>
 <script src="/workspace-ui.js?v=20260727-image-delete-v1"></script>
 </body>
 </html>

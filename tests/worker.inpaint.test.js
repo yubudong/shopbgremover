@@ -405,6 +405,59 @@ describe('private LaMa inpaint task chain', () => {
     ).bind(owner.userId).first('credits')).toBe(4);
   });
 
+  it('cancels an in-flight task without publishing a late result', async () => {
+    const owner = await login('admin@example.com', 'cancel-owner', 3);
+    const chain = taskChainEnv('admin_free');
+    const created = await body(await worker.fetch(batchRequest({
+      cookie: owner.cookie,
+      taskCount: 1,
+      clientBatchId: 'cancel_batch_001',
+      deviceId: 'cancel-owner',
+    }), chain.value));
+    const task = created.batch.tasks[0];
+    const form = new FormData();
+    form.set('image', new File([new Uint8Array([1, 2, 3])], 'input.png', { type: 'image/png' }));
+    form.set('mask', new File([new Uint8Array([4, 5, 6])], 'mask.png', { type: 'image/png' }));
+    form.set('mask_spec_hash', created.batch.mask_spec_hash);
+    await worker.fetch(new Request(
+      `${API_ORIGIN}/api/inpaint/batches/${created.batch.id}/tasks/0`,
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: form },
+    ), chain.value);
+
+    let releaseService;
+    let serviceStarted;
+    const started = new Promise((resolve) => { serviceStarted = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      serviceStarted();
+      await new Promise((resolve) => { releaseService = resolve; });
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { 'Content-Type': 'image/png' },
+      });
+    }));
+    const message = queueMessage(chain.queue.messages[0]);
+    const processing = worker.queue({ messages: [message] }, chain.value);
+    await started;
+
+    const cancelled = await worker.fetch(authenticatedRequest(
+      `/api/inpaint/batches/${created.batch.id}`,
+      owner.cookie,
+      { method: 'DELETE' },
+    ), chain.value);
+    expect(cancelled.status).toBe(200);
+    releaseService();
+    await processing;
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(await env.DB.prepare(
+      'SELECT status FROM inpaint_tasks WHERE id = ?'
+    ).bind(task.id).first('status')).toBe('cancelled');
+    expect(chain.r2.objects.size).toBe(0);
+    expect(await env.DB.prepare(
+      'SELECT credits FROM user_credits WHERE user_id = ?'
+    ).bind(owner.userId).first('credits')).toBe(3);
+  });
+
   it('retries transient failure and terminally cleans inputs without charging', async () => {
     const owner = await login('admin@example.com', 'retry-owner', 2);
     const chain = taskChainEnv('admin_free');

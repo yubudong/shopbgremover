@@ -117,7 +117,7 @@ test('all localized workspaces use stable per-image AI task identities', async (
     assert.match(html, /initialSource: restoredItem\?\.sourceBlob \|\| null/, file);
     assert.match(html, /window\.addEventListener\('load'[\s\S]*aiWorkflow\.restoreSession\(\)/, file);
     assert.match(html, /data-summary="\{ai\}[^"]+\{total\}[^"]+\{noCharge\}/, file);
-    assert.match(html, /const limit = currentUser \? 50 : 1/, file);
+    assert.match(html, /const limit = 50/, file);
     assert.match(html, /slice\(0, Math\.max\(0, limit - selectedFiles\.length\)\)/, file);
     assert.equal((html.match(/id="downloadBtn"/g) || []).length, 1, file);
     assert.match(html, /function setDownloadActions\(outputs, keepProcessReady = false\)/, file);
@@ -202,62 +202,63 @@ test('all localized workspaces use stable per-image AI task identities', async (
   }
 });
 
-test('all localized workspaces integrate the browser-only local cleanup editor', async () => {
+test('all localized workspaces integrate private LaMa cleanup with serial upload and recovery', async () => {
   const cleaner = await read('local-cleaner.js');
-  const worker = await read('local-cleaner-worker.js');
-  const core = await read('local-inpaint-core.mjs');
 
-  assert.match(cleaner, /new Worker\('\/local-cleaner-worker\.js\?v=20260725-preview-v3', \{ type: 'module' \}\)/);
   assert.match(cleaner, /decorateCard\(card, file, index/);
   assert.match(cleaner, /getSourceFile\(file\)/);
   assert.match(cleaner, /Only edit images you own or are authorized to modify/);
-  assert.match(cleaner, /document\.body\.append\(link\)/);
-  assert.match(cleaner, /link\.download = `\$\{baseName\}-cleaned\.png`/);
+  assert.match(cleaner, /temporarily uploaded to private storage/);
+  assert.match(cleaner, /AI cleanup is free and uses no credits/);
   assert.match(cleaner, /document\.getElementById\('localCleanupShortcut'\)/);
   assert.match(cleaner, /connectedEntries\(\)\[0\]\?\.button\.click\(\)/);
-  assert.match(cleaner, /shortcutButton\.disabled = count === 0/);
+  assert.match(cleaner, /shortcutButton\.disabled = count === 0 \|\| !serviceEnabled \|\| batchRunning/);
   assert.match(cleaner, /options\.initialSource && options\.initialSource !== file/);
   assert.match(cleaner, /edits\.set\(file, \{ blob: options\.initialSource, previewUrl: null \}\)/);
   assert.match(cleaner, /'zh-CN': \{/);
-  assert.match(cleaner, /normalizedLanguage/);
   assert.match(cleaner, /id="localCleanApplyBatch"/);
-  assert.match(cleaner, /async function applyBatchCleanup\(\)/);
-  assert.match(cleaner, /const entries = \[\.\.\.connectedEntries\(\)\]/);
-  assert.match(cleaner, /bitmap = await bitmapFrom\(currentSource\(entries\[index\]\.file\)\)/);
-  assert.match(cleaner, /saveEdit\(entries\[index\], blob\)/);
-  assert.match(cleaner, /batchButton\.addEventListener\('click', applyBatchCleanup\)/);
+  assert.match(cleaner, /id="localCleanDownloadBatch"/);
+  assert.match(cleaner, /async function runServerBatch\(entries, marks\)/);
+  assert.match(cleaner, /for \(const task of batch\.tasks\)/);
+  assert.match(cleaner, /await apiJson\(`\/api\/inpaint\/batches\/\$\{encodeURIComponent\(record\.batchId\)\}\/tasks\/\$\{task\.position\}`/);
+  assert.match(cleaner, /await wait\(POLL_DELAY_MS\)/);
+  assert.match(cleaner, /\/api\/inpaint\/tasks\/\$\{encodeURIComponent\(task\.id\)\}\/result/);
+  assert.match(cleaner, /method: 'DELETE'/);
+  assert.match(cleaner, /ACTIVE_BATCH_KEY = 'shopbg-inpaint-active-v1'/);
+  assert.match(cleaner, /localStorage\.setItem\(ACTIVE_BATCH_KEY/);
+  assert.match(cleaner, /async function resumeStoredBatch\(\)/);
+  assert.match(cleaner, /MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(cleaner, /MAX_SIDE = 2048/);
+  assert.match(cleaner, /task_count: entries\.length/);
+  assert.match(cleaner, /slice\(0, 50\)/);
+  assert.match(cleaner, /coordinate_space: 'normalized'/);
+  assert.match(cleaner, /mask_spec_hash/);
   assert.match(cleaner, /same relative position/i);
   assert.match(cleaner, /相同相对位置/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
-  assert.match(cleaner, /event\.ctrlKey && !event\.metaKey/);
-  assert.match(cleaner, /const compositeMaskValues = dilateCompositeMask\(mask, workWidth, workHeight, 2\)/);
-  assert.match(cleaner, /compositeMaskValues\[index\] \? 255 : 0/);
-  assert.match(cleaner, /repairedAreaContext\.globalCompositeOperation = 'destination-in'/);
-  assert.match(worker, /import \{ dilateMask, inpaintRgba \}/);
-  assert.doesNotMatch(worker, /maskBuffer: expandedMask\.buffer/);
-  assert.match(worker, /sampleRadius: 6/);
-  assert.match(worker, /smoothingPasses: 8/);
-  assert.doesNotMatch(cleaner, /\bfetch\s*\(/);
-  assert.doesNotMatch(worker, /\bfetch\s*\(/);
-  assert.doesNotMatch(core, /\bfetch\s*\(/);
-  assert.doesNotMatch(`${cleaner}\n${worker}\n${core}`, /\/api\/inpaint|https?:\/\//);
+  assert.match(cleaner, /!event\.ctrlKey && !event\.metaKey/);
+  assert.match(cleaner, /fetch\(path/);
+  assert.doesNotMatch(cleaner, /new Worker\(|inpaintRgba|dilateMask|sampleRadius|smoothingPasses/);
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260728-batch-clean-v1"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260728-batch-clean-v1"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260729-lama-public-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-lama-public-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
     assert.match(html, /local-clean-entry-pill/, file);
     assert.match(html, /🧽/, file);
+    assert.match(html, /(?:private|privat|privado|privé|私有)[^<]+(?:24|24)/i, file);
+    assert.match(html, /const limit = 50/, file);
     assert.doesNotMatch(html, /ShopBGLocalCleaner\?\.clearAll\(\)/, file);
     assert.match(html, /selectedFiles\.push\(\.\.\.additions\)/, file);
     assert.match(html, /additions\.forEach\(\(file, offset\)/, file);
     assert.match(html, /fileInput\.value = ''/, file);
     assert.match(html, /ShopBGLocalCleaner\?\.decorateCard\(card, file, i/, file);
     assert.match(html, /getSourceFile: \(file\) => window\.ShopBGLocalCleaner\?\.getSourceFile\(file\) \|\| file/, file);
-    assert.match(html, /onApply: \(\{ previewUrl, restored \}\)/, file);
+    assert.match(html, /onApply: async \(\{ previewUrl, restored \}\)/, file);
+    assert.match(html, /await aiWorkflow\?\.persistSession\(\)/, file);
     assert.match(html, /resetProcessActionAfterLocalEdit\(index, restored = false\)/, file);
     assert.match(html, /badge\.textContent = restored \? '⏳' : '✏️'/, file);
     assert.equal((html.match(/id="workspacePreview"/g) || []).length, 1, file);
@@ -268,6 +269,14 @@ test('all localized workspaces integrate the browser-only local cleanup editor',
     assert.match(html, /updateWorkspacePreview\(index, objectUrl\)/, file);
     assert.match(html, /card\.addEventListener\('click'/, file);
     assert.equal((html.match(/\/api\/remove-bg/g) || []).length, 0, file);
+  }
+
+  for (const locale of locales) {
+    const privacy = await read(`${locale}privacy.html`);
+    const terms = await read(`${locale}terms.html`);
+    assert.match(privacy, /LaMa/i, `${locale}privacy.html`);
+    assert.match(privacy, /24/, `${locale}privacy.html`);
+    assert.match(terms, /50/, `${locale}terms.html`);
   }
 });
 
@@ -541,8 +550,6 @@ test('Pages build contains only the canonical static site', async () => {
     'referrals-localized.js',
     'local-cleaner.css',
     'local-cleaner.js',
-    'local-cleaner-worker.js',
-    'local-inpaint-core.mjs',
     'workspace-ui.css',
     'workspace-ui.js',
     'admin.html',

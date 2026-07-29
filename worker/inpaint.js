@@ -487,31 +487,58 @@ async function acknowledgeResult(env, identity, taskId, respond, origin) {
 async function cancelBatch(env, identity, batchId, respond, origin) {
   const batch = await readOwnedBatch(env, batchId, identity.ownerKey);
   if (!batch) return respond({ error: 'Batch not found.' }, 404, origin);
-  if (['succeeded', 'partial', 'failed', 'cancelled'].includes(batch.status)) {
+  if (['succeeded', 'partial', 'failed'].includes(batch.status)) {
     return respond({ ok: true, status: batch.status }, 200, origin);
   }
   const objects = await env.DB.prepare(
-    `SELECT image_key, mask_key, result_key FROM inpaint_tasks
+    `SELECT id, image_key, mask_key, result_key FROM inpaint_tasks
      WHERE batch_id = ? AND owner_key = ?`
   ).bind(batchId, identity.ownerKey).all();
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE inpaint_batches
-       SET status = 'cancelled', completed_at = unixepoch(), updated_at = unixepoch()
-       WHERE id = ? AND owner_key = ?`
-    ).bind(batchId, identity.ownerKey),
-    env.DB.prepare(
-      `UPDATE inpaint_tasks
-       SET status = 'cancelled', completed_at = unixepoch(), updated_at = unixepoch()
-       WHERE batch_id = ? AND owner_key = ?
-         AND status IN ('awaiting_upload', 'queued')`
-    ).bind(batchId, identity.ownerKey),
-  ]);
-  await Promise.all((objects.results || []).flatMap((row) =>
-    [row.image_key, row.mask_key, row.result_key]
-      .filter(Boolean)
-      .map((key) => env.INPAINT_OBJECTS.delete(key).catch(() => undefined))
-  ));
+  if (batch.status !== 'cancelled') {
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE inpaint_batches
+         SET status = 'cancelled', completed_at = unixepoch(), updated_at = unixepoch()
+         WHERE id = ? AND owner_key = ?`
+      ).bind(batchId, identity.ownerKey),
+      env.DB.prepare(
+        `UPDATE inpaint_tasks
+         SET status = 'cancelled', completed_at = unixepoch(), updated_at = unixepoch()
+         WHERE batch_id = ? AND owner_key = ?
+           AND status IN ('awaiting_upload', 'queued', 'processing')`
+      ).bind(batchId, identity.ownerKey),
+    ]);
+  }
+  let cleanupFailed = false;
+  for (const row of objects.results || []) {
+    const keys = [row.image_key, row.mask_key, row.result_key].filter(Boolean);
+    try {
+      const deleted = await Promise.all(
+        keys.map((key) => deletePrivateObjectVerified(env, key))
+      );
+      if (deleted.some((confirmed) => !confirmed)) throw new Error('r2_delete_unconfirmed');
+      await env.DB.prepare(
+        `UPDATE inpaint_tasks
+         SET image_key = NULL, mask_key = NULL, result_key = NULL,
+             updated_at = unixepoch()
+         WHERE batch_id = ? AND owner_key = ? AND id = ? AND status = 'cancelled'`
+      ).bind(batchId, identity.ownerKey, row.id).run();
+    } catch (error) {
+      cleanupFailed = true;
+      console.error(JSON.stringify({
+        message: 'Cancelled inpaint object deletion was not confirmed',
+        batchId,
+        taskId: row.id,
+        error: safeErrorDetail(error?.message),
+      }));
+    }
+  }
+  if (cleanupFailed) {
+    return respond({
+      error: 'The batch was cancelled, but private object cleanup needs another retry.',
+      code: 'cancel_cleanup_failed',
+    }, 503, origin);
+  }
   return respond({ ok: true, status: 'cancelled' }, 200, origin);
 }
 
@@ -729,6 +756,26 @@ async function processQueueMessage(message, env) {
       if (!result.byteLength || result.byteLength > 25 * 1024 * 1024) {
         throw new Error('invalid_result_size');
       }
+      const currentStatus = await env.DB.prepare(
+        'SELECT status FROM inpaint_tasks WHERE id = ?'
+      ).bind(task.id).first('status');
+      if (currentStatus !== 'processing') {
+        const deleted = await Promise.all(
+          [task.image_key, task.mask_key, task.result_key]
+            .filter(Boolean)
+            .map((key) => deletePrivateObjectVerified(env, key))
+        );
+        if (deleted.every(Boolean)) {
+          await env.DB.prepare(
+            `UPDATE inpaint_tasks
+             SET image_key = NULL, mask_key = NULL, result_key = NULL,
+                 updated_at = unixepoch()
+             WHERE id = ? AND status = 'cancelled'`
+          ).bind(task.id).run();
+        }
+        message.ack();
+        return;
+      }
       await env.INPAINT_OBJECTS.put(task.result_key, result, {
         httpMetadata: { contentType: 'image/png' },
         customMetadata: { taskId: task.id, kind: 'result' },
@@ -739,7 +786,7 @@ async function processQueueMessage(message, env) {
       env.INPAINT_OBJECTS.delete(task.image_key).catch(() => undefined),
       env.INPAINT_OBJECTS.delete(task.mask_key).catch(() => undefined),
     ]);
-    await env.DB.prepare(
+    const completed = await env.DB.prepare(
       `UPDATE inpaint_tasks
        SET status = 'succeeded', image_key = NULL, mask_key = NULL,
            lease_expires_at = NULL, error_code = NULL, error_detail = NULL,
@@ -747,6 +794,11 @@ async function processQueueMessage(message, env) {
            completed_at = unixepoch(), updated_at = unixepoch()
        WHERE id = ? AND status = 'processing'`
     ).bind(RESULT_TTL_SECONDS, task.id).run();
+    if (Number(completed.meta?.changes || 0) !== 1) {
+      await env.INPAINT_OBJECTS.delete(task.result_key).catch(() => undefined);
+      message.ack();
+      return;
+    }
     await refreshBatch(env, task.batch_id);
     message.ack();
   } catch (error) {
@@ -773,13 +825,43 @@ export async function processInpaintQueue(batch, env) {
 }
 
 export async function cleanupExpiredInpaint(env) {
+  const cancelled = await env.DB.prepare(
+    `SELECT id, image_key, mask_key, result_key FROM inpaint_tasks
+     WHERE status = 'cancelled'
+       AND (image_key IS NOT NULL OR mask_key IS NOT NULL OR result_key IS NOT NULL)
+     ORDER BY updated_at
+     LIMIT 100`
+  ).all();
+  let cleaned = 0;
+  for (const task of cancelled.results || []) {
+    try {
+      const deleted = await Promise.all(
+        [task.image_key, task.mask_key, task.result_key]
+          .filter(Boolean)
+          .map((key) => deletePrivateObjectVerified(env, key))
+      );
+      if (deleted.some((confirmed) => !confirmed)) throw new Error('r2_delete_unconfirmed');
+      await env.DB.prepare(
+        `UPDATE inpaint_tasks
+         SET image_key = NULL, mask_key = NULL, result_key = NULL,
+             updated_at = unixepoch()
+         WHERE id = ? AND status = 'cancelled'`
+      ).bind(task.id).run();
+      cleaned += 1;
+    } catch (error) {
+      console.error(JSON.stringify({
+        message: 'Cancelled inpaint cleanup was not confirmed',
+        taskId: task.id,
+        error: safeErrorDetail(error?.message),
+      }));
+    }
+  }
   const expired = await env.DB.prepare(
     `SELECT id, result_key FROM inpaint_tasks
      WHERE result_key IS NOT NULL AND result_expires_at <= unixepoch()
      ORDER BY result_expires_at
      LIMIT 100`
   ).all();
-  let cleaned = 0;
   for (const task of expired.results || []) {
     try {
       if (!await deletePrivateObjectVerified(env, task.result_key)) {

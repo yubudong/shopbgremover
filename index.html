@@ -806,7 +806,7 @@
     .footer-langs a:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
     .footer-langs a.active { color: #60A5FA; border-color: rgba(96,165,250,0.3); }
 </style>
-<link rel="stylesheet" href="/local-cleaner.css?v=20260728-batch-clean-v1">
+<link rel="stylesheet" href="/local-cleaner.css?v=20260729-lama-public-v1">
 <link rel="stylesheet" href="/ai-workflow.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/workspace-ui.css?v=20260727-image-delete-v1">
 <link rel="stylesheet" href="/account-nav.css?v=20260727-unified-header-v1">
@@ -829,7 +829,7 @@
 <section class="tool-section" id="tool">
   <div class="tool-head">
     <h1>Remove product backgrounds for <em>Shopify, Amazon & eBay</em></h1>
-    <p>Remove small objects or watermark-like marks locally for free, then remove backgrounds with AI. Sign in to process up to 50 images per batch.</p>
+    <p>Use free LaMa AI to remove objects or watermark-like marks, then remove backgrounds as needed. Guests and signed-in users can clean up to 50 images per batch.</p>
   </div>
 
   <div class="workspace">
@@ -866,8 +866,8 @@
         <div class="tool-feat">
           <span class="tool-feat-icon">🧽</span>
           <div>
-            <div class="tool-feat-title">Local object cleanup</div>
-            <div class="tool-feat-desc">Brush away small objects and watermark-like marks for free</div>
+            <div class="tool-feat-title">AI precise object cleanup</div>
+            <div class="tool-feat-desc">Free LaMa cleanup for objects and watermark-like marks</div>
           </div>
         </div>
         <div class="tool-feat">
@@ -904,10 +904,10 @@
           <span class="local-clean-entry-icon">🧽</span>
           <div class="local-clean-entry-copy">
             <strong class="local-clean-entry-title">Remove objects / watermarks</strong>
-            <span class="local-clean-entry-pill">Local · Free</span>
+            <span class="local-clean-entry-pill">AI · Free · No credits</span>
           </div>
         </div>
-        <p>Brush or frame a small area. Your image stays in this browser and no credit is used.</p>
+        <p>A derived image and mask are temporarily uploaded to private storage, deleted after browser recovery, and retained for no more than 24 hours.</p>
         <button class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled>Upload an image to start</button>
       </div>
 
@@ -937,7 +937,7 @@
         <div class="ai-workflow-head">
           <div class="ai-workflow-copy">
             <strong>AI remove background</strong>
-            <span>Successful AI processing costs 1 credit per image. Local cleanup, background settings and export stay free.</span>
+            <span>AI background removal costs 1 credit only after success. AI object cleanup, background settings and export stay free.</span>
           </div>
           <label class="ai-master-toggle" title="Enable AI for all non-transparent images">
             <input id="aiRemoveToggle" type="checkbox" checked aria-label="Enable AI for all non-transparent images">
@@ -1304,7 +1304,7 @@
     <div class="trust-card">
       <span class="trust-icon">🔒</span>
       <h3>Browser-only recovery</h3>
-      <p>Your workspace is saved locally in this browser for up to 24 hours. Images leave the browser only when you enable AI background removal.</p>
+      <p>Your workspace is saved in this browser for up to 24 hours. AI cleanup temporarily uploads a derived image and mask to private storage; AI background removal uploads the required image to its processing API.</p>
     </div>
     <div class="trust-card">
       <span class="trust-icon">💰</span>
@@ -1908,7 +1908,7 @@ let selectedFiles   = [];
 
   function handleFiles(files, { restoredItems = [] } = {}) {
     const restoredByFile = new Map(restoredItems.map(item => [item.file, item]));
-    const limit = currentUser ? 50 : 1;
+    const limit = 50;
     const existing = new Set(selectedFiles.map(file => `${file.name}:${file.size}:${file.lastModified}`));
     const additions = files
       .filter(file => file.type.startsWith('image/'))
@@ -1920,9 +1920,7 @@ let selectedFiles   = [];
       })
       .slice(0, Math.max(0, limit - selectedFiles.length));
     if (!additions.length) {
-      if (selectedFiles.length >= limit) setStatus(currentUser
-        ? 'The 50-image batch limit has been reached.'
-        : 'Sign in to add more than one image.');
+      if (selectedFiles.length >= limit) setStatus('The 50-image batch limit has been reached.');
       return;
     }
     const startIndex = selectedFiles.length;
@@ -1966,7 +1964,7 @@ let selectedFiles   = [];
       card.appendChild(removeButton);
       window.ShopBGLocalCleaner?.decorateCard(card, file, i, {
         initialSource: restoredItem?.sourceBlob || null,
-        onApply: ({ previewUrl, restored }) => {
+        onApply: async ({ previewUrl, restored }) => {
           if (img.dataset.aiResultUrl) {
             URL.revokeObjectURL(img.dataset.aiResultUrl);
             delete img.dataset.aiResultUrl;
@@ -1976,6 +1974,7 @@ let selectedFiles   = [];
           badge.textContent = restored ? '⏳' : '✏️';
           aiWorkflow?.markSourceChanged(i);
           resetProcessActionAfterLocalEdit(i, restored);
+          await aiWorkflow?.persistSession();
         },
       });
       backgroundComposer?.decorateCard(card, i, file.name);
@@ -2022,7 +2021,7 @@ let selectedFiles   = [];
     setProcessButtonReady();
     setStatus(restored
       ? "Original restored. Only this image needs to be prepared again."
-      : "Local cleanup saved. Only this image needs to be prepared again.");
+      : "AI cleanup saved. Only this image needs to be prepared again.");
   }
 
   // ── Free-use gate (anonymous) ─────────────────────────────
@@ -2312,7 +2311,7 @@ let selectedFiles   = [];
   });
 </script>
 
-<script src="/local-cleaner.js?v=20260728-batch-clean-v1"></script>
+<script src="/local-cleaner.js?v=20260729-lama-public-v1"></script>
 <script src="/workspace-ui.js?v=20260727-image-delete-v1"></script>
 </body>
 </html>

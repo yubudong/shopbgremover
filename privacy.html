@@ -127,7 +127,7 @@ ul li{margin-bottom:6px}
   </ul>
 
   <h2>3. Your Images</h2>
-  <p>Your product images are sent to our AI processing API only when you enable AI background removal. <strong>Images are not stored on our servers after processing is complete.</strong> For refresh recovery, your browser can retain the original image, local edit, AI foreground, output, task state, and composition settings in local IndexedDB for up to 24 hours. You can clear this saved workspace from the processing page at any time.</p>
+  <p>When you use AI precise object or watermark cleanup, a derived image and its mask are temporarily uploaded to ShopBG Remover private storage and processed by our self-hosted LaMa service. Inputs are deleted when processing reaches a final state. The result is deleted after it is recovered by your browser; if recovery is interrupted, it is retained for no more than 24 hours. AI background removal sends the required image to its processing API. For refresh recovery, your browser can retain the original image, edited source, AI foreground, output, task state, and composition settings in local IndexedDB for up to 24 hours. You can clear this saved workspace at any time.</p>
 
   <h2>4. How We Use Your Information</h2>
   <ul>
