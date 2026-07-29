@@ -237,6 +237,13 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
   assert.match(cleaner, /相同相对位置/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
   assert.match(cleaner, /!event\.ctrlKey && !event\.metaKey/);
+  assert.match(cleaner, /id="localCleanPrevious" aria-keyshortcuts="ArrowLeft"/);
+  assert.match(cleaner, /id="localCleanNext" aria-keyshortcuts="ArrowRight"/);
+  assert.match(cleaner, /async function switchEditorImage\(offset\)/);
+  assert.match(cleaner, /editorDrafts\.set\(active\.file/);
+  assert.match(cleaner, /event\.key === 'ArrowLeft' \|\| event\.key === 'ArrowRight'/);
+  assert.match(cleaner, /event\.target\.closest\?\.\('input, textarea, select/);
+  assert.match(cleaner, /imageNavigationHint: '也可以按键盘 ← → 切换'/);
   assert.match(cleaner, /typeof API === 'string'/);
   assert.match(cleaner, /'https:\/\/api\.shopbgremover\.com'/);
   assert.match(cleaner, /fetch\(apiUrl\(path\)/);
@@ -245,8 +252,10 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/local-cleaner\.css\?v=20260729-lama-public-v2"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-lama-public-v2"/, file);
+    assert.match(html, /href="\/local-cleaner\.css\?v=20260729-editor-navigation-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-editor-navigation-v1"/, file);
+    assert.match(html, /href="\/workspace-ui\.css\?v=20260729-gallery-readable-v1"/, file);
+    assert.match(html, /src="\/workspace-ui\.js\?v=20260729-gallery-readable-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);
     assert.equal((html.match(/id="localCleanupShortcut"/g) || []).length, 1, file);
     assert.match(html, /class="local-clean-shortcut" id="localCleanupShortcut" type="button" disabled/, file);
@@ -312,12 +321,19 @@ test('marketplace guides use verified current image limits without compliance gu
 
 test('workspace preview and columns share a responsive aligned layout', async () => {
   const css = await read('local-cleaner.css');
+  const workspaceStyles = await read('workspace-ui.css');
   assert.match(css, /\.workspace\{align-items:stretch\}/);
   assert.match(css, /\.canvas-area\{display:flex;flex-direction:column\}/);
   assert.match(css, /\.settings-panel\{align-self:stretch\}/);
   assert.match(css, /\.workspace-preview\.visible\{display:block\}/);
   assert.match(css, /\.workspace-preview-stage\{/);
   assert.match(css, /object-fit:contain/);
+  assert.match(css, /\.local-clean-image-nav\{/);
+  assert.match(css, /grid-template-columns:auto minmax\(0,1fr\) auto/);
+  assert.match(workspaceStyles, /grid-template-columns:184px minmax\(0,1fr\)/);
+  assert.match(workspaceStyles, /grid-auto-rows:160px/);
+  assert.match(workspaceStyles, /\.upload-zone\.has-preview \.image-card\{width:160px;height:160px\}/);
+  assert.match(workspaceStyles, /\.upload-zone\.has-preview \.ai-card-control small\{[\s\S]*white-space:normal/);
 });
 
 test('each uploaded image can be removed locally without calling AI', async () => {
@@ -587,8 +603,8 @@ test('localized workspaces share the compact progressive UI without network beha
 
   for (const file of indexFiles) {
     const html = await read(file);
-    assert.match(html, /href="\/workspace-ui\.css\?v=20260727-image-delete-v1"/, file);
-    assert.match(html, /src="\/workspace-ui\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /href="\/workspace-ui\.css\?v=20260729-gallery-readable-v1"/, file);
+    assert.match(html, /src="\/workspace-ui\.js\?v=20260729-gallery-readable-v1"/, file);
   }
 
   assert.match(styles, /\.canvas-area \.tool-features\{flex:none\}/);

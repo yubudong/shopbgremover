@@ -18,6 +18,8 @@
       rights: 'Only edit images you own or are authorized to modify. A derived image and mask are temporarily uploaded to private storage, deleted after browser recovery, and retained for no more than 24 hours. AI cleanup is free and uses no credits.',
       close: 'Close AI editor', zoom: 'Zoom', zoomOut: 'Zoom out', zoomIn: 'Zoom in', fit: 'Fit',
       navigation: 'Scroll to move · Ctrl/⌘ + wheel to zoom',
+      imageNavigation: 'Batch image navigation', previousImage: 'Previous', nextImage: 'Next',
+      imagePosition: '{current} of {count}', imageNavigationHint: 'Use ← and → to switch images',
       shortcutEmpty: 'Upload an image to start', shortcutReady: 'Open AI cleanup',
       shortcutBatch: 'Open AI cleanup · batch position available',
       batchApply: 'Apply same marks to all {count} images',
@@ -44,6 +46,8 @@
       rights: 'Bearbeite nur eigene oder autorisierte Bilder. Bild und Maske werden vorübergehend privat hochgeladen, nach der Wiederherstellung gelöscht und höchstens 24 Stunden gespeichert. Die KI-Bereinigung ist kostenlos und verbraucht keine Credits.',
       close: 'KI-Editor schließen', zoom: 'Zoom', zoomOut: 'Verkleinern', zoomIn: 'Vergrößern', fit: 'Einpassen',
       navigation: 'Scrollen zum Bewegen · Strg/⌘ + Mausrad zum Zoomen',
+      imageNavigation: 'Bildnavigation im Stapel', previousImage: 'Zurück', nextImage: 'Weiter',
+      imagePosition: '{current} von {count}', imageNavigationHint: 'Mit ← und → zwischen Bildern wechseln',
       shortcutEmpty: 'Bild hochladen, um zu starten', shortcutReady: 'KI-Bereinigung öffnen',
       shortcutBatch: 'KI-Bereinigung · Stapelposition verfügbar',
       batchApply: 'Gleiche Markierungen auf alle {count} Bilder anwenden',
@@ -69,6 +73,8 @@
       rights: 'Edita solo imágenes propias o autorizadas. La imagen derivada y la máscara se suben temporalmente a almacenamiento privado, se borran tras la recuperación y se conservan como máximo 24 horas. La limpieza es gratis y no consume créditos.',
       close: 'Cerrar editor de IA', zoom: 'Zoom', zoomOut: 'Alejar', zoomIn: 'Acercar', fit: 'Ajustar',
       navigation: 'Desplaza para mover · Ctrl/⌘ + rueda para ampliar',
+      imageNavigation: 'Navegación de imágenes del lote', previousImage: 'Anterior', nextImage: 'Siguiente',
+      imagePosition: '{current} de {count}', imageNavigationHint: 'Usa ← y → para cambiar de imagen',
       shortcutEmpty: 'Sube una imagen para empezar', shortcutReady: 'Abrir limpieza con IA',
       shortcutBatch: 'Limpieza con IA · posición por lote',
       batchApply: 'Aplicar las mismas marcas a las {count} imágenes',
@@ -94,6 +100,8 @@
       rights: 'Modifiez uniquement vos images ou celles autorisées. L’image dérivée et le masque sont téléversés temporairement dans un stockage privé, supprimés après récupération et conservés au maximum 24 heures. Le nettoyage IA est gratuit et sans crédit.',
       close: 'Fermer l’éditeur IA', zoom: 'Zoom', zoomOut: 'Réduire', zoomIn: 'Agrandir', fit: 'Ajuster',
       navigation: 'Faites défiler pour déplacer · Ctrl/⌘ + molette pour zoomer',
+      imageNavigation: 'Navigation des images du lot', previousImage: 'Précédente', nextImage: 'Suivante',
+      imagePosition: '{current} sur {count}', imageNavigationHint: 'Utilisez ← et → pour changer d’image',
       shortcutEmpty: 'Importez une image pour commencer', shortcutReady: 'Ouvrir le nettoyage IA',
       shortcutBatch: 'Nettoyage IA · position groupée',
       batchApply: 'Appliquer les mêmes marques aux {count} images',
@@ -119,6 +127,8 @@
       rights: 'Edite apenas imagens próprias ou autorizadas. A imagem derivada e a máscara são enviadas temporariamente ao armazenamento privado, apagadas após a recuperação e mantidas por no máximo 24 horas. A limpeza é grátis e não usa créditos.',
       close: 'Fechar editor de IA', zoom: 'Zoom', zoomOut: 'Reduzir', zoomIn: 'Ampliar', fit: 'Ajustar',
       navigation: 'Role para mover · Ctrl/⌘ + roda para ampliar',
+      imageNavigation: 'Navegação de imagens do lote', previousImage: 'Anterior', nextImage: 'Próxima',
+      imagePosition: '{current} de {count}', imageNavigationHint: 'Use ← e → para trocar de imagem',
       shortcutEmpty: 'Envie uma imagem para começar', shortcutReady: 'Abrir limpeza com IA',
       shortcutBatch: 'Limpeza com IA · posição em lote',
       batchApply: 'Aplicar as mesmas marcações às {count} imagens',
@@ -144,6 +154,8 @@
       rights: '请只编辑你拥有或已获授权的图片。原图派生文件和蒙版会临时上传到私有存储；结果写回本浏览器后立即删除，异常时最长保留 24 小时。AI 清除完全免费，不扣积分。',
       close: '关闭 AI 编辑器', zoom: '缩放', zoomOut: '缩小', zoomIn: '放大', fit: '适应窗口',
       navigation: '滚动查看图片 · Ctrl/⌘ + 滚轮缩放',
+      imageNavigation: '本批图片切换', previousImage: '上一张', nextImage: '下一张',
+      imagePosition: '第 {current} / {count} 张', imageNavigationHint: '也可以按键盘 ← → 切换',
       shortcutEmpty: '上传图片后开始', shortcutReady: '打开 AI 精细清除',
       shortcutBatch: '打开 AI 精细清除 · 可批量套用位置',
       batchApply: '将相同标记应用到本批 {count} 张图片',
@@ -179,7 +191,10 @@
   let lastBatchEntries = [];
   let recoveryTimer = null;
   let batchRunning = false;
+  let editorSwitching = false;
+  let editorLoadToken = 0;
   let serviceEnabled = true;
+  let editorDrafts = new WeakMap();
   const previewUrls = new Set();
 
   const overlay = document.createElement('div');
@@ -204,6 +219,15 @@
             </div>
             <button class="local-clean-close" id="localCleanClose" type="button" aria-label="${copy.close}">×</button>
           </div>
+        </div>
+        <div class="local-clean-image-nav" role="group" aria-label="${copy.imageNavigation}">
+          <button type="button" id="localCleanPrevious" aria-keyshortcuts="ArrowLeft">← ${copy.previousImage}</button>
+          <div class="local-clean-image-meta">
+            <strong id="localCleanImagePosition"></strong>
+            <span id="localCleanImageName"></span>
+            <small>${copy.imageNavigationHint}</small>
+          </div>
+          <button type="button" id="localCleanNext" aria-keyshortcuts="ArrowRight">${copy.nextImage} →</button>
         </div>
         <div class="local-clean-stage" id="localCleanStage">
           <div class="local-clean-canvas-wrap">
@@ -270,6 +294,10 @@
   const zoomFitButton = document.getElementById('localCleanZoomFit');
   const zoomInButton = document.getElementById('localCleanZoomIn');
   const zoomValue = document.getElementById('localCleanZoomValue');
+  const previousImageButton = document.getElementById('localCleanPrevious');
+  const nextImageButton = document.getElementById('localCleanNext');
+  const imagePosition = document.getElementById('localCleanImagePosition');
+  const imageName = document.getElementById('localCleanImageName');
   const inpaintApiBase = typeof API === 'string'
     ? API.replace(/\/+$/, '')
     : (location.hostname === 'www.shopbgremover.com'
@@ -291,6 +319,21 @@
     ? { ...mark, points: mark.points.map((point) => ({ ...point })) }
     : { ...mark });
   const currentSource = (file) => edits.get(file)?.blob || file;
+
+  function activeEntryPosition(entries = connectedEntries()) {
+    if (!active) return -1;
+    return entries.findIndex((entry) => entry === active.entry || entry.file === active.file);
+  }
+
+  function saveActiveDraft() {
+    if (!active) return;
+    editorDrafts.set(active.file, {
+      marks: cloneMarks(active.marks),
+      redo: cloneMarks(active.redo),
+      tool: active.tool,
+      zoom: active.zoom,
+    });
+  }
 
   function deviceId() {
     let value = localStorage.getItem('sbgrDeviceId');
@@ -408,7 +451,8 @@
   function updateControls() {
     const markCount = active?.marks.length || 0;
     const count = connectedEntries().length;
-    const processing = Boolean(active?.processing || batchRunning);
+    const processing = Boolean(active?.processing || batchRunning || editorSwitching);
+    const activePosition = activeEntryPosition();
     undoButton.disabled = markCount === 0 || processing;
     redoButton.disabled = !active?.redo.length || processing;
     clearButton.disabled = markCount === 0 || processing;
@@ -423,6 +467,8 @@
     restoreButton.disabled = !active || !edits.has(active.file) || processing;
     downloadBatchButton.hidden = lastBatchEntries.length < 2;
     downloadBatchButton.disabled = processing || !lastBatchEntries.some((entry) => edits.has(entry.file));
+    previousImageButton.disabled = processing || activePosition <= 0;
+    nextImageButton.disabled = processing || activePosition < 0 || activePosition >= count - 1;
   }
 
   function applyZoom() {
@@ -467,7 +513,7 @@
   }
 
   function beginDrawing(event) {
-    if (!active || active.processing || batchRunning) return;
+    if (!active || active.processing || batchRunning || editorSwitching) return;
     event.preventDefault();
     maskCanvas.setPointerCapture?.(event.pointerId);
     const point = pointerPosition(event);
@@ -600,6 +646,7 @@
     const previewUrl = URL.createObjectURL(blob);
     previewUrls.add(previewUrl);
     edits.set(entry.file, { blob, previewUrl });
+    editorDrafts.delete(entry.file);
     entry.button.classList.add('edited');
     entry.button.textContent = copy.edited;
     await Promise.resolve(entry.onApply?.({ blob, previewUrl, restored: false, index: entry.index }));
@@ -810,39 +857,84 @@
     active.bitmap = await bitmapFrom(currentSource(active.file));
     active.marks = [];
     active.redo = [];
+    editorDrafts.delete(active.file);
     drawActiveBitmap();
     redrawMarks();
+  }
+
+  async function loadEditorEntry(entry, { resetScroll = true } = {}) {
+    if (!entry || batchRunning || editorSwitching) return;
+    saveActiveDraft();
+    const loadToken = ++editorLoadToken;
+    editorSwitching = true;
+    updateControls();
+    let bitmap;
+    try {
+      bitmap = await bitmapFrom(currentSource(entry.file));
+      if (loadToken !== editorLoadToken) {
+        closeBitmap(bitmap);
+        return;
+      }
+      const draft = editorDrafts.get(entry.file);
+      closeBitmap(active?.bitmap);
+      active = {
+        ...entry,
+        entry,
+        bitmap,
+        marks: cloneMarks(draft?.marks || []),
+        redo: cloneMarks(draft?.redo || []),
+        drawing: null,
+        pointerId: null,
+        tool: draft?.tool || 'brush',
+        processing: false,
+        zoom: draft?.zoom || 1,
+      };
+      const entries = connectedEntries();
+      const position = activeEntryPosition(entries);
+      imagePosition.textContent = formatCopy(copy.imagePosition, {
+        current: position + 1,
+        count: entries.length,
+      });
+      imageName.textContent = entry.file.name || '';
+      document.querySelectorAll('[data-clean-tool]').forEach((element) => {
+        element.classList.toggle('active', element.dataset.cleanTool === active.tool);
+      });
+      if (resetScroll) {
+        stage.scrollLeft = 0;
+        stage.scrollTop = 0;
+      }
+      drawActiveBitmap();
+      redrawMarks();
+      status.textContent = serviceEnabled ? copy.ready : copy.unavailable;
+    } catch (error) {
+      closeBitmap(bitmap);
+      console.error('AI editor image switch', error);
+      status.textContent = copy.failed;
+    } finally {
+      if (loadToken === editorLoadToken) editorSwitching = false;
+      updateControls();
+    }
+  }
+
+  async function switchEditorImage(offset) {
+    if (!active || batchRunning || active.processing || editorSwitching) return;
+    const entries = connectedEntries();
+    const position = activeEntryPosition(entries);
+    const nextEntry = entries[position + offset];
+    if (!nextEntry) return;
+    await loadEditorEntry(nextEntry);
   }
 
   async function openEditor(entry) {
-    closeBitmap(active?.bitmap);
-    active = {
-      ...entry,
-      entry,
-      bitmap: await bitmapFrom(currentSource(entry.file)),
-      marks: [],
-      redo: [],
-      drawing: null,
-      pointerId: null,
-      tool: 'brush',
-      processing: false,
-      zoom: 1,
-    };
-    document.querySelectorAll('[data-clean-tool]').forEach((element) => {
-      element.classList.toggle('active', element.dataset.cleanTool === 'brush');
-    });
     overlay.classList.add('visible');
     document.body.style.overflow = 'hidden';
-    stage.scrollLeft = 0;
-    stage.scrollTop = 0;
-    drawActiveBitmap();
-    redrawMarks();
-    status.textContent = serviceEnabled ? copy.ready : copy.unavailable;
-    updateControls();
+    await loadEditorEntry(entry);
   }
 
   function closeEditor() {
-    if (active?.processing || batchRunning) return;
+    if (active?.processing || batchRunning || editorSwitching) return;
+    saveActiveDraft();
+    editorLoadToken += 1;
     overlay.classList.remove('visible');
     document.body.style.overflow = '';
     closeBitmap(active?.bitmap);
@@ -908,7 +1000,22 @@
   document.getElementById('localCleanClose').addEventListener('click', closeEditor);
   overlay.addEventListener('click', (event) => { if (event.target === overlay) closeEditor(); });
   window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && overlay.classList.contains('visible')) closeEditor();
+    if (!overlay.classList.contains('visible')) return;
+    if (event.key === 'Escape') {
+      closeEditor();
+      return;
+    }
+    if (
+      (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      && !event.altKey
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.shiftKey
+      && !event.target.closest?.('input, textarea, select, [contenteditable="true"]')
+    ) {
+      event.preventDefault();
+      switchEditorImage(event.key === 'ArrowLeft' ? -1 : 1);
+    }
   });
   brushInput.addEventListener('input', () => {
     document.getElementById('localCleanBrushValue').textContent = brushInput.value;
@@ -916,6 +1023,8 @@
   zoomOutButton.addEventListener('click', () => setZoom((active?.zoom || 1) / 1.25));
   zoomFitButton.addEventListener('click', () => setZoom(1));
   zoomInButton.addEventListener('click', () => setZoom((active?.zoom || 1) * 1.25));
+  previousImageButton.addEventListener('click', () => switchEditorImage(-1));
+  nextImageButton.addEventListener('click', () => switchEditorImage(1));
   stage.addEventListener('wheel', (event) => {
     if (!active || (!event.ctrlKey && !event.metaKey)) return;
     event.preventDefault();
@@ -968,6 +1077,7 @@
       for (const url of previewUrls) URL.revokeObjectURL(url);
       previewUrls.clear();
       edits = new WeakMap();
+      editorDrafts = new WeakMap();
       cardEntries = [];
       lastBatchEntries = [];
       syncShortcut();
