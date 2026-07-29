@@ -706,9 +706,16 @@ test('credit center is visible from every localized workspace and pricing page',
 test('administrator overview links all billing operations without exposing balance mutation', async () => {
   const admin = await read('admin.html');
   assert.match(admin, /\/api\/admin\/overview/);
+  assert.match(admin, /id="inpaintValidation"/);
+  assert.match(admin, /\/api\/inpaint\/batches/);
+  assert.match(admin, /\/api\/inpaint\/tasks\/\$\{encodeURIComponent\(activeInpaint\.taskId\)\}\/result/);
+  assert.match(admin, /mask_spec_hash/);
+  assert.match(admin, /shopbg-admin-inpaint-validation-v1/);
+  assert.match(admin, /credentials:\s*'include'/);
+  assert.match(admin, /10 \* 1024 \* 1024/);
+  assert.match(admin, /确认已下载并清理服务器结果/);
   assert.match(admin, /href="\/admin-vouchers"/);
   assert.match(admin, /href="\/admin-referrals"/);
-  assert.match(admin, /credentials:\s*'include'/);
   assert.doesNotMatch(admin, /UPDATE user_credits|manual-credit|adjust-balance/i);
   assert.match(await read('admin-vouchers.html'), /href="\/admin"/);
   assert.match(await read('admin-referrals.html'), /href="\/admin"/);

@@ -19,7 +19,9 @@
     .portals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.portal{padding:18px;text-decoration:none}.portal:hover{border-color:#93c5fd}.portal b{display:block;margin:8px 0 5px}.portal small{color:#64748b;line-height:1.5}
     .panel{padding:19px;margin-top:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}.panel h2{margin:0;font-size:18px}.panel-head span{color:#64748b;font-size:12px}
     .table-wrap{overflow:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:12px}th,td{padding:10px 8px;border-bottom:1px solid #edf1f6;text-align:left;vertical-align:top}th{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.05em}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#64748b}.positive{color:#047857;font-weight:800}.negative{color:#b91c1c;font-weight:800}
+    .validation-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.validation-file{display:grid;gap:7px;padding:14px;border:1px solid #dfe5ee;border-radius:10px;background:#f8fafc}.validation-file span{font-size:12px;font-weight:800}.validation-file small{color:#64748b}.validation-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.validation-actions button,.validation-actions a{min-height:40px;padding:0 15px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#172033;font:inherit;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.validation-actions .primary{background:#2563eb;border-color:#2563eb;color:#fff}.validation-actions button:disabled{opacity:.45;cursor:not-allowed}.validation-status{margin:14px 0 0;padding:12px;border-radius:9px;background:#eff6ff;color:#1e40af;white-space:pre-wrap}.validation-status.error{background:#fff1f2;color:#9f1239}.validation-result{display:none;margin-top:14px;grid-template-columns:minmax(0,320px) 1fr;gap:14px;align-items:start}.validation-result.visible{display:grid}.validation-result img{width:100%;max-height:320px;object-fit:contain;border:1px solid #dfe5ee;border-radius:10px;background:#eef2f7}
     @media(max-width:850px){.stats{grid-template-columns:1fr 1fr}.portals{grid-template-columns:1fr}}@media(max-width:480px){main{width:calc(100% - 20px)}.stat strong{font-size:23px}}
+    @media(max-width:650px){.validation-grid,.validation-result{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -42,7 +44,39 @@
       <section class="portals">
         <a class="portal" href="/admin-vouchers"><span>🎟️</span><b>闲鱼卡密管理</b><small>生成、发货、作废、查询和争议冲正</small></a>
         <a class="portal" href="/admin-referrals"><span>🛡️</span><b>推荐奖励审核</b><small>处理卡密邀请风险与人工审核队列</small></a>
+        <a class="portal" href="#inpaintValidation"><span>🧽</span><b>AI 精细去水印验收</b><small>仅管理员使用真实图片验证私有 LaMa 链路</small></a>
         <a class="portal" href="/credits.html?lang=en"><span>👤</span><b>用户积分中心预览</b><small>查看用户实际看到的余额、订单和流水界面</small></a>
+      </section>
+      <section class="panel" id="inpaintValidation">
+        <div class="panel-head"><h2>AI 精细去水印 · 单图验收</h2><span>管理员专用 · 免费且不扣积分</span></div>
+        <p class="sub">原图和 PNG 蒙版会临时上传到私有 R2，经受保护的 LaMa 服务处理。输入与蒙版成功后立即删除；结果在确认后删除，最长保留 24 小时。</p>
+        <div class="validation-grid">
+          <label class="validation-file">
+            <span>测试原图</span>
+            <input id="inpaintImage" type="file" accept="image/png,image/jpeg,image/webp">
+            <small>PNG、JPG 或 WebP，最大 10 MB，长边不超过 2048 px。</small>
+          </label>
+          <label class="validation-file">
+            <span>黑白蒙版</span>
+            <input id="inpaintMask" type="file" accept="image/png">
+            <small>与原图尺寸一致的 PNG；白色区域表示需要清除。</small>
+          </label>
+        </div>
+        <div class="validation-actions">
+          <button class="primary" id="inpaintStart" type="button" disabled>开始真实链路验收</button>
+          <button id="inpaintCancel" type="button" disabled>取消活动批次</button>
+        </div>
+        <p class="validation-status" id="inpaintStatus" aria-live="polite">请选择原图和蒙版。页面刷新后可继续查询已经创建的验收任务。</p>
+        <div class="validation-result" id="inpaintResult">
+          <img id="inpaintPreview" alt="LaMa 验收结果预览">
+          <div>
+            <p>结果已从私有 R2 读取。先下载并检查图片，再确认删除服务器结果。</p>
+            <div class="validation-actions">
+              <a class="primary" id="inpaintDownload" download="shopbg-lama-validation.png">下载结果 PNG</a>
+              <button id="inpaintAcknowledge" type="button">确认已下载并清理服务器结果</button>
+            </div>
+          </div>
+        </div>
       </section>
       <section class="panel">
         <div class="panel-head"><h2>最近充值订单</h2><span>最多 30 条 · 只读</span></div>
@@ -57,6 +91,18 @@
   <script>
     const API = 'https://api.shopbgremover.com';
     const notice = document.getElementById('notice');
+    const INPAINT_STATE_KEY = 'shopbg-admin-inpaint-validation-v1';
+    const inpaintImage = document.getElementById('inpaintImage');
+    const inpaintMask = document.getElementById('inpaintMask');
+    const inpaintStart = document.getElementById('inpaintStart');
+    const inpaintCancel = document.getElementById('inpaintCancel');
+    const inpaintStatus = document.getElementById('inpaintStatus');
+    const inpaintResult = document.getElementById('inpaintResult');
+    const inpaintPreview = document.getElementById('inpaintPreview');
+    const inpaintDownload = document.getElementById('inpaintDownload');
+    const inpaintAcknowledge = document.getElementById('inpaintAcknowledge');
+    let activeInpaint = null;
+    let resultObjectUrl = null;
     const cell = (row, value, className = '') => {
       const td = document.createElement('td');
       td.textContent = value;
@@ -97,6 +143,158 @@
         body.append(row);
       });
     }
+    const inpaintMessage = (message, error = false) => {
+      inpaintStatus.textContent = message;
+      inpaintStatus.classList.toggle('error', error);
+    };
+    const inpaintJson = async (path, init = {}) => {
+      const response = await fetch(`${API}${path}`, {
+        credentials: 'include',
+        ...init,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      return data;
+    };
+    const updateInpaintStart = () => {
+      inpaintStart.disabled = !(inpaintImage.files[0] && inpaintMask.files[0]) || Boolean(activeInpaint);
+    };
+    const storeInpaintState = state => {
+      activeInpaint = state;
+      if (state) localStorage.setItem(INPAINT_STATE_KEY, JSON.stringify(state));
+      else localStorage.removeItem(INPAINT_STATE_KEY);
+      inpaintCancel.disabled = !state;
+      updateInpaintStart();
+    };
+    const clearInpaintResult = () => {
+      if (resultObjectUrl) URL.revokeObjectURL(resultObjectUrl);
+      resultObjectUrl = null;
+      inpaintPreview.removeAttribute('src');
+      inpaintDownload.removeAttribute('href');
+      inpaintResult.classList.remove('visible');
+    };
+    const showInpaintResult = async taskId => {
+      const response = await fetch(`${API}/api/inpaint/tasks/${encodeURIComponent(taskId)}/result`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      clearInpaintResult();
+      resultObjectUrl = URL.createObjectURL(await response.blob());
+      inpaintPreview.src = resultObjectUrl;
+      inpaintDownload.href = resultObjectUrl;
+      inpaintResult.classList.add('visible');
+      inpaintCancel.disabled = true;
+      inpaintMessage('处理成功。结果已读取，请下载并检查；确认后再清理服务器结果。');
+    };
+    const pollInpaint = async state => {
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        const data = await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(state.batchId)}`);
+        const task = data.batch.tasks.find(item => item.id === state.taskId);
+        if (!task) throw new Error('任务状态不存在。');
+        inpaintMessage(`批次：${data.batch.status}\n任务：${task.status}\n第 ${attempt + 1} 次状态检查`);
+        if (task.status === 'succeeded') {
+          await showInpaintResult(state.taskId);
+          return;
+        }
+        if (['failed', 'cancelled'].includes(task.status)) {
+          throw new Error(`任务${task.status === 'failed' ? '失败' : '已取消'}：${task.error_code || '无详细原因'}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      throw new Error('处理超时；任务仍保存在服务器，可刷新页面继续查询。');
+    };
+    const resumeInpaint = async () => {
+      const saved = localStorage.getItem(INPAINT_STATE_KEY);
+      if (!saved) return;
+      try {
+        const state = JSON.parse(saved);
+        if (!state?.batchId || !state?.taskId) throw new Error('invalid state');
+        storeInpaintState(state);
+        inpaintMessage('正在恢复上一次管理员验收任务…');
+        await pollInpaint(state);
+      } catch (error) {
+        if (error.message === 'invalid state' || /Batch not found|Task not found/.test(error.message)) {
+          storeInpaintState(null);
+        }
+        inpaintMessage(`恢复失败：${error.message}`, true);
+      }
+    };
+    inpaintImage.addEventListener('change', updateInpaintStart);
+    inpaintMask.addEventListener('change', updateInpaintStart);
+    inpaintStart.addEventListener('click', async () => {
+      const image = inpaintImage.files[0];
+      const mask = inpaintMask.files[0];
+      if (!image || !mask) return;
+      if (image.size > 10 * 1024 * 1024 || mask.size > 10 * 1024 * 1024) {
+        inpaintMessage('原图或蒙版超过 10 MB。', true);
+        return;
+      }
+      clearInpaintResult();
+      inpaintStart.disabled = true;
+      try {
+        inpaintMessage('正在创建管理员验收批次…');
+        const created = await inpaintJson('/api/inpaint/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task_count: 1,
+            client_batch_id: `admin_validation_${Date.now().toString(36)}`,
+            mask_spec: {
+              version: 1,
+              source: 'admin_validation',
+              normalized: false,
+            },
+          }),
+        });
+        const task = created.batch.tasks[0];
+        const state = { batchId: created.batch.id, taskId: task.id };
+        storeInpaintState(state);
+        inpaintMessage('正在把原图和蒙版上传到私有临时存储…');
+        const form = new FormData();
+        form.set('image', image, image.name);
+        form.set('mask', mask, mask.name);
+        form.set('mask_spec_hash', created.batch.mask_spec_hash);
+        await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(state.batchId)}/tasks/0`, {
+          method: 'POST',
+          body: form,
+        });
+        inpaintMessage('已进入单图队列，正在等待 LaMa 处理…');
+        await pollInpaint(state);
+      } catch (error) {
+        inpaintMessage(`验收失败：${error.message}`, true);
+      } finally {
+        updateInpaintStart();
+      }
+    });
+    inpaintCancel.addEventListener('click', async () => {
+      if (!activeInpaint) return;
+      try {
+        const data = await inpaintJson(`/api/inpaint/batches/${encodeURIComponent(activeInpaint.batchId)}`, {
+          method: 'DELETE',
+        });
+        clearInpaintResult();
+        storeInpaintState(null);
+        inpaintMessage(`批次已${data.status === 'cancelled' ? '取消' : '结束'}。`);
+      } catch (error) {
+        inpaintMessage(`取消失败：${error.message}`, true);
+      }
+    });
+    inpaintAcknowledge.addEventListener('click', async () => {
+      if (!activeInpaint) return;
+      try {
+        await inpaintJson(`/api/inpaint/tasks/${encodeURIComponent(activeInpaint.taskId)}/result`, {
+          method: 'DELETE',
+        });
+        clearInpaintResult();
+        storeInpaintState(null);
+        inpaintMessage('服务器结果已确认删除，本次验收记录仍保留在 D1 审计表。');
+      } catch (error) {
+        inpaintMessage(`清理失败：${error.message}`, true);
+      }
+    });
     fetch(`${API}/api/admin/overview`, { credentials: 'include' })
       .then(async response => {
         const data = await response.json();
@@ -120,6 +318,7 @@
         renderLedger(data.recent_ledger || []);
         notice.style.display = 'none';
         document.getElementById('adminApp').classList.add('visible');
+        resumeInpaint();
       })
       .catch(error => {
         document.getElementById('authStatus').textContent = '无法打开管理后台';
