@@ -172,23 +172,24 @@ function taskChainEnv(mode, r2 = memoryR2(), queue = memoryQueue()) {
 
 describe('private LaMa inpaint task chain', () => {
   it('keeps off mode read-only and reports the confirmed limits', async () => {
-    const response = await exports.default.fetch(new Request(
+    const chain = taskChainEnv('off');
+    const response = await worker.fetch(new Request(
       `${API_ORIGIN}/api/inpaint/batches`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{invalid',
       },
-    ), env);
+    ), chain.value);
     expect(response.status).toBe(503);
     expect(await body(response)).toMatchObject({ code: 'inpaint_off' });
     expect(await env.DB.prepare(
       'SELECT COUNT(*) AS count FROM inpaint_batches'
     ).first('count')).toBe(0);
 
-    const capabilities = await exports.default.fetch(
+    const capabilities = await worker.fetch(
       new Request(`${API_ORIGIN}/api/inpaint/capabilities`),
-      env,
+      chain.value,
     );
     expect(await body(capabilities)).toMatchObject({
       mode: 'off',
