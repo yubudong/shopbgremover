@@ -741,6 +741,14 @@ test('administrator overview links all billing operations without exposing balan
   assert.match(admin, /积分与订单/);
   assert.match(admin, /id="operationsView"/);
   assert.match(admin, /id="billingView"/);
+  assert.match(admin, /id="metricAnonymous"/);
+  assert.match(admin, /id="metricRegistered"/);
+  assert.match(admin, /id="metricRecharged"/);
+  assert.match(admin, /id="metricSessions"/);
+  assert.match(admin, /id="accountsTable"/);
+  assert.match(admin, /账号已脱敏/);
+  assert.match(script, /renderAccounts\(data\.active_accounts/);
+  assert.match(script, /account\.audience_type === 'recharged'/);
   assert.doesNotMatch(admin, /admin-analytics/);
   assert.match(script, /\/api\/admin\/overview/);
   assert.match(script, /\/api\/admin\/analytics\?days=/);
@@ -792,6 +800,9 @@ test('first-party analytics is privacy-minimal and wired to explicit product mil
     assert.match(privacy, /180/);
     assert.match(privacy, /Global Privacy Control/);
   }
+  assert.match(await read('privacy.html'), /irreversible account hash/);
+  assert.match(await read('zh-cn/privacy.html'), /不可逆账户哈希/);
+  assert.match(await read('zh-cn/privacy.html'), /不保存邮箱或明文用户 ID/);
 });
 
 test('localized low-credit prompts no longer advertise subscriptions or fake discounts', async () => {

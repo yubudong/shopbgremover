@@ -328,7 +328,17 @@ describe('production schema baseline', () => {
   });
 
   it('contains the credit-bucket, provider recovery, and payment idempotency columns', async () => {
-    const [credits, tasks, orders, voucherCards, referralCodes, reviews, holds] = await Promise.all([
+    const [
+      credits,
+      tasks,
+      orders,
+      voucherCards,
+      referralCodes,
+      reviews,
+      holds,
+      users,
+      analyticsEvents,
+    ] = await Promise.all([
       env.DB.prepare('PRAGMA table_info(credit_grants)').all(),
       env.DB.prepare('PRAGMA table_info(ai_tasks)').all(),
       env.DB.prepare('PRAGMA table_info(orders)').all(),
@@ -336,6 +346,8 @@ describe('production schema baseline', () => {
       env.DB.prepare('PRAGMA table_info(referral_codes)').all(),
       env.DB.prepare('PRAGMA table_info(referral_reward_reviews)').all(),
       env.DB.prepare('PRAGMA table_info(referral_reward_holds)').all(),
+      env.DB.prepare('PRAGMA table_info(users)').all(),
+      env.DB.prepare('PRAGMA table_info(analytics_events)').all(),
     ]);
 
     expect(credits.results.map((row) => row.name)).toEqual(expect.arrayContaining([
@@ -384,6 +396,10 @@ describe('production schema baseline', () => {
       'cancelled_at',
       'status',
     ]));
+    expect(users.results.map((row) => row.name)).toContain('analytics_hash');
+    expect(analyticsEvents.results.map((row) => row.name)).toEqual(
+      expect.arrayContaining(['account_hash', 'audience_type']),
+    );
   });
 });
 
@@ -1196,8 +1212,8 @@ describe('credit center and administrator overview', () => {
     });
 
     const stored = await env.DB.prepare(
-      `SELECT id, visitor_hash, session_hash, actor_type, country, source,
-              file_count, size_bucket
+      `SELECT id, visitor_hash, session_hash, actor_type, account_hash,
+              audience_type, country, source, file_count, size_bucket
        FROM analytics_events ORDER BY created_at, event_name`
     ).all();
     expect(stored.results).toHaveLength(5);
@@ -1206,6 +1222,8 @@ describe('credit center and administrator overview', () => {
     expect(stored.results[0].visitor_hash).not.toBe('raw-browser-visitor');
     expect(stored.results[0].session_hash).not.toBe('raw-browser-session');
     expect(stored.results.every((row) => row.actor_type === 'admin')).toBe(true);
+    expect(stored.results.every((row) => row.audience_type === 'internal')).toBe(true);
+    expect(stored.results.every((row) => /^[a-f0-9]{64}$/.test(row.account_hash))).toBe(true);
     expect(stored.results.some((row) => row.country === 'CN')).toBe(true);
     expect(stored.results.some((row) => row.source === 'google.com')).toBe(true);
     expect(stored.results.some((row) => row.file_count === 3 && row.size_bucket === '2-5MB')).toBe(true);
@@ -1227,6 +1245,104 @@ describe('credit center and administrator overview', () => {
       },
     ), analyticsEnv);
     expect((await jsonResponse(duplicate)).accepted).toBe(0);
+
+    const recharged = await createAuthenticatedUser({
+      email: 'analytics-recharged@example.com',
+      credits: 300,
+      deviceId: 'analytics-recharged-device',
+    });
+    await env.DB.prepare(
+      `INSERT INTO orders
+       (id, user_id, plan, amount, credits, base_credits, currency, status,
+        completed_at, payment_method)
+       VALUES ('analytics-recharged-order', ?, 'credits_300', 8.99, 300, 300,
+               'USD', 'completed', unixepoch(), 'paypal')`
+    ).bind(recharged.userId).run();
+    const publicEnv = overrideEnv({ ANALYTICS_MODE: 'public' });
+    const customerEvents = [{
+      user: regular,
+      visitor: 'registered-visitor',
+      session: 'registered-session',
+      ip: '203.0.113.72',
+      events: [{
+        event_id: 'registered-page-view',
+        event_name: 'page_view',
+        page_group: 'home',
+      }],
+    }, {
+      user: recharged,
+      visitor: 'recharged-visitor',
+      session: 'recharged-session',
+      ip: '203.0.113.73',
+      events: payload.events.map((event, index) => ({
+        ...event,
+        event_id: `recharged-event-${index + 1}`,
+      })),
+    }];
+    for (const customer of customerEvents) {
+      const response = await worker.fetch(authenticatedRequest(
+        '/api/analytics/events',
+        customer.user.cookie,
+        {
+          method: 'POST',
+          headers: {
+            Origin: 'https://www.shopbgremover.com',
+            'CF-Connecting-IP': customer.ip,
+          },
+          body: JSON.stringify({
+            visitor_id: customer.visitor,
+            session_id: customer.session,
+            events: customer.events,
+          }),
+        },
+      ), publicEnv);
+      expect(response.status).toBe(202);
+      expect((await jsonResponse(response)).accepted).toBe(customer.events.length);
+    }
+    const guestResponse = await worker.fetch(new Request(
+      `${API_ORIGIN}/api/analytics/events`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://www.shopbgremover.com',
+          'CF-Connecting-IP': '203.0.113.74',
+        },
+        body: JSON.stringify({
+          visitor_id: 'anonymous-visitor',
+          session_id: 'anonymous-session',
+          events: [{
+            event_id: 'anonymous-page-view',
+            event_name: 'page_view',
+            page_group: 'home',
+          }],
+        }),
+      },
+    ), publicEnv);
+    expect(guestResponse.status).toBe(202);
+    expect((await jsonResponse(guestResponse)).accepted).toBe(1);
+
+    const customerRows = await env.DB.prepare(
+      `SELECT audience_type, actor_type, account_hash
+       FROM analytics_events
+       WHERE audience_type != 'internal'
+       ORDER BY audience_type`
+    ).all();
+    expect(customerRows.results.some((row) => (
+      row.audience_type === 'anonymous'
+      && row.actor_type === 'guest'
+      && row.account_hash === ''
+    ))).toBe(true);
+    expect(customerRows.results.some((row) => (
+      row.audience_type === 'registered'
+      && row.actor_type === 'user'
+      && /^[a-f0-9]{64}$/.test(row.account_hash)
+    ))).toBe(true);
+    expect(customerRows.results.some((row) => (
+      row.audience_type === 'recharged'
+      && row.actor_type === 'user'
+      && /^[a-f0-9]{64}$/.test(row.account_hash)
+    ))).toBe(true);
 
     await env.DB.prepare(
       `INSERT INTO ai_tasks
@@ -1251,14 +1367,33 @@ describe('credit center and administrator overview', () => {
     expect(body.mode).toBe('admin_only');
     expect(body.retention_days).toBe(180);
     expect(body.summary).toEqual(expect.objectContaining({
-      visitors: 1,
-      sessions: 1,
+      anonymous: 1,
+      registered: 1,
+      recharged: 1,
+      visitors: 3,
+      sessions: 3,
       selected: 1,
       starts: 1,
       completed: 1,
       downloads: 1,
       download_rate: 100,
     }));
+    expect(body.active_accounts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        account: 'an***************@example.com',
+        audience_type: 'registered',
+        recharge_count: 0,
+      }),
+      expect.objectContaining({
+        account: 'an*****************@example.com',
+        audience_type: 'recharged',
+        recharge_count: 1,
+        credits: 300,
+      }),
+    ]));
+    expect(JSON.stringify(body.active_accounts)).not.toContain(
+      'analytics-recharged@example.com',
+    );
     expect(body.service.remove_bg).toEqual(expect.objectContaining({
       started: 1,
       succeeded: 1,
@@ -1297,7 +1432,7 @@ describe('credit center and administrator overview', () => {
     expect(privacyOptOut.status).toBe(202);
     expect(await env.DB.prepare(
       'SELECT COUNT(*) AS count FROM analytics_events'
-    ).first('count')).toBe(5);
+    ).first('count')).toBe(12);
   });
 
   it('rejects cross-site and unsupported analytics payloads without recording them', async () => {

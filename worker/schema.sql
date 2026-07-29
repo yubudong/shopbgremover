@@ -1,5 +1,5 @@
 -- ShopBGRemover production schema baseline.
--- Includes tracked migrations through 0012_lama_inpaint_tasks.sql.
+-- Includes tracked migrations through 0014_analytics_customer_segments.sql.
 --
 -- This is the canonical schema for a fresh database. Production already has
 -- real data and migration records; do not reapply this file to
@@ -10,8 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   name TEXT,
   avatar TEXT,
+  analytics_hash TEXT,
   created_at INTEGER DEFAULT (unixepoch())
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_analytics_hash
+ON users(analytics_hash)
+WHERE analytics_hash IS NOT NULL AND analytics_hash != '';
 
 CREATE TABLE IF NOT EXISTS user_credits (
   user_id TEXT PRIMARY KEY,
@@ -599,6 +604,9 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   page_group TEXT NOT NULL DEFAULT '',
   actor_type TEXT NOT NULL DEFAULT 'guest'
     CHECK (actor_type IN ('guest', 'user', 'admin')),
+  account_hash TEXT NOT NULL DEFAULT '',
+  audience_type TEXT NOT NULL DEFAULT 'anonymous'
+    CHECK (audience_type IN ('anonymous', 'registered', 'recharged', 'internal')),
   device_type TEXT NOT NULL DEFAULT ''
     CHECK (device_type IN ('', 'desktop', 'tablet', 'mobile')),
   language TEXT NOT NULL DEFAULT '',
@@ -624,6 +632,13 @@ ON analytics_events(tool_id, event_name, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_analytics_events_session_created
 ON analytics_events(session_hash, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_audience_created
+ON analytics_events(audience_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_account_created
+ON analytics_events(account_hash, created_at)
+WHERE account_hash != '';
 
 CREATE TABLE IF NOT EXISTS analytics_rate_limits (
   ip_hash TEXT NOT NULL,

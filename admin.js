@@ -141,14 +141,16 @@
 
   function renderTrend(rows) {
     const target = $('trendChart');
-    if (!rows?.some((row) => row.visitors || row.selected || row.starts || row.downloads)) {
+    if (!rows?.some((row) => (
+      row.anonymous || row.registered || row.recharged || row.sessions
+    ))) {
       target.innerHTML = '<div class="empty">行为数据会从运营统计启用后开始积累</div>';
       return;
     }
     const width = 760;
     const height = 245;
     const maxValue = Math.max(1, ...rows.flatMap(
-      (row) => [row.visitors, row.selected, row.starts, row.downloads],
+      (row) => [row.anonymous, row.registered, row.recharged, row.sessions],
     ));
     const line = (key, color) => (
       `<polyline points="${chartPoints(rows.map((row) => row[key]), width, height, maxValue)}" `
@@ -170,12 +172,12 @@
       return `<line x1="44" x2="746" y1="${y}" y2="${y}" class="chart-grid"/>`
         + `<text x="36" y="${y + 3}" text-anchor="end" class="chart-label">${value}</text>`;
     }).join('');
-    target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="访客、上传、开始和下载趋势">`
+    target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="匿名、登录未充值、已充值和会话趋势">`
       + grid
-      + line('visitors', '#2563eb')
-      + line('selected', '#0891b2')
-      + line('starts', '#7c3aed')
-      + line('downloads', '#059669')
+      + line('anonymous', '#2563eb')
+      + line('registered', '#7c3aed')
+      + line('recharged', '#059669')
+      + line('sessions', '#f59e0b')
       + labels
       + '</svg>';
   }
@@ -246,16 +248,32 @@
     )).join('');
   }
 
+  function renderAccounts(accounts) {
+    const body = $('accountsTable');
+    if (!accounts?.length) {
+      body.innerHTML = '<tr><td colspan="8"><div class="empty">所选时间内暂无登录用户行为</div></td></tr>';
+      return;
+    }
+    body.innerHTML = accounts.map((account) => {
+      const recharged = account.audience_type === 'recharged';
+      return `<tr><td><span class="account-name">${escapeHtml(account.account || '—')}</span></td>`
+        + `<td><span class="audience-chip ${recharged ? 'recharged' : 'registered'}">${recharged ? '已充值用户' : '登录未充值'}</span></td>`
+        + `<td>${escapeHtml(formatTime(account.last_active_at))}</td>`
+        + `<td>${number(account.sessions)}</td><td>${number(account.starts)}</td>`
+        + `<td>${number(account.downloads)}</td><td>${number(account.recharge_count)}</td>`
+        + `<td>${number(account.credits)}</td></tr>`;
+    }).join('');
+  }
+
   function renderAnalytics(data) {
     const summary = data.summary || {};
-    $('metricVisitors').textContent = number(summary.visitors);
-    $('metricSessions').textContent = `${number(summary.sessions)} 次访问会话`;
-    $('metricSelected').textContent = number(summary.selected);
-    $('metricStarts').textContent = number(summary.starts);
-    $('metricDownloads').textContent = number(summary.downloads);
-    $('metricDownloadRate').textContent = `${Number(summary.download_rate || 0).toFixed(1)}% 下载转化率`;
+    $('metricAnonymous').textContent = number(summary.anonymous);
+    $('metricRegistered').textContent = number(summary.registered);
+    $('metricRecharged').textContent = number(summary.recharged);
+    $('metricSessions').textContent = number(summary.sessions);
     renderTrend(data.trend || []);
     renderFunnel(data.funnel || {});
+    renderAccounts(data.active_accounts || []);
     renderTools(data.tools || []);
     renderService('inpaint', data.service?.inpaint || {});
     renderService('removeBg', data.service?.remove_bg || {});
@@ -358,7 +376,10 @@
     $('pageEyebrow').textContent = eyebrow;
     $('pageTitle').textContent = title;
     $('analyticsActions').classList.toggle('hidden', view !== 'operations');
-    if (view === 'operations' && ['#tools', '#service', '#acquisition'].includes(location.hash)) {
+    if (
+      view === 'operations'
+      && ['#customers', '#tools', '#service', '#acquisition'].includes(location.hash)
+    ) {
       requestAnimationFrame(() => {
         document.querySelector(location.hash)?.scrollIntoView({ block: 'start' });
       });

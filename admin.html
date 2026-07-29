@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-store">
   <title>运营后台 · ShopBG Remover</title>
   <link rel="icon" href="/favicon.svg">
-  <link rel="stylesheet" href="/admin.css?v=20260729-operations-v1">
+  <link rel="stylesheet" href="/admin.css?v=20260729-audience-v2">
 </head>
 <body>
   <aside class="sidebar">
@@ -17,6 +17,7 @@
     </a>
     <nav class="side-nav" aria-label="后台导航">
       <a href="#operations" data-admin-view="operations"><span>⌂</span>网站运营</a>
+      <a href="#customers" data-admin-view="operations"><span>◫</span>客户分层</a>
       <a href="#tools" data-admin-view="operations"><span>▦</span>工具分析</a>
       <a href="#service" data-admin-view="operations"><span>◉</span>服务质量</a>
       <a href="#acquisition" data-admin-view="operations"><span>↗</span>来源与设备</a>
@@ -59,38 +60,38 @@
         <section class="metric-grid">
           <article class="metric-card accent-blue">
             <span>匿名访客</span>
-            <strong id="metricVisitors">—</strong>
-            <small id="metricSessions">— 次访问会话</small>
+            <strong id="metricAnonymous">—</strong>
+            <small>未登录的独立访客</small>
           </article>
           <article class="metric-card accent-violet">
-            <span>上传图片</span>
-            <strong id="metricSelected">—</strong>
-            <small>至少选择过产品图的会话</small>
+            <span>登录用户（未充值）</span>
+            <strong id="metricRegistered">—</strong>
+            <small>已登录但没有成功充值</small>
           </article>
           <article class="metric-card accent-cyan">
-            <span>开始处理</span>
-            <strong id="metricStarts">—</strong>
-            <small>通过确认并真正开始的会话</small>
+            <span>已充值用户</span>
+            <strong id="metricRecharged">—</strong>
+            <small>至少有一笔成功充值</small>
           </article>
           <article class="metric-card accent-green">
-            <span>成功下载</span>
-            <strong id="metricDownloads">—</strong>
-            <small id="metricDownloadRate">— 下载转化率</small>
+            <span>访问会话</span>
+            <strong id="metricSessions">—</strong>
+            <small>已排除管理员和内部访问</small>
           </article>
         </section>
 
-        <section class="panel-grid">
+        <section id="customers" class="panel-grid">
           <article class="panel trend-panel">
             <div class="panel-title">
-              <div><p class="eyebrow">趋势</p><h2>访问与使用变化</h2></div>
+              <div><p class="eyebrow">客户分层趋势</p><h2>不同客户群体的访问变化</h2></div>
               <div class="legend">
-                <span><i class="dot visitors"></i>访客</span>
-                <span><i class="dot selected"></i>上传</span>
-                <span><i class="dot starts"></i>开始</span>
-                <span><i class="dot downloads"></i>下载</span>
+                <span><i class="dot anonymous"></i>匿名</span>
+                <span><i class="dot registered"></i>登录未充值</span>
+                <span><i class="dot recharged"></i>已充值</span>
+                <span><i class="dot sessions"></i>会话</span>
               </div>
             </div>
-            <div id="trendChart" class="chart" aria-label="访问与使用趋势图"></div>
+            <div id="trendChart" class="chart" aria-label="客户群体与会话趋势图"></div>
           </article>
           <article class="panel funnel-panel">
             <div class="panel-title">
@@ -98,6 +99,20 @@
             </div>
             <div id="funnelChart" class="funnel"></div>
           </article>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="panel-title">
+            <div><p class="eyebrow">登录客户明细</p><h2>所选时间内活跃的登录用户</h2></div>
+            <p class="muted">账号已脱敏 · 不显示管理员 · 最多 200 条</p>
+          </div>
+          <div class="table-wrap">
+            <table class="customer-table">
+              <thead><tr><th>账号</th><th>当前类型</th><th>最近访问</th><th>会话</th><th>开始处理</th><th>成功下载</th><th>成功充值</th><th>当前积分</th></tr></thead>
+              <tbody id="accountsTable"></tbody>
+            </table>
+          </div>
+          <p class="panel-note">客户类型按当前成功充值记录判断；积分用完后仍属于已充值用户。运营事件只保存不可逆账户哈希，不保存邮箱或明文用户 ID。</p>
         </section>
 
         <section id="tools" class="panel table-panel">
@@ -222,6 +237,6 @@
       </section>
     </div>
   </main>
-  <script src="/admin.js?v=20260729-operations-v1"></script>
+  <script src="/admin.js?v=20260729-audience-v2"></script>
 </body>
 </html>

@@ -1467,6 +1467,49 @@ async function analyticsHash(env, kind, value) {
   return sha256Hex(`${env.JWT_SECRET}:analytics:${kind}:${value}`);
 }
 
+async function resolveAnalyticsAudience(env, user) {
+  if (!user?.sub) {
+    return {
+      actorType: 'guest',
+      accountHash: '',
+      audienceType: 'anonymous',
+    };
+  }
+
+  const accountHash = await analyticsHash(env, 'account', user.sub);
+  const isInternal = Boolean(
+    user.email && getAdminEmails(env).has(user.email.toLowerCase()),
+  );
+  const [completedRecharge] = await Promise.all([
+    isInternal
+      ? Promise.resolve(null)
+      : env.DB.prepare(
+        `SELECT 1 AS found
+         FROM orders
+         WHERE user_id = ?
+           AND status = 'completed'
+           AND completed_at IS NOT NULL
+           AND payment_method IN ('paypal', 'voucher')
+         LIMIT 1`
+      ).bind(user.sub).first(),
+    env.DB.prepare(
+      `UPDATE users
+       SET analytics_hash = ?
+       WHERE id = ? AND (analytics_hash IS NULL OR analytics_hash = '')`
+    ).bind(accountHash, user.sub).run(),
+  ]);
+
+  return {
+    actorType: isInternal ? 'admin' : 'user',
+    accountHash,
+    audienceType: isInternal
+      ? 'internal'
+      : completedRecharge
+        ? 'recharged'
+        : 'registered',
+  };
+}
+
 async function acceptAnalyticsRate(env, request, eventCount, now) {
   const rawIp = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipHash = await analyticsHash(env, 'rate', rawIp);
@@ -1511,13 +1554,16 @@ async function storeAnalyticsBatch(env, request, payload) {
     return { error: 'Analytics request was not accepted.', status: 429 };
   }
 
-  const [visitorHash, sessionHash, user, admin] = await Promise.all([
+  const [visitorHash, sessionHash, user] = await Promise.all([
     analyticsHash(env, 'visitor', visitorId),
     analyticsHash(env, 'session', sessionId),
     getUser(request, env),
-    getAdmin(request, env),
   ]);
-  const actorType = admin ? 'admin' : user ? 'user' : 'guest';
+  const {
+    actorType,
+    accountHash,
+    audienceType,
+  } = await resolveAnalyticsAudience(env, user);
   const country = analyticsToken(
     request.headers.get('CF-IPCountry') || '',
     2,
@@ -1543,10 +1589,11 @@ async function storeAnalyticsBatch(env, request, payload) {
       env.DB.prepare(
         `INSERT OR IGNORE INTO analytics_events
          (id, visitor_hash, session_hash, event_name, tool_id, page_group,
-          actor_type, device_type, language, country, source, campaign,
+          actor_type, account_hash, audience_type, device_type, language,
+          country, source, campaign,
           file_count, size_bucket, duration_ms, status_code, error_code,
           created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
         visitorHash,
@@ -1555,6 +1602,8 @@ async function storeAnalyticsBatch(env, request, payload) {
         toolId,
         analyticsToken(event.page_group, 80),
         actorType,
+        accountHash,
+        audienceType,
         deviceType,
         analyticsToken(event.language, 16, /[^a-zA-Z-]/g),
         country,
@@ -1620,6 +1669,7 @@ async function getAnalyticsOverview(env, days) {
     deviceRows,
     countryRows,
     languageRows,
+    activeAccountRows,
     inpaintService,
     removeBgService,
     inpaintP95,
@@ -1630,24 +1680,32 @@ async function getAnalyticsOverview(env, days) {
   ] = await Promise.all([
     env.DB.prepare(
       `SELECT
-         COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
+         COUNT(DISTINCT CASE
+           WHEN audience_type = 'anonymous' THEN visitor_hash
+         END) AS anonymous,
          COUNT(DISTINCT session_hash) AS sessions,
          COUNT(DISTINCT CASE WHEN event_name = 'file_selected' THEN session_hash END) AS selected,
          COUNT(DISTINCT CASE WHEN event_name = 'tool_started' THEN session_hash END) AS starts,
          COUNT(DISTINCT CASE WHEN event_name = 'result_ready' THEN session_hash END) AS completed,
          COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads
        FROM analytics_events
-       WHERE created_at >= ?`
+       WHERE created_at >= ? AND audience_type != 'internal'`
     ).bind(cutoff).first(),
     env.DB.prepare(
       `SELECT
          strftime('%Y-%m-%d', created_at, 'unixepoch', '+8 hours') AS day,
-         COUNT(DISTINCT CASE WHEN event_name = 'page_view' THEN visitor_hash END) AS visitors,
-         COUNT(DISTINCT CASE WHEN event_name = 'file_selected' THEN session_hash END) AS selected,
-         COUNT(DISTINCT CASE WHEN event_name = 'tool_started' THEN session_hash END) AS starts,
-         COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads
+         COUNT(DISTINCT CASE
+           WHEN audience_type = 'anonymous' THEN visitor_hash
+         END) AS anonymous,
+         COUNT(DISTINCT CASE
+           WHEN audience_type = 'registered' AND account_hash != '' THEN account_hash
+         END) AS registered,
+         COUNT(DISTINCT CASE
+           WHEN audience_type = 'recharged' AND account_hash != '' THEN account_hash
+         END) AS recharged,
+         COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
-       WHERE created_at >= ?
+       WHERE created_at >= ? AND audience_type != 'internal'
        GROUP BY day
        ORDER BY day`
     ).bind(cutoff).all(),
@@ -1660,33 +1718,90 @@ async function getAnalyticsOverview(env, days) {
          COUNT(DISTINCT CASE WHEN event_name = 'result_downloaded' THEN session_hash END) AS downloads,
          AVG(CASE WHEN event_name = 'result_ready' THEN duration_ms END) AS avg_duration_ms
        FROM analytics_events
-       WHERE created_at >= ? AND tool_id NOT IN ('', 'workspace', 'pricing')
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND tool_id NOT IN ('', 'workspace', 'pricing')
        GROUP BY tool_id
        ORDER BY starts DESC, opens DESC`
     ).bind(cutoff).all(),
     env.DB.prepare(
       `SELECT source AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
-       WHERE created_at >= ? AND event_name = 'page_view' AND source != ''
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND event_name = 'page_view' AND source != ''
        GROUP BY source ORDER BY sessions DESC LIMIT 12`
     ).bind(cutoff).all(),
     env.DB.prepare(
       `SELECT device_type AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
-       WHERE created_at >= ? AND event_name = 'page_view' AND device_type != ''
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND event_name = 'page_view' AND device_type != ''
        GROUP BY device_type ORDER BY sessions DESC`
     ).bind(cutoff).all(),
     env.DB.prepare(
       `SELECT country AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
-       WHERE created_at >= ? AND event_name = 'page_view' AND country != ''
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND event_name = 'page_view' AND country != ''
        GROUP BY country ORDER BY sessions DESC LIMIT 12`
     ).bind(cutoff).all(),
     env.DB.prepare(
       `SELECT language AS label, COUNT(DISTINCT session_hash) AS sessions
        FROM analytics_events
-       WHERE created_at >= ? AND event_name = 'page_view' AND language != ''
+       WHERE created_at >= ? AND audience_type != 'internal'
+         AND event_name = 'page_view' AND language != ''
        GROUP BY language ORDER BY sessions DESC`
+    ).bind(cutoff).all(),
+    env.DB.prepare(
+      `WITH activity AS (
+         SELECT
+           account_hash,
+           MAX(created_at) AS last_active_at,
+           COUNT(DISTINCT session_hash) AS sessions,
+           COUNT(DISTINCT CASE
+             WHEN event_name = 'tool_started' THEN session_hash
+           END) AS starts,
+           COUNT(DISTINCT CASE
+             WHEN event_name = 'result_downloaded' THEN session_hash
+           END) AS downloads
+         FROM analytics_events
+         WHERE created_at >= ?
+           AND audience_type IN ('registered', 'recharged')
+           AND account_hash != ''
+         GROUP BY account_hash
+       ),
+       recharges AS (
+         SELECT
+           user_id,
+           COUNT(*) AS recharge_count,
+           MAX(completed_at) AS last_recharge_at
+         FROM orders
+         WHERE status = 'completed'
+           AND completed_at IS NOT NULL
+           AND payment_method IN ('paypal', 'voucher')
+         GROUP BY user_id
+       )
+       SELECT
+         u.email,
+         u.created_at AS account_created_at,
+         activity.last_active_at,
+         activity.sessions,
+         activity.starts,
+         activity.downloads,
+         COALESCE(recharges.recharge_count, 0) AS recharge_count,
+         recharges.last_recharge_at,
+         COALESCE(user_credits.credits, 0) AS credits,
+         SUM(CASE
+           WHEN COALESCE(recharges.recharge_count, 0) = 0 THEN 1 ELSE 0
+         END) OVER () AS registered_total,
+         SUM(CASE
+           WHEN COALESCE(recharges.recharge_count, 0) > 0 THEN 1 ELSE 0
+         END) OVER () AS recharged_total
+       FROM activity
+       JOIN users u ON u.analytics_hash = activity.account_hash
+       LEFT JOIN user_credits ON user_credits.user_id = u.id
+       LEFT JOIN recharges ON recharges.user_id = u.id
+       ORDER BY activity.last_active_at DESC
+       LIMIT 200`
     ).bind(cutoff).all(),
     env.DB.prepare(
       `SELECT
@@ -1760,9 +1875,11 @@ async function getAnalyticsOverview(env, days) {
     env.DB.prepare(
       `SELECT
          (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
-          WHERE created_at >= ? AND event_name = 'pricing_view') AS pricing_views,
+          WHERE created_at >= ? AND audience_type != 'internal'
+            AND event_name = 'pricing_view') AS pricing_views,
          (SELECT COUNT(DISTINCT session_hash) FROM analytics_events
-          WHERE created_at >= ? AND event_name = 'xianyu_clicked') AS xianyu_clicks,
+          WHERE created_at >= ? AND audience_type != 'internal'
+            AND event_name = 'xianyu_clicked') AS xianyu_clicks,
          (SELECT COUNT(*) FROM orders
           WHERE created_at >= ? AND payment_method = 'paypal') AS paypal_orders,
          (SELECT COUNT(*) FROM orders
@@ -1772,18 +1889,29 @@ async function getAnalyticsOverview(env, days) {
           WHERE redeemed_at >= ? AND status = 'redeemed') AS vouchers_redeemed`
     ).bind(cutoff, cutoff, cutoff, cutoff, cutoff).first(),
     env.DB.prepare(
-      'SELECT MIN(created_at) AS created_at FROM analytics_events'
+      `SELECT MIN(created_at) AS created_at
+       FROM analytics_events
+       WHERE audience_type != 'internal'`
     ).first('created_at'),
   ]);
 
   const summaryValues = {
-    visitors: Number(summary?.visitors || 0),
+    anonymous: Number(summary?.anonymous || 0),
+    registered: Number(
+      activeAccountRows.results?.[0]?.registered_total || 0,
+    ),
+    recharged: Number(
+      activeAccountRows.results?.[0]?.recharged_total || 0,
+    ),
     sessions: Number(summary?.sessions || 0),
     selected: Number(summary?.selected || 0),
     starts: Number(summary?.starts || 0),
     completed: Number(summary?.completed || 0),
     downloads: Number(summary?.downloads || 0),
   };
+  summaryValues.visitors = summaryValues.anonymous
+    + summaryValues.registered
+    + summaryValues.recharged;
   summaryValues.download_rate = analyticsRate(
     summaryValues.downloads,
     summaryValues.starts,
@@ -1794,10 +1922,10 @@ async function getAnalyticsOverview(env, days) {
     const row = byDay.get(day) || {};
     return {
       day,
-      visitors: Number(row.visitors || 0),
-      selected: Number(row.selected || 0),
-      starts: Number(row.starts || 0),
-      downloads: Number(row.downloads || 0),
+      anonymous: Number(row.anonymous || 0),
+      registered: Number(row.registered || 0),
+      recharged: Number(row.recharged || 0),
+      sessions: Number(row.sessions || 0),
     };
   });
 
@@ -1872,6 +2000,20 @@ async function getAnalyticsOverview(env, days) {
     devices: deviceRows.results || [],
     countries: countryRows.results || [],
     languages: languageRows.results || [],
+    active_accounts: (activeAccountRows.results || []).map((account) => ({
+      account: maskEmail(account.email),
+      audience_type: Number(account.recharge_count || 0) > 0
+        ? 'recharged'
+        : 'registered',
+      account_created_at: Number(account.account_created_at || 0),
+      last_active_at: Number(account.last_active_at || 0),
+      sessions: Number(account.sessions || 0),
+      starts: Number(account.starts || 0),
+      downloads: Number(account.downloads || 0),
+      recharge_count: Number(account.recharge_count || 0),
+      last_recharge_at: Number(account.last_recharge_at || 0),
+      credits: Number(account.credits || 0),
+    })),
     errors: errorRows.results || [],
     commerce: {
       pricing_views: Number(commerce?.pricing_views || 0),
