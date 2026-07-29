@@ -1,5 +1,6 @@
 import { env, exports } from 'cloudflare:workers';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import worker from '../worker/index.js';
 
 const API_ORIGIN = 'https://api.shopbgremover.com';
 
@@ -57,6 +58,16 @@ afterEach(() => {
 
 async function jsonResponse(response) {
   return JSON.parse(await response.text());
+}
+
+function overrideEnv(overrides) {
+  return new Proxy(env, {
+    get(target, property) {
+      return Object.prototype.hasOwnProperty.call(overrides, property)
+        ? overrides[property]
+        : target[property];
+    },
+  });
 }
 
 async function createAuthenticatedUser({
@@ -1089,11 +1100,12 @@ describe('credit center and administrator overview', () => {
   });
 
   it('collects only allowlisted, hashed first-party events and exposes aggregated admin data', async () => {
+    const analyticsEnv = overrideEnv({ ANALYTICS_MODE: 'admin_only' });
     const regular = await createAuthenticatedUser({
       email: 'analytics-regular@example.com',
       credits: 0,
     });
-    const regularResponse = await exports.default.fetch(authenticatedRequest(
+    const regularResponse = await worker.fetch(authenticatedRequest(
       '/api/analytics/events',
       regular.cookie,
       {
@@ -1112,7 +1124,7 @@ describe('credit center and administrator overview', () => {
           }],
         }),
       },
-    ));
+    ), analyticsEnv);
     expect(regularResponse.status).toBe(202);
     expect(await jsonResponse(regularResponse)).toEqual({
       accepted: 0,
@@ -1164,7 +1176,7 @@ describe('credit center and administrator overview', () => {
         file_count: 3,
       }],
     };
-    const collected = await exports.default.fetch(authenticatedRequest(
+    const collected = await worker.fetch(authenticatedRequest(
       '/api/analytics/events',
       admin.cookie,
       {
@@ -1176,7 +1188,7 @@ describe('credit center and administrator overview', () => {
         },
         body: JSON.stringify(payload),
       },
-    ));
+    ), analyticsEnv);
     expect(collected.status).toBe(202);
     expect(await jsonResponse(collected)).toEqual({
       accepted: 5,
@@ -1198,7 +1210,7 @@ describe('credit center and administrator overview', () => {
     expect(stored.results.some((row) => row.source === 'google.com')).toBe(true);
     expect(stored.results.some((row) => row.file_count === 3 && row.size_bucket === '2-5MB')).toBe(true);
 
-    const duplicate = await exports.default.fetch(authenticatedRequest(
+    const duplicate = await worker.fetch(authenticatedRequest(
       '/api/analytics/events',
       admin.cookie,
       {
@@ -1213,7 +1225,7 @@ describe('credit center and administrator overview', () => {
           events: [payload.events[0]],
         }),
       },
-    ));
+    ), analyticsEnv);
     expect((await jsonResponse(duplicate)).accepted).toBe(0);
 
     await env.DB.prepare(
@@ -1223,16 +1235,16 @@ describe('credit center and administrator overview', () => {
                unixepoch() - 2, unixepoch(), unixepoch())`
     ).run();
 
-    const forbidden = await exports.default.fetch(authenticatedRequest(
+    const forbidden = await worker.fetch(authenticatedRequest(
       '/api/admin/analytics?days=30',
       regular.cookie,
-    ));
+    ), analyticsEnv);
     expect(forbidden.status).toBe(403);
 
-    const overview = await exports.default.fetch(authenticatedRequest(
+    const overview = await worker.fetch(authenticatedRequest(
       '/api/admin/analytics?days=30',
       admin.cookie,
-    ));
+    ), analyticsEnv);
     expect(overview.status).toBe(200);
     expect(overview.headers.get('Cache-Control')).toBe('no-store');
     const body = await jsonResponse(overview);
