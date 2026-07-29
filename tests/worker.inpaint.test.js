@@ -1,6 +1,7 @@
 import { env, exports } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../worker/index.js';
+import { cleanupExpiredInpaint } from '../worker/inpaint.js';
 
 const API_ORIGIN = 'https://api.shopbgremover.com';
 
@@ -372,6 +373,27 @@ describe('private LaMa inpaint task chain', () => {
       `/api/inpaint/tasks/${task.id}/result`,
       owner.cookie,
     ), chain.value)).status).toBe(200);
+
+    const workingDelete = chain.r2.delete;
+    chain.r2.delete = vi.fn(async () => undefined);
+    const unconfirmedDelete = await worker.fetch(authenticatedRequest(
+      `/api/inpaint/tasks/${task.id}/result`,
+      owner.cookie,
+      { method: 'DELETE' },
+    ), chain.value);
+    expect(unconfirmedDelete.status).toBe(503);
+    expect(await body(unconfirmedDelete)).toMatchObject({
+      code: 'result_delete_failed',
+    });
+    expect(chain.r2.delete).toHaveBeenCalledTimes(2);
+    expect((await env.DB.prepare(
+      'SELECT result_key, result_acknowledged_at FROM inpaint_tasks WHERE id = ?'
+    ).bind(task.id).first())).toMatchObject({
+      result_key: completed.result_key,
+      result_acknowledged_at: null,
+    });
+
+    chain.r2.delete = workingDelete;
     expect((await worker.fetch(authenticatedRequest(
       `/api/inpaint/tasks/${task.id}/result`,
       owner.cookie,
@@ -421,5 +443,40 @@ describe('private LaMa inpaint task chain', () => {
       `SELECT COUNT(*) AS count FROM credit_ledger
        WHERE user_id = ? AND task_id = ?`
     ).bind(owner.userId, task.id).first('count')).toBe(0);
+  });
+
+  it('keeps an expired result pointer when R2 deletion cannot be confirmed', async () => {
+    const owner = await login('admin@example.com', 'expiry-owner', 0);
+    const chain = taskChainEnv('admin_free');
+    const created = await body(await worker.fetch(batchRequest({
+      cookie: owner.cookie,
+      taskCount: 1,
+      clientBatchId: 'expiry_batch_001',
+      deviceId: 'expiry-owner',
+    }), chain.value));
+    const task = created.batch.tasks[0];
+    const resultKey = `inpaint/${created.batch.id}/${task.id}/result.png`;
+    await chain.r2.put(resultKey, new Uint8Array([137, 80, 78, 71]));
+    await env.DB.prepare(
+      `UPDATE inpaint_tasks
+       SET status = 'succeeded', result_key = ?,
+           result_expires_at = unixepoch() - 1
+       WHERE id = ?`
+    ).bind(resultKey, task.id).run();
+
+    const workingDelete = chain.r2.delete;
+    chain.r2.delete = vi.fn(async () => undefined);
+    expect(await cleanupExpiredInpaint(chain.value)).toBe(0);
+    expect(chain.r2.delete).toHaveBeenCalledTimes(2);
+    expect(await env.DB.prepare(
+      'SELECT result_key FROM inpaint_tasks WHERE id = ?'
+    ).bind(task.id).first('result_key')).toBe(resultKey);
+
+    chain.r2.delete = workingDelete;
+    expect(await cleanupExpiredInpaint(chain.value)).toBe(1);
+    expect(chain.r2.objects.has(resultKey)).toBe(false);
+    expect(await env.DB.prepare(
+      'SELECT result_key FROM inpaint_tasks WHERE id = ?'
+    ).bind(task.id).first('result_key')).toBeNull();
   });
 });

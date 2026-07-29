@@ -22,6 +22,15 @@ function safeErrorDetail(value) {
   return String(value || '').replace(/\s+/g, ' ').slice(0, 500) || null;
 }
 
+async function deletePrivateObjectVerified(env, key) {
+  if (!key) return true;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await env.INPAINT_OBJECTS.delete(key);
+    if (!await env.INPAINT_OBJECTS.head(key)) return true;
+  }
+  return false;
+}
+
 function productDay(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
@@ -449,7 +458,23 @@ async function acknowledgeResult(env, identity, taskId, respond, origin) {
      WHERE id = ? AND owner_key = ?`
   ).bind(taskId, identity.ownerKey).first();
   if (!task) return respond({ error: 'Task not found.' }, 404, origin);
-  if (task.result_key) await env.INPAINT_OBJECTS.delete(task.result_key);
+  if (task.result_key) {
+    try {
+      if (!await deletePrivateObjectVerified(env, task.result_key)) {
+        throw new Error('r2_delete_unconfirmed');
+      }
+    } catch (error) {
+      console.error(JSON.stringify({
+        message: 'Inpaint result deletion was not confirmed',
+        taskId,
+        error: safeErrorDetail(error?.message),
+      }));
+      return respond({
+        error: 'The server result could not be deleted. Please retry.',
+        code: 'result_delete_failed',
+      }, 503, origin);
+    }
+  }
   await env.DB.prepare(
     `UPDATE inpaint_tasks
      SET result_key = NULL, result_acknowledged_at = unixepoch(),
@@ -754,15 +779,27 @@ export async function cleanupExpiredInpaint(env) {
      ORDER BY result_expires_at
      LIMIT 100`
   ).all();
+  let cleaned = 0;
   for (const task of expired.results || []) {
-    await env.INPAINT_OBJECTS.delete(task.result_key).catch(() => undefined);
-    await env.DB.prepare(
-      `UPDATE inpaint_tasks
-       SET result_key = NULL, result_expired_at = unixepoch(), updated_at = unixepoch()
-       WHERE id = ? AND result_key = ?`
-    ).bind(task.id, task.result_key).run();
+    try {
+      if (!await deletePrivateObjectVerified(env, task.result_key)) {
+        throw new Error('r2_delete_unconfirmed');
+      }
+      await env.DB.prepare(
+        `UPDATE inpaint_tasks
+         SET result_key = NULL, result_expired_at = unixepoch(), updated_at = unixepoch()
+         WHERE id = ? AND result_key = ?`
+      ).bind(task.id, task.result_key).run();
+      cleaned += 1;
+    } catch (error) {
+      console.error(JSON.stringify({
+        message: 'Expired inpaint result deletion was not confirmed',
+        taskId: task.id,
+        error: safeErrorDetail(error?.message),
+      }));
+    }
   }
-  return (expired.results || []).length;
+  return cleaned;
 }
 
 export const INPAINT_LIMITS = Object.freeze({
