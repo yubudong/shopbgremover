@@ -138,10 +138,13 @@ function memoryR2() {
 
 function memoryQueue() {
   const messages = [];
+  const options = [];
   return {
     messages,
-    async send(message) {
+    options,
+    async send(message, sendOptions = {}) {
       messages.push(message);
+      options.push(sendOptions);
     },
   };
 }
@@ -569,6 +572,51 @@ describe('private LaMa inpaint task chain', () => {
     expect(await env.DB.prepare(
       'SELECT status FROM inpaint_tasks WHERE id = ?'
     ).bind(awaitingTask.id).first('status')).toBe('cancelled');
+  });
+
+  it('requeues same-owner contention without consuming delivery retries', async () => {
+    const owner = await login('admin@example.com', 'contention-owner', 3);
+    const chain = taskChainEnv('admin_free');
+    const created = await body(await worker.fetch(batchRequest({
+      cookie: owner.cookie,
+      taskCount: 2,
+      clientBatchId: 'contention_batch_001',
+      deviceId: 'contention-owner',
+    }), chain.value));
+    for (let position = 0; position < 2; position += 1) {
+      const form = new FormData();
+      form.set('image', new File([new Uint8Array([1, 2, position])], 'input.png', {
+        type: 'image/png',
+      }));
+      form.set('mask', new File([new Uint8Array([4, 5, position])], 'mask.png', {
+        type: 'image/png',
+      }));
+      form.set('mask_spec_hash', created.batch.mask_spec_hash);
+      expect((await worker.fetch(new Request(
+        `${API_ORIGIN}/api/inpaint/batches/${created.batch.id}/tasks/${position}`,
+        { method: 'POST', headers: { Cookie: owner.cookie }, body: form },
+      ), chain.value)).status).toBe(202);
+    }
+    await env.DB.prepare(
+      `UPDATE inpaint_tasks
+       SET status = 'processing', lease_expires_at = unixepoch() + 120
+       WHERE id = ?`
+    ).bind(created.batch.tasks[0].id).run();
+
+    const blockedMessage = queueMessage(chain.queue.messages[1], 3);
+    await worker.queue({ messages: [blockedMessage] }, chain.value);
+
+    expect(blockedMessage.ack).toHaveBeenCalledOnce();
+    expect(blockedMessage.retry).not.toHaveBeenCalled();
+    expect(chain.queue.messages).toHaveLength(3);
+    expect(chain.queue.messages[2]).toEqual(chain.queue.messages[1]);
+    expect(chain.queue.options[2]).toEqual({ delaySeconds: 2 });
+    expect(await env.DB.prepare(
+      'SELECT status, attempts FROM inpaint_tasks WHERE id = ?'
+    ).bind(created.batch.tasks[1].id).first()).toMatchObject({
+      status: 'queued',
+      attempts: 0,
+    });
   });
 
   it('retries transient failure and terminally cleans inputs without charging', async () => {

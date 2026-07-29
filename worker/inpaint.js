@@ -698,7 +698,12 @@ async function processQueueMessage(message, env) {
     if (!state || ['succeeded', 'failed', 'cancelled'].includes(state)) {
       message.ack();
     } else {
-      message.retry({ delaySeconds: 2 });
+      try {
+        await env.INPAINT_QUEUE.send(message.body, { delaySeconds: 2 });
+        message.ack();
+      } catch {
+        message.retry({ delaySeconds: 2 });
+      }
     }
     return;
   }
