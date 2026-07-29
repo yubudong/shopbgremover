@@ -458,6 +458,119 @@ describe('private LaMa inpaint task chain', () => {
     ).bind(owner.userId).first('credits')).toBe(3);
   });
 
+  it('accepts later task uploads while an earlier task is processing', async () => {
+    const owner = await login('admin@example.com', 'progressive-owner', 3);
+    const chain = taskChainEnv('admin_free');
+    const created = await body(await worker.fetch(batchRequest({
+      cookie: owner.cookie,
+      taskCount: 2,
+      clientBatchId: 'progressive_batch_001',
+      deviceId: 'progressive-owner',
+    }), chain.value));
+    const firstForm = new FormData();
+    firstForm.set('image', new File([new Uint8Array([1, 2, 3])], 'first.png', {
+      type: 'image/png',
+    }));
+    firstForm.set('mask', new File([new Uint8Array([4, 5, 6])], 'mask.png', {
+      type: 'image/png',
+    }));
+    firstForm.set('mask_spec_hash', created.batch.mask_spec_hash);
+    expect((await worker.fetch(new Request(
+      `${API_ORIGIN}/api/inpaint/batches/${created.batch.id}/tasks/0`,
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: firstForm },
+    ), chain.value)).status).toBe(202);
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE inpaint_tasks SET status = 'processing' WHERE id = ?`
+      ).bind(created.batch.tasks[0].id),
+      env.DB.prepare(
+        `UPDATE inpaint_batches SET status = 'processing' WHERE id = ?`
+      ).bind(created.batch.id),
+    ]);
+    expect(await env.DB.prepare(
+      'SELECT status FROM inpaint_batches WHERE id = ?'
+    ).bind(created.batch.id).first('status')).toBe('processing');
+
+    const secondForm = new FormData();
+    secondForm.set('image', new File([new Uint8Array([7, 8, 9])], 'second.png', {
+      type: 'image/png',
+    }));
+    secondForm.set('mask', new File([new Uint8Array([10, 11, 12])], 'mask.png', {
+      type: 'image/png',
+    }));
+    secondForm.set('mask_spec_hash', created.batch.mask_spec_hash);
+    const secondUpload = await worker.fetch(new Request(
+      `${API_ORIGIN}/api/inpaint/batches/${created.batch.id}/tasks/1`,
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: secondForm },
+    ), chain.value);
+    expect(secondUpload.status).toBe(202);
+    expect(await env.DB.prepare(
+      'SELECT status FROM inpaint_tasks WHERE id = ?'
+    ).bind(created.batch.tasks[1].id).first('status')).toBe('queued');
+  });
+
+  it('cancels a partially completed batch and deletes completed results', async () => {
+    const owner = await login('admin@example.com', 'partial-cancel-owner', 3);
+    const chain = taskChainEnv('admin_free');
+    const created = await body(await worker.fetch(batchRequest({
+      cookie: owner.cookie,
+      taskCount: 2,
+      clientBatchId: 'partial_cancel_batch_001',
+      deviceId: 'partial-cancel-owner',
+    }), chain.value));
+    const completedTask = created.batch.tasks[0];
+    const awaitingTask = created.batch.tasks[1];
+    const form = new FormData();
+    form.set('image', new File([new Uint8Array([1, 2, 3])], 'input.png', {
+      type: 'image/png',
+    }));
+    form.set('mask', new File([new Uint8Array([4, 5, 6])], 'mask.png', {
+      type: 'image/png',
+    }));
+    form.set('mask_spec_hash', created.batch.mask_spec_hash);
+    await worker.fetch(new Request(
+      `${API_ORIGIN}/api/inpaint/batches/${created.batch.id}/tasks/0`,
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: form },
+    ), chain.value);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      new Uint8Array([137, 80, 78, 71]),
+      { headers: { 'Content-Type': 'image/png' } },
+    )));
+    await worker.queue(
+      { messages: [queueMessage(chain.queue.messages[0])] },
+      chain.value,
+    );
+    expect(await env.DB.prepare(
+      'SELECT status FROM inpaint_tasks WHERE id = ?'
+    ).bind(completedTask.id).first('status')).toBe('succeeded');
+    expect(chain.r2.objects.size).toBe(1);
+
+    const cancelled = await worker.fetch(authenticatedRequest(
+      `/api/inpaint/batches/${created.batch.id}`,
+      owner.cookie,
+      { method: 'DELETE' },
+    ), chain.value);
+    expect(cancelled.status).toBe(200);
+    expect(await body(cancelled)).toMatchObject({ ok: true, status: 'cancelled' });
+    expect(chain.r2.objects.size).toBe(0);
+
+    const completed = await env.DB.prepare(
+      `SELECT status, image_key, mask_key, result_key, result_acknowledged_at
+       FROM inpaint_tasks WHERE id = ?`
+    ).bind(completedTask.id).first();
+    expect(completed).toMatchObject({
+      status: 'succeeded',
+      image_key: null,
+      mask_key: null,
+      result_key: null,
+    });
+    expect(completed.result_acknowledged_at).not.toBeNull();
+    expect(await env.DB.prepare(
+      'SELECT status FROM inpaint_tasks WHERE id = ?'
+    ).bind(awaitingTask.id).first('status')).toBe('cancelled');
+  });
+
   it('retries transient failure and terminally cleans inputs without charging', async () => {
     const owner = await login('admin@example.com', 'retry-owner', 2);
     const chain = taskChainEnv('admin_free');

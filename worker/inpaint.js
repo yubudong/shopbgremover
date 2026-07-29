@@ -307,7 +307,7 @@ async function createBatch(request, env, identity, respond, origin) {
 async function uploadTask(request, env, identity, batchId, position, respond, origin) {
   const batch = await readOwnedBatch(env, batchId, identity.ownerKey);
   if (!batch) return respond({ error: 'Batch not found.' }, 404, origin);
-  if (!['creating', 'queued'].includes(batch.status)) {
+  if (!['creating', 'queued', 'processing'].includes(batch.status)) {
     return respond({ error: 'This batch no longer accepts uploads.' }, 409, origin);
   }
   if (!Number.isInteger(position) || position < 0 || position >= Number(batch.task_count)) {
@@ -520,8 +520,13 @@ async function cancelBatch(env, identity, batchId, respond, origin) {
       await env.DB.prepare(
         `UPDATE inpaint_tasks
          SET image_key = NULL, mask_key = NULL, result_key = NULL,
+             result_acknowledged_at = CASE
+               WHEN status = 'succeeded' AND result_key IS NOT NULL
+               THEN COALESCE(result_acknowledged_at, unixepoch())
+               ELSE result_acknowledged_at
+             END,
              updated_at = unixepoch()
-         WHERE batch_id = ? AND owner_key = ? AND id = ? AND status = 'cancelled'`
+         WHERE batch_id = ? AND owner_key = ? AND id = ?`
       ).bind(batchId, identity.ownerKey, row.id).run();
     } catch (error) {
       cleanupFailed = true;
