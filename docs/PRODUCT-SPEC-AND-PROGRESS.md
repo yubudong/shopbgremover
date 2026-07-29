@@ -988,6 +988,19 @@ npm run pages:deploy
 - 当前状态：授权样图的本地相对质量门已通过，私有生产链仍为 `off` 且无任务数据；绝对恢复质量、正确人工蒙版、同位置批量和完整生产恢复/清理仍需在管理员灰度中验证。
 - 下一步：将生产 Worker 只切到 `admin_free`，确认管理员邮箱后先用 1 张小水印和少量压力图验证真实上传、Access/HMAC、单身份串行、Queue 全站并发 2、结果读取、刷新恢复、确认删除、R2/D1 清理和零积分；随后用同一位置的复制样例逐步扩到 50 张并验证第 51 张拒绝。管理员灰度全部通过且六语种上传披露与新前端完成前，不切 `public_free`。
 
+### 8.32 2026-07-29：Worker `admin_free` 管理员灰度部署（已完成，真实图片验收待管理员登录）
+
+- 任务：把已完成私有链路的生产 Worker 从 `off` 切到只允许 `ADMIN_EMAILS=yubudong2023@gmail.com` 的 `admin_free`，先验证未授权请求拒绝与零写入，再进入管理员真实图片验收。
+- 成果：`wrangler.toml` 的 `INPAINT_MODE` 已改为 `admin_free`；生产 Worker 版本 `97e332db-013a-41ca-afc8-9d9901ce6729` 已部署，继续绑定私有 R2、单消息 Queue、D1、受保护 LaMa 服务 Secrets 和每小时清理 Cron。生产能力接口返回 `mode=admin_free`、`enabled=true` 和确认的 50/50/60 限制；无登录批次请求返回 401 与“使用管理员账号登录”，没有创建任务。
+- 测试隔离修正：原 `off` 用例通过 Cloudflare 导出 Worker 读取 `wrangler.toml`，切换生产配置后会误读 `admin_free`；测试改为与其他模式相同，直接给 Worker 注入显式 `off` 环境，避免测试结果依赖当前部署模式。备份保护 3 项、前端 72 项和 Worker 55 项全部通过，共 130 项；Worker 首次在受限环境仍因默认日志目录与回环监听权限失败，按既有允许方式重跑后全绿。Wrangler dry-run gzip 31.60 KiB，并准确识别 `admin_free`、私有 R2、Queue 和 D1。提交 `f23ef99` 已推送，CI `30412748082` 通过。
+- 生产预检与部署后核对：部署前后 `inpaint_batches=0`、`inpaint_tasks=0`；管理员基线为可用积分 1184、累计使用 208，部署和游客探针后保持不变。两次查询均 `changes=0`、`rows_written=0`。浏览器现有 ShopBG 会话为 `yubudong@protonmail.com`、余额 55，不在管理员白名单；没有为测试临时扩权、修改白名单或伪造会话。
+- 修改文件：修改 `wrangler.toml`、`tests/worker.inpaint.test.js` 和本文档；未修改或纳入未跟踪的测试 ZIP、`photo/ecommerce-test-suite-v2/`、`.DS_Store`、`docs/SEO-Roadmap-2026-05-22.md` 与 `marketing/xianyu-listings/.DS_Store`。
+- 生产写入/AI/资金影响：真实发生一次 Worker `admin_free` 部署；没有上传图片、创建批次、写 R2/D1、发送 Queue、调用 Hetzner LaMa/fal.ai、扣积分或修改订单。普通用户和游客不能创建任务。R2、Zero Trust 和 Hetzner 仍有超出免费额度或服务器资源使用的既有风险，但本阶段无图片流量。
+- 部署状态：Worker 管理员灰度已部署；Pages 没有新入口，旧浏览器本地功能仍在，`public_free` 未开放。管理员真实图片、结果恢复/确认删除、50/51、R2/Queue/D1 清理和零积分端到端仍未执行，不能标记管理员验收完成。
+- 踩坑与调整：生产配置切换会影响从 `wrangler.toml` 启动的集成测试，模式测试必须显式注入目标值。现有浏览器会话不是管理员账号，安全边界要求停在登录切换处；不能为了继续自动化而把另一个账号加入生产管理员白名单。
+- 当前状态：`admin_free` 已安全上线，未授权请求被拒绝且任务数据仍为零；唯一当前阻塞是浏览器需要登录既定管理员账号。
+- 下一步：用户在已打开的 ShopBG 页面退出 `yubudong@protonmail.com`，登录 `yubudong2023@gmail.com` 后通知继续。随后先用 `04-shadow-lamp.png` 做一张真实链路测试，确认结果和即时清理，再扩到少量压力图与 50/51 边界；任何积分变化、残留对象、Queue 异常或资源异常都先关闭开关并调查。
+
 ---
 
 ## 9. 文档维护规则
