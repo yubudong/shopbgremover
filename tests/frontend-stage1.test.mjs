@@ -235,8 +235,13 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
   assert.match(cleaner, /mask_spec_hash/);
   assert.match(cleaner, /same relative position/i);
   assert.match(cleaner, /相同相对位置/);
+  assert.match(cleaner, /class="local-clean-tool active"[^>]*data-clean-tool="rectangle"/);
+  assert.match(cleaner, /tool: draft\?\.tool \|\| 'rectangle'/);
   assert.match(cleaner, /stage\.addEventListener\('wheel'/);
-  assert.match(cleaner, /!event\.ctrlKey && !event\.metaKey/);
+  assert.match(cleaner, /if \(!active \|\| active\.processing \|\| batchRunning \|\| editorSwitching\) return/);
+  assert.match(cleaner, /Math\.exp\(-delta \* 0\.002\)/);
+  assert.match(cleaner, /鼠标移到图片上滚动即可缩放/);
+  assert.doesNotMatch(cleaner, /!event\.ctrlKey && !event\.metaKey/);
   assert.match(cleaner, /id="localCleanPrevious" aria-keyshortcuts="ArrowLeft"/);
   assert.match(cleaner, /id="localCleanNext" aria-keyshortcuts="ArrowRight"/);
   assert.match(cleaner, /async function switchEditorImage\(offset\)/);
@@ -253,7 +258,7 @@ test('all localized workspaces integrate private LaMa cleanup with serial upload
   for (const file of indexFiles) {
     const html = await read(file);
     assert.match(html, /href="\/local-cleaner\.css\?v=20260729-editor-navigation-v1"/, file);
-    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-editor-navigation-v1"/, file);
+    assert.match(html, /src="\/local-cleaner\.js\?v=20260729-rectangle-wheel-v1"/, file);
     assert.match(html, /href="\/workspace-ui\.css\?v=20260729-gallery-readable-v1"/, file);
     assert.match(html, /src="\/workspace-ui\.js\?v=20260729-gallery-readable-v1"/, file);
     assert.equal((html.match(/id="localCleanEntry"/g) || []).length, 1, file);

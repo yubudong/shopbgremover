@@ -17,7 +17,7 @@
       help: 'Use a close-fitting mark. Large covered product details may be reconstructed differently from the original.',
       rights: 'Only edit images you own or are authorized to modify. A derived image and mask are temporarily uploaded to private storage, deleted after browser recovery, and retained for no more than 24 hours. AI cleanup is free and uses no credits.',
       close: 'Close AI editor', zoom: 'Zoom', zoomOut: 'Zoom out', zoomIn: 'Zoom in', fit: 'Fit',
-      navigation: 'Scroll to move · Ctrl/⌘ + wheel to zoom',
+      navigation: 'Use the mouse wheel over the image to zoom · Fit resets the view',
       imageNavigation: 'Batch image navigation', previousImage: 'Previous', nextImage: 'Next',
       imagePosition: '{current} of {count}', imageNavigationHint: 'Use ← and → to switch images',
       shortcutEmpty: 'Upload an image to start', shortcutReady: 'Open AI cleanup',
@@ -45,7 +45,7 @@
       help: 'Markiere möglichst knapp. Große verdeckte Produktdetails können anders rekonstruiert werden.',
       rights: 'Bearbeite nur eigene oder autorisierte Bilder. Bild und Maske werden vorübergehend privat hochgeladen, nach der Wiederherstellung gelöscht und höchstens 24 Stunden gespeichert. Die KI-Bereinigung ist kostenlos und verbraucht keine Credits.',
       close: 'KI-Editor schließen', zoom: 'Zoom', zoomOut: 'Verkleinern', zoomIn: 'Vergrößern', fit: 'Einpassen',
-      navigation: 'Scrollen zum Bewegen · Strg/⌘ + Mausrad zum Zoomen',
+      navigation: 'Mausrad über dem Bild zum Zoomen · Einpassen setzt die Ansicht zurück',
       imageNavigation: 'Bildnavigation im Stapel', previousImage: 'Zurück', nextImage: 'Weiter',
       imagePosition: '{current} von {count}', imageNavigationHint: 'Mit ← und → zwischen Bildern wechseln',
       shortcutEmpty: 'Bild hochladen, um zu starten', shortcutReady: 'KI-Bereinigung öffnen',
@@ -72,7 +72,7 @@
       help: 'Ajusta bien la marca. Los detalles grandes cubiertos pueden reconstruirse de forma distinta.',
       rights: 'Edita solo imágenes propias o autorizadas. La imagen derivada y la máscara se suben temporalmente a almacenamiento privado, se borran tras la recuperación y se conservan como máximo 24 horas. La limpieza es gratis y no consume créditos.',
       close: 'Cerrar editor de IA', zoom: 'Zoom', zoomOut: 'Alejar', zoomIn: 'Acercar', fit: 'Ajustar',
-      navigation: 'Desplaza para mover · Ctrl/⌘ + rueda para ampliar',
+      navigation: 'Usa la rueda sobre la imagen para ampliar · Ajustar restablece la vista',
       imageNavigation: 'Navegación de imágenes del lote', previousImage: 'Anterior', nextImage: 'Siguiente',
       imagePosition: '{current} de {count}', imageNavigationHint: 'Usa ← y → para cambiar de imagen',
       shortcutEmpty: 'Sube una imagen para empezar', shortcutReady: 'Abrir limpieza con IA',
@@ -99,7 +99,7 @@
       help: 'Serrez la sélection. Les grands détails masqués peuvent être reconstruits différemment.',
       rights: 'Modifiez uniquement vos images ou celles autorisées. L’image dérivée et le masque sont téléversés temporairement dans un stockage privé, supprimés après récupération et conservés au maximum 24 heures. Le nettoyage IA est gratuit et sans crédit.',
       close: 'Fermer l’éditeur IA', zoom: 'Zoom', zoomOut: 'Réduire', zoomIn: 'Agrandir', fit: 'Ajuster',
-      navigation: 'Faites défiler pour déplacer · Ctrl/⌘ + molette pour zoomer',
+      navigation: 'Utilisez la molette sur l’image pour zoomer · Ajuster réinitialise la vue',
       imageNavigation: 'Navigation des images du lot', previousImage: 'Précédente', nextImage: 'Suivante',
       imagePosition: '{current} sur {count}', imageNavigationHint: 'Utilisez ← et → pour changer d’image',
       shortcutEmpty: 'Importez une image pour commencer', shortcutReady: 'Ouvrir le nettoyage IA',
@@ -126,7 +126,7 @@
       help: 'Marque de forma justa. Grandes detalhes cobertos podem ser reconstruídos de modo diferente.',
       rights: 'Edite apenas imagens próprias ou autorizadas. A imagem derivada e a máscara são enviadas temporariamente ao armazenamento privado, apagadas após a recuperação e mantidas por no máximo 24 horas. A limpeza é grátis e não usa créditos.',
       close: 'Fechar editor de IA', zoom: 'Zoom', zoomOut: 'Reduzir', zoomIn: 'Ampliar', fit: 'Ajustar',
-      navigation: 'Role para mover · Ctrl/⌘ + roda para ampliar',
+      navigation: 'Use a roda sobre a imagem para ampliar · Ajustar redefine a visualização',
       imageNavigation: 'Navegação de imagens do lote', previousImage: 'Anterior', nextImage: 'Próxima',
       imagePosition: '{current} de {count}', imageNavigationHint: 'Use ← e → para trocar de imagem',
       shortcutEmpty: 'Envie uma imagem para começar', shortcutReady: 'Abrir limpeza com IA',
@@ -153,7 +153,7 @@
       help: '标记请尽量贴合目标。被大面积遮挡的商品细节可能无法还原成原样。',
       rights: '请只编辑你拥有或已获授权的图片。原图派生文件和蒙版会临时上传到私有存储；结果写回本浏览器后立即删除，异常时最长保留 24 小时。AI 清除完全免费，不扣积分。',
       close: '关闭 AI 编辑器', zoom: '缩放', zoomOut: '缩小', zoomIn: '放大', fit: '适应窗口',
-      navigation: '滚动查看图片 · Ctrl/⌘ + 滚轮缩放',
+      navigation: '鼠标移到图片上滚动即可缩放 · 点击“适应窗口”恢复',
       imageNavigation: '本批图片切换', previousImage: '上一张', nextImage: '下一张',
       imagePosition: '第 {current} / {count} 张', imageNavigationHint: '也可以按键盘 ← → 切换',
       shortcutEmpty: '上传图片后开始', shortcutReady: '打开 AI 精细清除',
@@ -241,8 +241,8 @@
         <div class="local-clean-section">
           <span class="local-clean-label">${copy.tool}</span>
           <div class="local-clean-tools">
-            <button class="local-clean-tool active" type="button" data-clean-tool="brush">${copy.brush}</button>
-            <button class="local-clean-tool" type="button" data-clean-tool="rectangle">${copy.rectangle}</button>
+            <button class="local-clean-tool" type="button" data-clean-tool="brush">${copy.brush}</button>
+            <button class="local-clean-tool active" type="button" data-clean-tool="rectangle">${copy.rectangle}</button>
           </div>
           <label class="local-clean-label" for="localCleanBrush" style="margin-top:15px">${copy.size} · <span id="localCleanBrushValue">36</span></label>
           <input class="local-clean-range" id="localCleanBrush" type="range" min="8" max="120" value="36">
@@ -885,7 +885,7 @@
         redo: cloneMarks(draft?.redo || []),
         drawing: null,
         pointerId: null,
-        tool: draft?.tool || 'brush',
+        tool: draft?.tool || 'rectangle',
         processing: false,
         zoom: draft?.zoom || 1,
       };
@@ -1026,9 +1026,11 @@
   previousImageButton.addEventListener('click', () => switchEditorImage(-1));
   nextImageButton.addEventListener('click', () => switchEditorImage(1));
   stage.addEventListener('wheel', (event) => {
-    if (!active || (!event.ctrlKey && !event.metaKey)) return;
+    if (!active || active.processing || batchRunning || editorSwitching) return;
     event.preventDefault();
-    setZoom(active.zoom * (event.deltaY < 0 ? 1.15 : 1 / 1.15), {
+    const delta = Math.max(-120, Math.min(120, event.deltaY));
+    if (!delta) return;
+    setZoom(active.zoom * Math.exp(-delta * 0.002), {
       x: event.clientX,
       y: event.clientY,
     });
