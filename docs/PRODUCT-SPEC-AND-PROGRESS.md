@@ -47,7 +47,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 | 阶段 | 状态 | 当前结论 |
 |---|---|---|
 | 0 生产基线与安全 | ✅ 完成 | 凭据收口、D1 迁移前备份、恢复验证、回归测试和 CI 已建立 |
-| 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；隔离的本机 Sandbox 付款/退款工具已准备，真实 Sandbox 与 Live Capture/退款仍未验收 |
+| 1 计费与积分 | 🟡 进行中 | 代码、D1、PayPal Live 应用和 Webhook 已上线；独立 Sandbox 已完成 ShopBG 订单、积分、退款、真实回调和幂等闭环，只剩 Live 真实资金验收 |
 | 2 推荐奖励 | ✅ 核心完成 | 真实卡密推荐闭环、风险审核、观察期和争议取消已验收；PayPal 资金证据归阶段 1/8 |
 | 3 闲鱼卡密 | ✅ 完成 | 生成、发货、作废、真实兑换、推荐绑定、争议冲正和管理员配置中文购买入口均已上线 |
 | 4 去物体/水印 | 🟡 `public_free` 已上线，完整 50 图生产验收通过 | 六语种 LaMa 工作区已向游客和登录用户开放；单图、小批刷新恢复、网页同位置 50 图、ZIP、零积分和新任务 R2 清理均通过，继续保留低流量共机观察 |
@@ -60,7 +60,7 @@ git show 4b0b7f2:docs/PRODUCT-SPEC-AND-PROGRESS.md
 
 | 优先级 | 项目 | 当前边界 | 完成条件 |
 |---|---|---|---|
-| P0 | PayPal Sandbox 与真实捕获/退款 | 页面、订单 Worker、Webhook 和冲正自动化已上线；本机 Sandbox 工具已隔离生产，但尚未配置 Sandbox 凭证和买家账号，也没有带 Capture ID 的可退款生产订单 | 先用 Sandbox Business/Personal 完成 USD 3.49 模拟付款和全额退款；再使用可验证的境外真实买家账号完成 USD 3.49 付款、100 积分到账、全额退款、Webhook 冲正和最终余额恢复 |
+| P0（外部条件） | PayPal 真实捕获/退款 | 页面、订单 Worker、Webhook、自动冲正和独立 Sandbox 的 USD 3.49 模拟闭环均已验收；生产仍没有带 Capture ID 的已付款订单 | 使用可验证的境外真实买家账号完成 USD 3.49 付款、100 积分到账、全额退款、Webhook 冲正和最终余额恢复 |
 | P1（外部阻塞） | Temu 官方预设 | 公开资料不足，不能用第三方参数硬编码；SKU 分组替代能力已上线 | 获得目标站点官方卖家后台的尺寸、格式、文件上限和规则证据后实施 |
 | P2（补验） | 管理员审计表单正常入口 | 表单已上线；生产没有待审核推荐或可争议卡密，操作按钮为 0 | 自然符合条件的记录出现后，完成“打开→字符校验→勾选→取消”，不得产生审核或争议写入 |
 | P1（观察） | LaMa 精细清除上线 | `public_free`、六语种页面、登录/游客单图、刷新恢复及网页同位置 50/50、ZIP 50 项、零积分和新任务清理均已通过；8 GB 共机保守门仍未通过 | 继续低流量观察 CPU/内存、Queue、失败率和月度 Cloudflare/R2 用量；出现新残留、排队停滞、OOM 或其它资源异常时立即切回 `admin_free`/`off` |
@@ -300,7 +300,7 @@ ZIP 已支持：
 - 登录用户订单归属
 - Capture/退款 Webhook 验签与幂等
 - 购买、首充赠送和推荐奖励的自动化冲正
-- 退款事件兼容 PayPal Payments v2 的 `supplementary_data.related_ids.capture_id`，同时保留旧 Capture 形态回退
+- 退款事件兼容 PayPal Payments v2 的 `supplementary_data.related_ids.capture_id` 和真实退款资源的 PayPal HTTPS `links[rel=up]` Capture 路径；撤销事件保留 Capture 资源 ID 回退
 
 已完成但只用于 Sandbox 与本机开发：
 
@@ -309,10 +309,10 @@ ZIP 已支持：
 - 旧 `setup-paypal.sh` 不再写 Cloudflare Secret、执行远程 D1 schema 或部署生产 Worker；旧测试页不再加载 PayPal SDK 或调用生产 API。
 - PayPal Developer 已创建独立 `ShopBG Remover Sandbox` Merchant 应用；没有修改或删除原 `Default Application` 及其 staging Webhook。
 - 独立应用凭证只读验证成功。USD 3.49 模拟订单 `8JH12456DK0790435` 已由 Sandbox Personal 买家批准并完成 Capture `64K58142BT782410Y`，随后完成全额退款 `9BH59605SL975242X`；API 重新读取订单与退款均为 `COMPLETED`，PayPal Developer API Calls 同时显示 Capture 与 Refund 请求为 HTTP 201。
+- 独立 ShopBG Sandbox Worker/D1 进一步完成订单 `3WF051057E3681137`、Capture `0M2037857C264474D`、100 积分单次入账、Refund `5R588356YF0608933`、真实签名 Webhook `WH-6VH19140LY203204V-85U99071VA7903049`、积分归零以及重复 Capture/Webhook 幂等；Sandbox 与生产 D1、路由、R2、Queue、Secrets 和资金完全隔离。
 
 未完成：
 
-- ShopBG 积分入账、真实 Sandbox Webhook 验签和退款冲正仍须在隔离数据环境补做端到端沙盒验收，不能用 Sandbox 订单污染生产 D1。
 - 生产没有带 Capture ID 的已付款订单。
 - 测试订单 `7B088068TB296413G` 仍为 `pending`，没有 Capture、积分批次、流水或 Webhook。
 - 需要可即时完成验证的境外买家账号执行真实付款和全额退款。
@@ -344,9 +344,9 @@ ZIP 已支持：
 - Pages 部署：`5d5b7597-8b82-4cae-97ee-94f42957b3ed`
 - Pages 来源提交：`6e44111`
 - Pages 独立地址：`https://5d5b7597.shopbgremover.pages.dev`
-- Worker 版本：`2251ddec-321f-483e-a01c-3b15b2bb4377`
-- Worker 来源提交：`bbbe682`
-- 当前 CI：`30509641037`，通过
+- Worker 版本：`d4146446-2874-4092-b63c-7fe28316b2c4`
+- Worker 来源提交：`dd77ba1`
+- 当前 CI：`30513085935`，通过
 - 文档恢复点：`4b0b7f2`
 - 恢复点 CI：`30202067070`，通过
 
@@ -377,9 +377,9 @@ npm run pages:deploy
 当前回归基线：
 
 - 备份保护：3 项
-- 前端/浏览器模块：62 项
+- 前端/浏览器模块：68 项
 - Worker：62 项
-- 合计：127 项
+- 合计：133 项
 - Pages 白名单：96 个静态文件
 
 发布原则：
@@ -1138,10 +1138,10 @@ npm run pages:deploy
 - 生产写入/AI/资金影响：已部署一次 Worker 代码版本；另在 PayPal Sandbox 创建一个独立应用和两笔模拟订单，两笔均已 Capture 后全额退款。没有 Live PayPal 订单、生产 Webhook、D1/R2/Queue、积分、AI、Cloudflare Secret 或数据库写入；真实资金影响为 0。
 - 部署状态：提交 `bbbe682` 已推送，CI `30509641037` 全部通过；只重发 Worker 为 `2251ddec-321f-483e-a01c-3b15b2bb4377`，未重发 Pages、未执行 D1 迁移。生产 `/api/me` 未登录只读烟测返回 HTTP 200 与 `{"user":null}`。专属 Sandbox 凭证已安全保存于本机 0600 忽略文件；Personal 买家密码只用于浏览器登录且未写入项目文件。`test-paypal.html` 继续被 96 文件 Pages 白名单明确排除。
 - 踩坑与调整：旧 `setup-paypal.sh` 名为“沙盒”但实际会覆盖当前生产 Secret、对生产 D1 直接执行 schema 并部署 Worker；不能继续使用。原 `Default Application` 已有其他项目 Webhook，虽然首次付款退款成功，但共享应用不能证明 ShopBG 沙盒隔离，因此保留原配置不动并新建专属应用重测。Webhook 模拟器的事件不属于真实 App，且不能通过 PayPal 的回调验签接口验证，最终 Webhook 验收必须来自专属 Sandbox App 的真实 Capture/Refund 事件。
-- 当前状态：安全工具、专属 Sandbox 应用、PayPal 模拟付款/全额退款以及真实退款资源兼容均已完成；阶段 1 仍保持进行中，因为 ShopBG 隔离数据环境中的积分入账、真实 Sandbox Webhook 和退款回滚尚未验收，生产真实资金闭环也未执行。
-- 下一步：建立隔离的 ShopBG Worker/D1 环境并为专属 Sandbox App 配置对应 Webhook，验证 100 积分入账、退款冲正、重复回调幂等和最终余额恢复；全部通过后才进入真实资金测试。
+- 当前状态：本节的安全工具、专属 Sandbox App 和直接 API 付款/退款已完成；其后 ShopBG 隔离数据环境的积分与真实 Webhook 闭环以及生产兼容修复已由 8.41 完成。阶段 1 只剩 Live 真实资金验收。
+- 下一步：按 8.41 的最终边界等待用户准备可验证的境外真实买家账号，再执行首笔 Live USD 3.49 付款与全额退款；不得再把本节旧的“隔离环境待建”状态视为当前缺口。
 
-### 8.41 2026-07-30：ShopBG PayPal 隔离端到端沙盒闭环（隔离验收已通过，生产修复待发布）
+### 8.41 2026-07-30：ShopBG PayPal 隔离端到端沙盒闭环（已完成并发布生产兼容修复）
 
 - 任务：在完全不连接生产 D1、R2、Queue、路由和 PayPal Live 的条件下，验证 ShopBG 自身的创建订单、买家批准、Capture、100 积分入账、真实退款 Webhook、积分冲正和重复请求幂等。
 - 隔离环境：创建独立 D1 `shopbgremover-paypal-sandbox-db`（ID `dff2a084-c889-46a8-9f44-0bd76e754a30`），只写入完整 schema 和一个 `.invalid` 测试用户，初始积分为 0；创建独立 Worker `shopbgremover-paypal-sandbox`，仅绑定该 D1，`INPAINT_MODE` 与 `ANALYTICS_MODE` 均为 `off`，没有绑定生产 R2、Queue、自定义域名或生产路由。专属 PayPal Sandbox App 的 Webhook `5D1143483N898782J` 只订阅退款与撤销事件，并指向隔离 Worker。
@@ -1150,11 +1150,11 @@ npm run pages:deploy
 - 工具与安全：新增隔离 Wrangler 配置、只包含 `.invalid` 测试账户的加法 seed、受限 Secret 上传脚本、可断点恢复/只读状态/真实事件重放的 ShopBG 端到端脚本，以及环境隔离、URL 白名单、测试 JWT、时间格式、积分账本和 Webhook 方法专项测试。状态查询会同时核对 PayPal 订单/退款、Webhook 注册、真实事件资源和 ShopBG 余额；PayPal Webhook 事件查询时间移除 API 不接受的毫秒，并且结束时间不再指向未来。
 - 修改文件：`.gitignore`、`package.json`、`scripts/paypal_sandbox.mjs`、`worker/index.js`、`tests/worker.integration.test.js`、新增 `wrangler.paypal-sandbox.toml`、`worker/paypal-sandbox-seed.sql`、`scripts/paypal_shopbg_sandbox.mjs`、`scripts/paypal_shopbg_sandbox_secrets.mjs`、`tests/paypal-shopbg-sandbox.test.mjs` 和本文档。继续保留且不修改/纳入未跟踪的 `docs/SEO-Roadmap-2026-05-22.md`、测试 ZIP、测试图片目录和各处 `.DS_Store`。
 - 测试：备份保护 3 项、前端 68 项、Worker 62 项，共 133 项通过；新增真实 `links[rel=up]` 退款形态的 Worker 集成测试。隔离 Worker dry-run gzip 37.77 KiB，只识别隔离 D1 和安全开关；脚本语法和 `git diff --check` 通过。最终四条隔离 D1 只读核验均为 `rows_written=0`，订单为 `refunded`、退款额 `3.49`、Webhook 为 `processed`、余额 0，购买与退款账本各 1 条。
-- 生产写入/AI/资金影响：生产环境为 0 写入；没有修改生产 D1、Pages、R2、Queue、路由、Secrets、积分或订单，没有调用 LaMa/fal.ai，也没有真实资金。Cloudflare 控制面真实新增一个隔离 D1、一个隔离 Worker，并在 PayPal Sandbox 创建一个 Webhook 和一笔模拟订单；隔离 D1 真实记录测试订单、+100、-100 和 Webhook 状态，Sandbox 资金不是真钱。生产 Worker 尚未发布本次 `links[rel=up]` 修复。
-- 部署状态：隔离 Worker 初始版 `acec51e8-a478-466f-958b-adf2580b48a4` 和修复版 `76ad5c73-f69a-4c54-aa6f-fb454169db05` 已部署，隔离端到端验收完成。当前代码尚未提交，CI 尚未运行，生产 Worker 仍为 `2251ddec-321f-483e-a01c-3b15b2bb4377`，因此本阶段只能标记“隔离验收通过”，不能标记生产发布完成。
+- 生产写入/AI/资金影响：生产 D1、Pages、R2、Queue、路由、Secrets、积分和订单均为 0 写入，没有调用 LaMa/fal.ai，也没有真实资金。生产只真实部署一次 Worker 代码兼容修复。Cloudflare 控制面另行新增一个隔离 D1、一个隔离 Worker，并在 PayPal Sandbox 创建一个 Webhook 和一笔模拟订单；隔离 D1 真实记录测试订单、+100、-100 和 Webhook 状态，Sandbox 资金不是真钱。
+- 部署状态：隔离 Worker 初始版 `acec51e8-a478-466f-958b-adf2580b48a4` 和修复版 `76ad5c73-f69a-4c54-aa6f-fb454169db05` 已部署，隔离端到端验收完成。提交 `dd77ba1` 已推送，CI `30513085935` 全部通过；只部署生产 Worker 为 `d4146446-2874-4092-b63c-7fe28316b2c4`，没有部署 Pages、执行 D1 迁移或改 Secret。生产 `/api/me` 未登录只读烟测返回 HTTP 200 与 `{"user":null}`。
 - 踩坑与调整：PayPal Developer 后台与 Sandbox 买家结账若复用同一浏览器 Cookie，会互相顶掉登录状态，因此固定使用 Chrome 保持开发者后台登录、内置浏览器完成 Sandbox 买家付款。付款页点击后因刻意使用无效回跳地址而停留，但 PayPal API 已返回 `APPROVED`，脚本据真实状态继续，不重复创建订单。PayPal 真实退款事件约 11 秒即投递；原 3 分钟等待超时不是 PayPal 延迟，而是旧解析把已送达事件标成孤儿，排查必须同时看 Worker Tail、Webhook 事件表和 PayPal 事件资源。
-- 当前状态：ShopBG 隔离创建订单、买家批准、Capture、单次积分入账、重复 Capture、全额退款、真实签名 Webhook、积分回滚、真实事件重放和最终账本只读核验全部通过；真实资金影响为 0。生产真实付款仍未执行。
-- 下一步：提交并等待 CI 通过，再只部署生产 Worker 的退款关联兼容修复，不部署 Pages、不迁移或写生产 D1；部署后只读烟测 `/api/me`。完成后把本节更新为生产已发布，再由用户决定何时找朋友执行首笔真实付款与退款。
+- 当前状态：ShopBG 隔离创建订单、买家批准、Capture、单次积分入账、重复 Capture、全额退款、真实签名 Webhook、积分回滚、真实事件重放、最终账本只读核验、自动化、CI 和生产 Worker 兼容修复均已完成；真实资金影响为 0。生产真实付款仍未执行。
+- 下一步：Sandbox 阶段不再阻塞。等用户准备好可验证的境外真实买家账号后，先只读记录生产账户积分、付费积分、订单和账本基线，再执行一笔 Live USD 3.49 付款、核对 100 积分入账、全额退款、真实 Webhook 冲正及最终余额恢复；真实付款前再次明确原交易手续费可能不退。
 
 ---
 
