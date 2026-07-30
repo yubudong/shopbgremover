@@ -161,6 +161,52 @@ export function createPayPalSandboxClient({
     getRefund(refundId) {
       return request(`/v2/payments/refunds/${encodeURIComponent(refundId)}`);
     },
+    createWebhook(url, eventTypes) {
+      if (!url?.startsWith('https://')) {
+        throw new Error('Sandbox Webhook URL 必须使用 HTTPS。');
+      }
+      const names = Array.from(new Set(eventTypes || [])).filter(Boolean);
+      if (!names.length) throw new Error('Sandbox Webhook 至少需要一个事件类型。');
+      return request('/v1/notifications/webhooks', {
+        method: 'POST',
+        body: {
+          url,
+          event_types: names.map((name) => ({ name })),
+        },
+      });
+    },
+    getWebhook(webhookId) {
+      return request(
+        `/v1/notifications/webhooks/${encodeURIComponent(webhookId)}`,
+      );
+    },
+    listWebhookEvents({
+      startTime,
+      endTime,
+      eventType,
+      pageSize = 20,
+    } = {}) {
+      const params = new URLSearchParams();
+      if (startTime) params.set('start_time', startTime);
+      if (endTime) params.set('end_time', endTime);
+      if (eventType) params.set('event_type', eventType);
+      params.set('page_size', String(pageSize));
+      return request(`/v1/notifications/webhooks-events?${params}`);
+    },
+    getWebhookEvent(eventId) {
+      return request(
+        `/v1/notifications/webhooks-events/${encodeURIComponent(eventId)}`,
+      );
+    },
+    resendWebhookEvent(eventId, webhookIds = []) {
+      return request(
+        `/v1/notifications/webhooks-events/${encodeURIComponent(eventId)}/resend`,
+        {
+          method: 'POST',
+          body: { webhook_ids: webhookIds },
+        },
+      );
+    },
   };
 }
 

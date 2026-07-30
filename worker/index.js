@@ -917,7 +917,27 @@ function findPayPalWebhookCaptureId(event) {
   if (typeof relatedCaptureId === 'string' && relatedCaptureId) {
     return relatedCaptureId;
   }
-  const legacyCaptureId = event?.resource?.id;
+
+  for (const link of event?.resource?.links || []) {
+    if (link?.rel !== 'up' && link?.rel !== 'self') continue;
+    try {
+      const url = new URL(link.href);
+      if (
+        url.protocol !== 'https:'
+        || !(url.hostname === 'paypal.com' || url.hostname.endsWith('.paypal.com'))
+      ) {
+        continue;
+      }
+      const match = url.pathname.match(/^\/v2\/payments\/captures\/([^/]+)$/);
+      if (match?.[1]) return decodeURIComponent(match[1]);
+    } catch {
+      // Ignore malformed relationship links and continue to safe fallbacks.
+    }
+  }
+
+  const legacyCaptureId = event?.event_type === 'PAYMENT.CAPTURE.REVERSED'
+    ? event?.resource?.id
+    : null;
   return typeof legacyCaptureId === 'string' && legacyCaptureId
     ? legacyCaptureId
     : null;

@@ -6,6 +6,7 @@ dist/
 .env.*.local
 .dev.vars*
 .paypal-sandbox-state.json
+.paypal-shopbg-sandbox-state.json
 .wrangler/
 .vercel/output/
 .pages-dist/

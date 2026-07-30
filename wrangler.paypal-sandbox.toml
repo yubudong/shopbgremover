@@ -1,0 +1,26 @@
+name = "shopbgremover-paypal-sandbox"
+main = "worker/index.js"
+compatibility_date = "2026-07-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = false
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shopbgremover-paypal-sandbox-db"
+database_id = "dff2a084-c889-46a8-9f44-0bd76e754a30"
+
+[vars]
+FRONTEND_URL = "https://www.shopbgremover.com"
+NEXTAUTH_URL = "https://www.shopbgremover.com"
+ADMIN_EMAILS = ""
+INPAINT_MODE = "off"
+ANALYTICS_MODE = "off"
+PAYPAL_MODE = "sandbox"

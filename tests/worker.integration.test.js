@@ -3141,9 +3141,16 @@ describe('PayPal refund webhook', () => {
       resource: {
         id: 'REFUND-RESOURCE-1',
         amount: { value: '3.49', currency_code: 'USD' },
-        supplementary_data: {
-          related_ids: { capture_id: 'CAPTURE-REFUND' },
-        },
+        links: [
+          {
+            rel: 'self',
+            href: 'https://api.sandbox.paypal.com/v2/payments/refunds/REFUND-RESOURCE-1',
+          },
+          {
+            rel: 'up',
+            href: 'https://api.sandbox.paypal.com/v2/payments/captures/CAPTURE-REFUND',
+          },
+        ],
       },
     };
     const webhookRequest = () => new Request(`${API_ORIGIN}/api/paypal/webhook`, {
