@@ -1,62 +1,60 @@
-#!/bin/bash
-# PayPal 沙盒支付配置脚本
+#!/usr/bin/env bash
 
-echo "=== PayPal 沙盒支付配置向导 ==="
-echo ""
+set -euo pipefail
+umask 077
 
-# 检查 wrangler 是否安装
-if ! command -v wrangler &> /dev/null; then
-    echo "❌ wrangler 未安装"
-    echo "安装命令: npm install -g wrangler"
-    exit 1
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${PROJECT_ROOT}/.dev.vars.paypal-sandbox"
+
+printf '%s\n' \
+  "=== ShopBG Remover PayPal 沙盒配置 ===" \
+  "此命令只写本机 ${CONFIG_FILE}。" \
+  "不会修改 Cloudflare Secret、生产 D1、Worker、Pages 或 PayPal Live 配置。" \
+  "" \
+  "请从 PayPal Developer Dashboard 的 Sandbox App 获取凭证。"
+
+if [[ -e "${CONFIG_FILE}" ]]; then
+  read -r -p "本机沙盒配置已存在，是否覆盖？输入 YES 继续：" CONFIRM
+  if [[ "${CONFIRM}" != "YES" ]]; then
+    echo "已取消，没有修改任何文件。"
+    exit 0
+  fi
 fi
 
-echo "✅ wrangler 已安装"
-echo ""
+read -r -p "Sandbox Client ID：" PAYPAL_CLIENT_ID
+read -r -s -p "Sandbox Secret（输入时不显示）：" PAYPAL_SECRET
+printf '\n'
 
-# 提示用户输入凭证
-echo "请访问 https://developer.paypal.com/dashboard/"
-echo "切换到 Sandbox 标签，获取你的 App 凭证"
-echo ""
+if [[ -z "${PAYPAL_CLIENT_ID}" || -z "${PAYPAL_SECRET}" ]]; then
+  echo "Client ID 和 Secret 均不能为空。" >&2
+  exit 1
+fi
 
-read -p "请输入 PayPal Sandbox Client ID: " PAYPAL_CLIENT_ID
-read -p "请输入 PayPal Sandbox Secret: " PAYPAL_SECRET
+if [[ "${PAYPAL_CLIENT_ID}" == *$'\n'* || "${PAYPAL_SECRET}" == *$'\n'* ]]; then
+  echo "凭证格式不正确。" >&2
+  exit 1
+fi
 
-# 生成 JWT Secret
-JWT_SECRET=$(openssl rand -base64 32)
-echo ""
-echo "✅ 已生成 JWT_SECRET: $JWT_SECRET"
-echo ""
+JWT_SECRET="$(openssl rand -hex 32)"
+TEMP_FILE="$(mktemp "${TMPDIR:-/tmp}/shopbg-paypal-sandbox.XXXXXX")"
+cleanup() {
+  rm -f -- "${TEMP_FILE}"
+}
+trap cleanup EXIT
 
-# 配置 Cloudflare Worker Secrets
-echo "正在配置 Cloudflare Worker 环境变量..."
-echo ""
+{
+  printf 'PAYPAL_MODE="sandbox"\n'
+  printf 'PAYPAL_CLIENT_ID="%s"\n' "${PAYPAL_CLIENT_ID//\"/\\\"}"
+  printf 'PAYPAL_SECRET="%s"\n' "${PAYPAL_SECRET//\"/\\\"}"
+  printf 'JWT_SECRET="%s"\n' "${JWT_SECRET}"
+} > "${TEMP_FILE}"
 
-echo "$PAYPAL_CLIENT_ID" | wrangler secret put PAYPAL_CLIENT_ID
-echo "$PAYPAL_SECRET" | wrangler secret put PAYPAL_SECRET
-echo "$JWT_SECRET" | wrangler secret put JWT_SECRET
+chmod 600 "${TEMP_FILE}"
+mv -- "${TEMP_FILE}" "${CONFIG_FILE}"
+chmod 600 "${CONFIG_FILE}"
 
-echo ""
-echo "✅ 环境变量配置完成！"
-echo ""
-
-# 初始化数据库
-echo "正在初始化数据库..."
-wrangler d1 execute shopbgremover-db --file=schema.sql --remote
-
-echo ""
-echo "✅ 数据库初始化完成！"
-echo ""
-
-# 部署 Worker
-echo "正在部署 Worker..."
-wrangler deploy
-
-echo ""
-echo "🎉 配置完成！"
-echo ""
-echo "下一步："
-echo "1. 访问 https://www.shopbgremover.com/pricing.html"
-echo "2. 使用 Google 登录"
-echo "3. 点击 PayPal 按钮测试支付"
-echo ""
+printf '%s\n' \
+  "" \
+  "沙盒凭证已安全保存；凭证内容没有输出到终端。" \
+  "下一步运行：npm run paypal:sandbox:check" \
+  "然后运行：npm run paypal:sandbox:run"

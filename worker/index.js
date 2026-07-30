@@ -911,6 +911,18 @@ function findPayPalCapture(order) {
   return null;
 }
 
+function findPayPalWebhookCaptureId(event) {
+  const relatedCaptureId =
+    event?.resource?.supplementary_data?.related_ids?.capture_id;
+  if (typeof relatedCaptureId === 'string' && relatedCaptureId) {
+    return relatedCaptureId;
+  }
+  const legacyCaptureId = event?.resource?.id;
+  return typeof legacyCaptureId === 'string' && legacyCaptureId
+    ? legacyCaptureId
+    : null;
+}
+
 function moneyToMinorUnits(value) {
   const match = String(value ?? '').match(/^(\d+)(?:\.(\d{1,2}))?$/);
   if (!match) return null;
@@ -4038,7 +4050,10 @@ export default {
           return json({ ok: true, ignored: true }, 200, origin);
         }
 
-        const captureId = event.resource?.id;
+        // Payments v2 refund resources identify the original capture in
+        // supplementary_data.related_ids.capture_id. Keep the resource ID
+        // fallback for capture-shaped reversal events and older deliveries.
+        const captureId = findPayPalWebhookCaptureId(event);
         const order = await env.DB.prepare(
           `SELECT id, user_id, amount, currency, status,
                   is_first_qualified_purchase

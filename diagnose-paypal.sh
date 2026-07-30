@@ -1,47 +1,12 @@
-#!/bin/bash
-# PayPal 沙盒支付诊断脚本
+#!/usr/bin/env bash
 
-echo "=== PayPal 沙盒支付诊断 ==="
-echo ""
+set -euo pipefail
 
-# 1. 检查项目文件
-echo "📁 检查项目文件..."
-if [ -f "worker/index.js" ]; then
-    echo "✅ worker/index.js 存在"
-else
-    echo "❌ worker/index.js 不存在"
-fi
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ -f "public/pricing.html" ]; then
-    echo "✅ public/pricing.html 存在"
-else
-    echo "❌ public/pricing.html 不存在"
-fi
+printf '%s\n' \
+  "=== ShopBG Remover PayPal 沙盒诊断 ===" \
+  "只验证本机 Sandbox 凭证，不读取或修改生产配置。"
 
-if [ -f "schema.sql" ]; then
-    echo "✅ schema.sql 存在"
-else
-    echo "❌ schema.sql 不存在"
-fi
-
-echo ""
-
-# 2. 检查 PayPal API 端点
-echo "🔍 检查 PayPal API 端点..."
-grep -n "paypal/create-order" worker/index.js | head -3
-grep -n "paypal/capture-order" worker/index.js | head -3
-
-echo ""
-
-# 3. 检查前端 Client ID
-echo "🔍 检查前端 PayPal Client ID..."
-grep "paypal.com/sdk/js" public/pricing.html
-
-echo ""
-
-# 4. 检查 wrangler 配置
-echo "📋 检查 wrangler.toml..."
-cat wrangler.toml
-
-echo ""
-echo "=== 诊断完成 ==="
+cd "${PROJECT_ROOT}"
+node scripts/paypal_sandbox.mjs check

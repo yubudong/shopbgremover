@@ -3139,8 +3139,11 @@ describe('PayPal refund webhook', () => {
       id: 'WH-REFUND-1',
       event_type: 'PAYMENT.CAPTURE.REFUNDED',
       resource: {
-        id: 'CAPTURE-REFUND',
+        id: 'REFUND-RESOURCE-1',
         amount: { value: '3.49', currency_code: 'USD' },
+        supplementary_data: {
+          related_ids: { capture_id: 'CAPTURE-REFUND' },
+        },
       },
     };
     const webhookRequest = () => new Request(`${API_ORIGIN}/api/paypal/webhook`, {
@@ -3220,8 +3223,11 @@ describe('PayPal refund webhook', () => {
       id: 'WH-REFUND-REWARDS',
       event_type: 'PAYMENT.CAPTURE.REFUNDED',
       resource: {
-        id: 'REFUND-REWARD-CAPTURE',
+        id: 'REFUND-REWARD-RESOURCE',
         amount: { value: '8.99', currency_code: 'USD' },
+        supplementary_data: {
+          related_ids: { capture_id: 'REFUND-REWARD-CAPTURE' },
+        },
       },
     };
     const webhook = () => exports.default.fetch(new Request(

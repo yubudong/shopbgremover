@@ -4,6 +4,8 @@ dist/
 *.log
 .env.local
 .env.*.local
+.dev.vars*
+.paypal-sandbox-state.json
 .wrangler/
 .vercel/output/
 .pages-dist/
