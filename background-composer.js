@@ -9,6 +9,7 @@
   const BACKGROUND_MODES = new Set(['white', 'transparent', 'custom', 'image']);
   const BACKGROUND_FITS = new Set(['cover', 'contain', 'stretch']);
   const PRODUCT_ALIGNMENTS = new Set(['center', 'bottom', 'custom']);
+  const DEFAULT_PRODUCT_SHADOW_STRENGTH = 50;
   const OUTPUT_ENCODINGS = Object.freeze({
     png: Object.freeze({ extension: 'png', mime: 'image/png', supportsAlpha: true }),
     jpeg: Object.freeze({ extension: 'jpg', mime: 'image/jpeg', supportsAlpha: false }),
@@ -135,6 +136,16 @@
     const number = Number(value);
     if (!Number.isFinite(number)) return fallback;
     return Math.min(maximum, Math.max(minimum, number));
+  }
+
+  function getProductShadowOpacity(strength) {
+    const normalized = clampNumber(
+      strength,
+      0,
+      100,
+      DEFAULT_PRODUCT_SHADOW_STRENGTH,
+    );
+    return Math.round((normalized / 100) * 0.56 * 1000) / 1000;
   }
 
   function format(template, values = {}) {
@@ -450,6 +461,8 @@
       productCenter: document.getElementById('productCenter'),
       productBottom: document.getElementById('productBottom'),
       productShadow: document.getElementById('productShadow'),
+      productShadowStrength: document.getElementById('productShadowStrength'),
+      productShadowStrengthValue: document.getElementById('productShadowStrengthValue'),
       itemOverrideCopy: document.getElementById('itemOverrideCopy'),
     };
     const text = elements.imagePanel?.dataset || {};
@@ -469,6 +482,7 @@
       productOffsetY: 0,
       productAlign: 'center',
       productShadow: false,
+      productShadowStrength: DEFAULT_PRODUCT_SHADOW_STRENGTH,
     };
     let decodedBackgroundImage = null;
     let currentTemplateId = null;
@@ -506,6 +520,12 @@
           ? source.productAlign
           : 'center',
         productShadow: source.productShadow === true,
+        productShadowStrength: clampNumber(
+          source.productShadowStrength,
+          0,
+          100,
+          DEFAULT_PRODUCT_SHADOW_STRENGTH,
+        ),
       };
     }
 
@@ -808,6 +828,13 @@
       elements.productCenter?.classList.toggle('active', state.productAlign === 'center');
       elements.productBottom?.classList.toggle('active', state.productAlign === 'bottom');
       if (elements.productShadow) elements.productShadow.checked = state.productShadow;
+      if (elements.productShadowStrength) {
+        elements.productShadowStrength.value = String(state.productShadowStrength);
+        elements.productShadowStrength.disabled = !state.productShadow;
+      }
+      if (elements.productShadowStrengthValue) {
+        elements.productShadowStrengthValue.textContent = `${state.productShadowStrength}%`;
+      }
       syncBackgroundTemplateLibrary();
     }
 
@@ -884,6 +911,12 @@
         ? settings.productAlign
         : 'center';
       state.productShadow = settings.productShadow === true;
+      state.productShadowStrength = clampNumber(
+        settings.productShadowStrength,
+        0,
+        100,
+        DEFAULT_PRODUCT_SHADOW_STRENGTH,
+      );
       const requestedMode = BACKGROUND_MODES.has(settings.bgMode) ? settings.bgMode : 'white';
       if (settings.backgroundImageBlob instanceof Blob) {
         const restored = await acceptBackgroundFile(settings.backgroundImageBlob, { restored: true });
@@ -967,7 +1000,8 @@
       for (const job of jobs) {
         if (!job) continue;
         const config = resolvedConfig(job.index);
-        const needsTransparentSubject = config.bgMode === 'image' || config.productShadow;
+        const needsTransparentSubject = config.bgMode === 'image'
+          || (config.productShadow && config.productShadowStrength > 0);
         if (!needsTransparentSubject) continue;
         if (config.bgMode === 'image' && !config.backgroundImageBlob) {
           return text.missingError || text.decodeError;
@@ -1076,10 +1110,12 @@
         context.fillRect(0, 0, canvasWidth, canvasHeight);
       }
 
-      if (config.productShadow) {
+      if (config.productShadow && config.productShadowStrength > 0) {
         const shortestSide = Math.min(canvasWidth, canvasHeight);
         context.save();
-        context.shadowColor = 'rgba(15, 23, 42, 0.28)';
+        context.shadowColor = `rgba(15, 23, 42, ${getProductShadowOpacity(
+          config.productShadowStrength,
+        )})`;
         context.shadowBlur = Math.max(4, shortestSide * 0.025);
         context.shadowOffsetX = 0;
         context.shadowOffsetY = Math.max(2, shortestSide * 0.02);
@@ -1159,6 +1195,9 @@
         editorDraft.productAlign === 'bottom',
       );
       editorElements.shadow.checked = editorDraft.productShadow;
+      editorElements.shadowStrength.value = String(editorDraft.productShadowStrength);
+      editorElements.shadowStrength.disabled = !editorDraft.productShadow;
+      editorElements.shadowStrengthValue.textContent = `${editorDraft.productShadowStrength}%`;
       editorElements.reset.disabled = !itemOverrides.has(editorIndex);
     }
 
@@ -1257,6 +1296,11 @@
                 <span>${itemText.shadowLabel || 'Soft product shadow'}</span>
                 <input id="itemOverrideShadow" type="checkbox">
               </label>
+              <div class="product-range-row">
+                <label for="itemOverrideShadowStrength">${itemText.shadowStrengthLabel || 'Shadow strength'}</label>
+                <input id="itemOverrideShadowStrength" type="range" min="0" max="100" step="1">
+                <output class="product-range-value" id="itemOverrideShadowStrengthValue" for="itemOverrideShadowStrength"></output>
+              </div>
             </div>
             <div class="composition-editor-status" id="itemOverrideStatus" aria-live="polite"></div>
           </div>
@@ -1297,6 +1341,8 @@
         center: editorOverlay.querySelector('#itemOverrideCenter'),
         bottom: editorOverlay.querySelector('#itemOverrideBottom'),
         shadow: editorOverlay.querySelector('#itemOverrideShadow'),
+        shadowStrength: editorOverlay.querySelector('#itemOverrideShadowStrength'),
+        shadowStrengthValue: editorOverlay.querySelector('#itemOverrideShadowStrengthValue'),
         status: editorOverlay.querySelector('#itemOverrideStatus'),
         reset: editorOverlay.querySelector('#itemOverrideReset'),
         apply: editorOverlay.querySelector('#itemOverrideApply'),
@@ -1421,6 +1467,16 @@
       });
       editorElements.shadow.addEventListener('change', () => {
         editorDraft.productShadow = editorElements.shadow.checked;
+        renderEditor();
+      });
+      editorElements.shadowStrength.addEventListener('input', () => {
+        editorDraft.productShadowStrength = clampNumber(
+          editorElements.shadowStrength.value,
+          0,
+          100,
+          DEFAULT_PRODUCT_SHADOW_STRENGTH,
+        );
+        renderEditor();
       });
       editorElements.apply.addEventListener('click', () => {
         if (editorDraft.bgMode === 'image' && !editorDraft.backgroundImageBlob) {
@@ -1572,6 +1628,17 @@
     });
     elements.productShadow?.addEventListener('change', () => {
       state.productShadow = elements.productShadow.checked;
+      render();
+      notifyChanged();
+    });
+    elements.productShadowStrength?.addEventListener('input', () => {
+      state.productShadowStrength = clampNumber(
+        elements.productShadowStrength.value,
+        0,
+        100,
+        DEFAULT_PRODUCT_SHADOW_STRENGTH,
+      );
+      render();
       notifyChanged();
     });
 
@@ -1603,6 +1670,7 @@
     getForegroundPlacement,
     getImagePlacement,
     getOutputEncoding,
+    getProductShadowOpacity,
     resolveCompositionConfig,
     backgroundTemplateByteSize,
     deleteBackgroundTemplate,
@@ -1613,5 +1681,6 @@
     MAX_BACKGROUND_BYTES,
     MAX_BACKGROUND_TEMPLATES,
     MAX_BACKGROUND_TEMPLATE_BYTES,
+    DEFAULT_PRODUCT_SHADOW_STRENGTH,
   };
 })();

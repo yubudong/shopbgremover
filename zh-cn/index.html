@@ -54,7 +54,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/ai-workflow.js?v=20260729-admin-operations-v1"></script>
-<script src="/background-composer.js?v=20260727-image-delete-v1"></script>
+<script src="/background-composer.js?v=20260807-shadow-strength-v1"></script>
 <script src="/product-organizer.js?v=20260727-image-delete-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -532,6 +532,11 @@
             <span>商品柔和阴影</span>
             <input id="productShadow" type="checkbox">
           </label>
+          <div class="product-range-row">
+            <label for="productShadowStrength">阴影力度</label>
+            <input id="productShadowStrength" type="range" min="0" max="100" step="1" value="50" disabled>
+            <output class="product-range-value" id="productShadowStrengthValue" for="productShadowStrength">50%</output>
+          </div>
         </div>
       </div>
       <div id="itemOverrideCopy" hidden
@@ -563,6 +568,7 @@
         data-center-label="居中"
         data-bottom-label="底部对齐"
         data-shadow-label="商品柔和阴影"
+        data-shadow-strength-label="阴影力度"
         data-use-batch-label="使用批次设置"
         data-apply-label="应用到当前图片"
         data-image-required="请先选择背景图片。"

@@ -50,7 +50,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/ai-workflow.js?v=20260729-admin-operations-v1"></script>
-<script src="/background-composer.js?v=20260727-image-delete-v1"></script>
+<script src="/background-composer.js?v=20260807-shadow-strength-v1"></script>
 <script src="/product-organizer.js?v=20260727-image-delete-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1051,6 +1051,11 @@
             <span>Soft product shadow</span>
             <input id="productShadow" type="checkbox">
           </label>
+          <div class="product-range-row">
+            <label for="productShadowStrength">Shadow strength</label>
+            <input id="productShadowStrength" type="range" min="0" max="100" step="1" value="50" disabled>
+            <output class="product-range-value" id="productShadowStrengthValue" for="productShadowStrength">50%</output>
+          </div>
         </div>
       </div>
       <div id="itemOverrideCopy" hidden
@@ -1082,6 +1087,7 @@
         data-center-label="Center"
         data-bottom-label="Bottom align"
         data-shadow-label="Soft product shadow"
+        data-shadow-strength-label="Shadow strength"
         data-use-batch-label="Use batch settings"
         data-apply-label="Apply to this image"
         data-image-required="Choose a background image first."

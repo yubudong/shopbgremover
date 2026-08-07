@@ -54,7 +54,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/ai-workflow.js?v=20260729-admin-operations-v1"></script>
-<script src="/background-composer.js?v=20260727-image-delete-v1"></script>
+<script src="/background-composer.js?v=20260807-shadow-strength-v1"></script>
 <script src="/product-organizer.js?v=20260727-image-delete-v1"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -532,6 +532,11 @@
             <span>Weicher Produktschatten</span>
             <input id="productShadow" type="checkbox">
           </label>
+          <div class="product-range-row">
+            <label for="productShadowStrength">Schattenstärke</label>
+            <input id="productShadowStrength" type="range" min="0" max="100" step="1" value="50" disabled>
+            <output class="product-range-value" id="productShadowStrengthValue" for="productShadowStrength">50%</output>
+          </div>
         </div>
       </div>
       <div id="itemOverrideCopy" hidden
@@ -563,6 +568,7 @@
         data-center-label="Zentrieren"
         data-bottom-label="Unten ausrichten"
         data-shadow-label="Weicher Produktschatten"
+        data-shadow-strength-label="Schattenstärke"
         data-use-batch-label="Stapelvorgaben verwenden"
         data-apply-label="Auf dieses Bild anwenden"
         data-image-required="Wähle zuerst ein Hintergrundbild."

@@ -7,6 +7,14 @@ import { promisify } from 'node:util';
 
 const locales = ['', 'de/', 'es/', 'fr/', 'pt-br/', 'zh-cn/'];
 const indexFiles = locales.map((locale) => `${locale}index.html`);
+const shadowStrengthLabels = [
+  'Shadow strength',
+  'Schattenstärke',
+  'Intensidad de sombra',
+  'Intensité de l’ombre',
+  'Intensidade da sombra',
+  '阴影力度',
+];
 const pricingFiles = locales.map((locale) => `${locale}pricing.html`);
 const termsFiles = locales.map((locale) => `${locale}terms.html`);
 const publicSeoFiles = locales.flatMap((locale) => [
@@ -86,12 +94,16 @@ test('all localized workspaces use stable per-image AI task identities', async (
   assert.match(workflow, /restoreSession/);
   assert.equal((workflow.match(/\/api\/remove-bg/g) || []).length, 1);
 
-  for (const file of indexFiles) {
+  for (let index = 0; index < indexFiles.length; index += 1) {
+    const file = indexFiles[index];
     const html = await read(file);
     assert.match(html, /src="\/ai-workflow\.js\?v=20260729-admin-operations-v1"/, file);
-    assert.match(html, /src="\/background-composer\.js\?v=20260727-image-delete-v1"/, file);
+    assert.match(html, /src="\/background-composer\.js\?v=20260807-shadow-strength-v1"/, file);
     assert.match(html, /src="\/product-organizer\.js\?v=20260727-image-delete-v1"/, file);
     assert.match(html, /href="\/ai-workflow\.css\?v=20260727-image-delete-v1"/, file);
+    assert.equal((html.match(/id="productShadowStrength"/g) || []).length, 1, file);
+    assert.match(html, /id="productShadowStrength" type="range" min="0" max="100" step="1" value="50" disabled/, file);
+    assert.ok(html.includes(`data-shadow-strength-label="${shadowStrengthLabels[index]}"`), file);
     assert.match(html, /const DEVICE_ID = getOrCreateDeviceId\(\)/, file);
     assert.match(html, /'X-Device-ID': DEVICE_ID/, file);
     assert.match(html, /aiWorkflow\?\.register\(file, i, card, restoredItem\?\.job \|\| null\)/, file);
@@ -399,7 +411,12 @@ test('uploaded background validation and composition stay browser-local', async 
   assert.match(composer, /getImagePlacement/);
   assert.match(composer, /getForegroundPlacement/);
   assert.match(composer, /context\.drawImage\(\s*background/);
-  assert.match(composer, /context\.shadowColor = 'rgba\(15, 23, 42, 0\.28\)'/);
+  assert.match(composer, /DEFAULT_PRODUCT_SHADOW_STRENGTH = 50/);
+  assert.match(composer, /productShadowStrength: clampNumber/);
+  assert.match(composer, /getProductShadowOpacity\(/);
+  assert.match(composer, /config\.productShadow && config\.productShadowStrength > 0/);
+  assert.match(composer, /id="itemOverrideShadowStrength" type="range" min="0" max="100" step="1"/);
+  assert.match(composer, /editorDraft\.productShadowStrength = clampNumber/);
   assert.match(composer, /const itemOverrides = new Map\(\)/);
   assert.match(composer, /function decorateCard\(card, index, fileName = ''\)/);
   assert.match(composer, /itemOverrides: Object\.fromEntries/);

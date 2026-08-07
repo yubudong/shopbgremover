@@ -30,12 +30,14 @@ const {
   getForegroundPlacement,
   getImagePlacement,
   getOutputEncoding,
+  getProductShadowOpacity,
   normalizeBackgroundTemplate,
   resolveCompositionConfig,
   validateBackgroundFile,
   MAX_BACKGROUND_BYTES,
   MAX_BACKGROUND_TEMPLATES,
   MAX_BACKGROUND_TEMPLATE_BYTES,
+  DEFAULT_PRODUCT_SHADOW_STRENGTH,
 } = globalThis.ShopBGBackgroundComposer;
 
 test('uploaded background files accept only JPG, PNG, or WebP up to 20 MB', () => {
@@ -76,6 +78,7 @@ test('browser background templates preserve only reusable background settings', 
     backgroundBlur: 9,
     productScale: 55,
     productShadow: true,
+    productShadowStrength: 90,
   }, 1234);
 
   assert.deepEqual(template, {
@@ -98,6 +101,16 @@ test('browser background templates preserve only reusable background settings', 
     () => normalizeBackgroundTemplate({ imageBlob: new Blob(['svg'], { type: 'image/svg+xml' }) }),
     /invalid_background_template/,
   );
+});
+
+test('product shadow strength preserves the legacy look at 50 percent', () => {
+  assert.equal(DEFAULT_PRODUCT_SHADOW_STRENGTH, 50);
+  assert.equal(getProductShadowOpacity(0), 0);
+  assert.equal(getProductShadowOpacity(50), 0.28);
+  assert.equal(getProductShadowOpacity(100), 0.56);
+  assert.equal(getProductShadowOpacity('invalid'), 0.28);
+  assert.equal(getProductShadowOpacity(-20), 0);
+  assert.equal(getProductShadowOpacity(140), 0.56);
 });
 
 test('platform output size enforcement accepts 2 MB exactly and rejects one byte over', () => {
@@ -604,6 +617,11 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
       backgroundOffsetX: 8,
       backgroundOffsetY: -6,
       backgroundBlur: 12,
+      productShadow: true,
+      productShadowStrength: 75,
+      itemOverrides: {
+        0: { productShadow: true, productShadowStrength: 30 },
+      },
       outputSize: '1000',
       renameMode: 'sequence',
     },
@@ -629,6 +647,11 @@ test('refresh recovery stores original, edited source, task state, outputs, and 
     backgroundOffsetX: 8,
     backgroundOffsetY: -6,
     backgroundBlur: 12,
+    productShadow: true,
+    productShadowStrength: 75,
+    itemOverrides: {
+      0: { productShadow: true, productShadowStrength: 30 },
+    },
     outputSize: '1000',
     renameMode: 'sequence',
   });
